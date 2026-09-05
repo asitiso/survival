@@ -8,3 +8,4 @@ Imported from the verified Phase 3218 full merged archive.
 - Release: `RQ-D4630257` PASS
 - Candidate: `RCQ-6006367D` PASS
 - Action invariant: 9/9
+- GitHub import: full source/assets/tests imported; verified `dist/` restoration triggered from the original Phase 3218 archive history.

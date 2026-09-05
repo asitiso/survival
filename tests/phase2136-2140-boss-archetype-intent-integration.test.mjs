@@ -1,0 +1,4 @@
+import test from 'node:test'; import assert from 'node:assert/strict'; import fs from 'node:fs';
+const game=fs.readFileSync(new URL('../src/game/game.ts',import.meta.url),'utf8');
+test('phase 2136-2140 Game loads both boss identity atlases and draws spawn, recall, countdown, and special cues',()=>{for(const needle of ['BOSS_ARCHETYPE_IDENTITY_ATLAS','BOSS_SPECIAL_INTENT_ATLAS','drawBossArchetypeRecall','drawBossSpecialIntentCue','eventToastBossArchetype','bossArchetypeIdentityIcon','bossSpecialIntentIcon'])assert.match(game,new RegExp(needle));});
+test('phase 2136-2140 identity additions do not add actions or persistence schema',()=>{const cfg=fs.readFileSync(new URL('../src/game/config.ts',import.meta.url),'utf8');assert.match(cfg,/\] as const;/);assert.equal((cfg.match(/id:/g)||[]).length>=9,true);const snap=fs.readFileSync(new URL('../src/game/endless/snapshot.ts',import.meta.url),'utf8');assert.doesNotMatch(snap,/bossArchetypeIdentity|bossSpecialIntent/);});

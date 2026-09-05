@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import { auditFinalFormIdentityAssets } from '../dist/game/final-form-identity-asset-audit.js';
+test('Phase 1935 final form identity audit is deterministic and presentation-only',()=>{const a=auditFinalFormIdentityAssets();assert.equal(a.samples.length,60);assert.equal(a.coverage,1);assert.equal(a.uniqueCellCount,12);assert.equal(a.surfaceCoverage,1);assert.equal(a.motionAmplitude,0);assert.equal(a.textFallbackPreserved,true);assert.equal(a.actionCount,9);assert.equal(a.snapshotSchemaMutation,false);assert.equal(a.passed,true);});

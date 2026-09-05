@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { saveRunSnapshot, loadRunSnapshot } from '../dist/domain/run-snapshot.js';
+import { auditStorageFailureInjection } from '../dist/game/storage-failure-injection-audit.js';
+
+const base=(savedAt=1000)=>({version:1,savedAt,heroId:'arkan',traitId:'destruction',threatLevel:5,elapsed:60,hero:{level:5,xp:10,xpNext:20,hp:100,maxHp:100,coins:30,kills:4},coreHp:100,spellLevels:{fireBolt:2,chainLightning:1,frostNova:1,flameField:1,meteorStorm:1,blackHole:1},equipment:{coins:30,weapon:null,armor:null,healingPotions:1},relic:null,fusions:[],fateChoices:[],map:{id:'ruinedGate',evolutionStage:0},progression:{bossesKilled:0,goldEarned:30,shopTokens:0}});
+function storage({throwGet=false,throwBackup=false,throwPrimary=false}={}){const map=new Map();return{map,getItem(key){if(throwGet)throw new Error('get');return map.get(key)??null;},setItem(key,value){if(throwBackup&&key.endsWith('.backup'))throw new Error('backup quota');if(throwPrimary&&key==='arcane-last-stand.run-snapshot')throw new Error('primary quota');map.set(key,value);},removeItem(key){map.delete(key);}};}
+
+test('phase 723 snapshot save still attempts the primary write when storage getItem fails',()=>{const s=storage({throwGet:true});saveRunSnapshot(s,base(2000));assert.ok(s.map.has('arcane-last-stand.run-snapshot'));});
+test('phase 724 backup quota failure does not block replacing the primary checkpoint',()=>{const s=storage();saveRunSnapshot(s,base(1000));s.setItem=((orig=>function(key,value){if(key.endsWith('.backup'))throw new Error('backup quota');return orig.call(this,key,value);})(s.setItem));saveRunSnapshot(s,base(2000));assert.equal(loadRunSnapshot({getItem:key=>s.map.get(key)??null,setItem(){},removeItem(){}})?.savedAt,2000);});
+test('phase 725 primary quota failure preserves the last valid checkpoint instead of corrupting resume',()=>{const s=storage();saveRunSnapshot(s,base(1000));const guarded={...s,setItem(key,value){if(key==='arcane-last-stand.run-snapshot')throw new Error('quota');s.map.set(key,value);}};saveRunSnapshot(guarded,base(2000));assert.equal(loadRunSnapshot(s)?.savedAt,1000);});
+test('phase 726 failure-injection audit covers read backup primary journal and clear faults without throwing',()=>{const a=auditStorageFailureInjection();assert.equal(a.samples>=5,true);assert.equal(a.lastValidCheckpointCoverage,1);assert.equal(a.primaryWriteRecoveryCoverage,1);assert.equal(a.optionalPersistenceIsolation,true);assert.equal(a.passed,true);});

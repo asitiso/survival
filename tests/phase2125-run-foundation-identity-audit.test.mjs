@@ -1,0 +1,3 @@
+import test from 'node:test'; import assert from 'node:assert/strict';
+import { auditRunFoundationIdentityAssets } from '../dist/game/run-foundation-identity-asset-audit.js';
+test('phase 2125 audits exactly 60 deterministic run foundation identity samples',()=>{const a=auditRunFoundationIdentityAssets();assert.equal(a.samples.length,60);assert.equal(a.traitCount,8);assert.equal(a.relicCount,14);assert.equal(a.ascensionCount,24);assert.equal(a.traitRecallCoverage,1);assert.equal(a.relicToastCoverage,1);assert.equal(a.ascensionToastCoverage,1);assert.equal(a.textFallbackPreserved,true);assert.equal(a.imageLoadFailureNonBlocking,true);assert.equal(a.actionCount,9);assert.equal(a.snapshotSchemaMutation,false);assert.deepEqual(a.issues,[]);assert.equal(a.passed,true);});

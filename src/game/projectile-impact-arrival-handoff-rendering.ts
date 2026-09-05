@@ -1,0 +1,5 @@
+import type { Vec2 } from '../core/math.js';
+const clamp=(v:number,min:number,max:number)=>Math.max(min,Math.min(max,v));
+function clampVector(v:Vec2,max:number):Vec2{const m=Math.hypot(v.x,v.y);if(m<=max||m<=.0001)return{x:v.x,y:v.y};const s=max/m;return{x:v.x*s,y:v.y*s};}
+export function projectileImpactEntryOffset(launchOffset:Vec2|undefined,launchTtl:number|undefined,launchMaxTtl:number|undefined,reducedMotion=false):Vec2{if(!launchOffset)return{x:0,y:0};const max=Math.max(.0001,Number.isFinite(launchMaxTtl??0)?launchMaxTtl??0:0),t=clamp((Number.isFinite(launchTtl??0)?launchTtl??0:0)/max,0,1);if(t<=0)return{x:0,y:0};const blend=t*t*(reducedMotion?.58:1);return clampVector({x:launchOffset.x*blend,y:launchOffset.y*blend},reducedMotion?10:18);}
+export function projectileImpactVisualPosition(canonicalImpact:Vec2,entryOffset:Vec2,ttl:number,maxTtl:number):Vec2{const max=Math.max(.0001,Number.isFinite(maxTtl)?maxTtl:0),t=clamp((Number.isFinite(ttl)?ttl:0)/max,0,1),blend=t*t;return{x:canonicalImpact.x+entryOffset.x*blend,y:canonicalImpact.y+entryOffset.y*blend};}

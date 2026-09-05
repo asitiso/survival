@@ -1,0 +1,4 @@
+import type { Vec2 } from '../core/math.js';
+const clamp=(v:number,min:number,max:number)=>Math.max(min,Math.min(max,v));
+function clampVector(v:Vec2,max:number):Vec2{const m=Math.hypot(v.x,v.y);if(m<=max||m<=.0001)return{x:v.x,y:v.y};const s=max/m;return{x:v.x*s,y:v.y*s};}
+export function projectileThreatPositionHandoff(input:{gameplayPos:Vec2;launchOffset?:Vec2|undefined;launchTtl?:number|undefined;launchMaxTtl?:number|undefined},reducedMotion=false){const offset=input.launchOffset,max=Math.max(.0001,input.launchMaxTtl??0),t=clamp((input.launchTtl??0)/max,0,1);if(!offset||t<=0)return{owner:'canonical' as const,pos:{...input.gameplayPos},presentationOnly:true as const};const blend=t*t,carry=clampVector({x:offset.x*blend,y:offset.y*blend},reducedMotion?23:36);return{owner:'launch' as const,pos:{x:input.gameplayPos.x+carry.x,y:input.gameplayPos.y+carry.y},presentationOnly:true as const};}

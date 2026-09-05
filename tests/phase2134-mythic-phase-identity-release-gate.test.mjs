@@ -1,0 +1,5 @@
+import test from 'node:test'; import assert from 'node:assert/strict';
+import { auditReleaseFreeze } from '../dist/game/release-freeze-audit.js';
+import { releaseCandidateAudit } from '../dist/game/release-candidate-audit.js';
+test('phase 2134 release freeze binds Mythic Phase identity evidence',()=>{const f=auditReleaseFreeze();assert.equal(f.mythicPhaseIdentityAssetsPassed,true);assert.equal(f.mythicPhaseIdentityAssetsSamples,60);assert.equal(f.passed,true);});
+test('phase 2134 candidate fails closed on forged Mythic Phase evidence and sample mutation changes signature',()=>{const base=releaseCandidateAudit();const forged=structuredClone(base.evidence);forged.releaseFreeze.mythicPhaseIdentityAssetsPassed=false;forged.releaseFreeze.passed=true;const bad=releaseCandidateAudit(forged);assert.equal(bad.status,'REVIEW');assert.ok(bad.issues.includes('release-freeze'));const changed=structuredClone(base.evidence);changed.releaseFreeze.mythicPhaseIdentityAssetsSamples+=1;const mutated=releaseCandidateAudit(changed);assert.notEqual(mutated.signature,base.signature);assert.match(base.markdown,/mythic-phase-identity-assets safe \(60\)/);});

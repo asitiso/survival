@@ -1,0 +1,6 @@
+import test from 'node:test';import assert from 'node:assert/strict';import { lateRunShopNeed } from '../dist/game/late-run-shop-need.js';
+const maxed={coins:6000,weapon:{id:'arcane-staff',kind:'weapon',name:'Arcane',rank:5,power:.15,legendary:true},armor:{id:'iron-robe',kind:'armor',name:'Robe',rank:5,power:.08,legendary:true},healingPotions:3};
+test('phase 627 maxed equipment with reserve potions de-emphasizes the shop during 60-120 minutes',()=>{const p=lateRunShopNeed(4200,maxed);assert.equal(p.deemphasizeShop,true);assert.equal(p.reason,'complete-build');});
+test('phase 628 low potion reserve keeps the shop visually relevant even on a completed build',()=>{const p=lateRunShopNeed(4200,{...maxed,healingPotions:1});assert.equal(p.deemphasizeShop,false);assert.equal(p.reason,'low-potion');});
+test('phase 629 an unfinished weapon or armor keeps the shop relevant for meaningful upgrades',()=>{const p=lateRunShopNeed(4200,{...maxed,weapon:{...maxed.weapon,rank:4,legendary:false}});assert.equal(p.deemphasizeShop,false);assert.equal(p.reason,'needs-upgrade');});
+test('phase 630 late-run shop need adds no control and stays inactive outside 60-120 minutes',()=>{const p=lateRunShopNeed(4200,maxed);assert.equal(p.newControlCount,0);assert.equal(lateRunShopNeed(3500,maxed).deemphasizeShop,false);assert.equal(lateRunShopNeed(7300,maxed).deemphasizeShop,false);});

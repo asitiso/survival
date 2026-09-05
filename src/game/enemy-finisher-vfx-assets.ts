@@ -1,0 +1,7 @@
+import type { EnemyDeathVisualSource } from './enemies.js';
+export type EnemyFinisherVfxState='burst'|'afterglow';
+export const ENEMY_FINISHER_VFX_SOURCES:readonly EnemyDeathVisualSource[]=['normal','explosion','freeze','ultimate','finalForm','fusion'] as const;
+export const ENEMY_FINISHER_VFX_STATES:readonly EnemyFinisherVfxState[]=['burst','afterglow'] as const;
+export const ENEMY_FINISHER_VFX_ATLAS={src:'./assets/enemies/enemy-finisher-vfx.png',columns:6,rows:2,cellSize:128,width:768,height:256} as const;
+export function enemyFinisherVfxSprite(source:EnemyDeathVisualSource,state:EnemyFinisherVfxState){const col=ENEMY_FINISHER_VFX_SOURCES.indexOf(source),row=ENEMY_FINISHER_VFX_STATES.indexOf(state);if(col<0||row<0)throw new Error(`Unknown enemy finisher VFX: ${source}:${state}`);const size=128;return{sx:col*size,sy:row*size,sw:size,sh:size,presentationOnly:true as const,loadFailureBlocksGameplay:false as const};}
+export function auditEnemyFinisherVfxAtlas(){const cells=new Set<string>(),outOfBounds:string[]=[];for(const source of ENEMY_FINISHER_VFX_SOURCES)for(const state of ENEMY_FINISHER_VFX_STATES){const r=enemyFinisherVfxSprite(source,state);cells.add(`${r.sx}:${r.sy}`);if(r.sx<0||r.sy<0||r.sx+r.sw>ENEMY_FINISHER_VFX_ATLAS.width||r.sy+r.sh>ENEMY_FINISHER_VFX_ATLAS.height)outOfBounds.push(`${source}:${state}`);}const itemCount=12;return{sourceCount:6,stateCount:2,itemCount,uniqueCellCount:cells.size,coverage:cells.size/itemCount,outOfBounds,passed:cells.size===itemCount&&outOfBounds.length===0};}

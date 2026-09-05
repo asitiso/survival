@@ -1,0 +1,17 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+const spellSource=fs.readFileSync(new URL('../src/game/spells.ts',import.meta.url),'utf8');
+const gameSource=fs.readFileSync(new URL('../src/game/game.ts',import.meta.url),'utf8');
+const freezeSource=fs.readFileSync(new URL('../src/game/release-freeze-audit.ts',import.meta.url),'utf8');
+const candidateSource=fs.readFileSync(new URL('../src/game/release-candidate-audit.ts',import.meta.url),'utf8');
+function pngDimensions(buffer){assert.equal(buffer.toString('ascii',1,4),'PNG');return{width:buffer.readUInt32BE(16),height:buffer.readUInt32BE(20)};}
+async function load(){assert.equal(fs.existsSync(new URL('../src/game/persistent-spell-zone-vfx-assets.ts',import.meta.url)),true);return import('../dist/game/persistent-spell-zone-vfx-assets.js');}
+
+test('phase 2505 persistent zone atlas covers four heroes x two zones x three lifecycle states',async()=>{const mod=await load(),audit=mod.auditPersistentSpellZoneVfxAtlas();assert.equal(audit.heroCount,4);assert.equal(audit.zoneCount,2);assert.equal(audit.stateCount,3);assert.equal(audit.itemCount,24);assert.equal(audit.uniqueCellCount,24);assert.equal(audit.passed,true);const b=fs.readFileSync(path.resolve(mod.PERSISTENT_SPELL_ZONE_VFX_ATLAS.src.replace(/^\.\//,'')));assert.deepEqual(pngDimensions(b),{width:768,height:512});assert.ok(b.length>9000);});
+test('phase 2506 flame field lifecycle derives enter active state from existing ttl without changing ticks',()=>{assert.match(spellSource,/maxTtl/);assert.match(spellSource,/persistentSpellZoneVfxSprite\(field\.heroId,'flameField'/);assert.match(spellSource,/field\.tickTimer \+= field\.tick/);});
+test('phase 2507 black hole lifecycle derives enter active state from existing ttl without changing pull damage',()=>{assert.match(spellSource,/persistentSpellZoneVfxSprite\(hole\.heroId,'blackHole'/);assert.match(spellSource,/enemy\.type === 'boss' \? 35 : enemy\.type === 'elite' \? 65 : 128/);assert.match(spellSource,/hole\.tickTimer \+= hole\.tickInterval/);});
+test('phase 2508 expired persistent zones emit bounded expire afterglow only after gameplay ttl ends',()=>{assert.match(spellSource,/persistentZoneExpireVfx/);assert.match(spellSource,/ttl <= 0[\s\S]*persistentZoneExpireVfx\.push/);assert.match(spellSource,/persistentZoneExpireVfx\.length > 16/);});
+test('phase 2509 persistent zone atlas loads independently and legacy primitive rendering stays present',()=>{assert.match(gameSource,/initializePersistentSpellZoneVfxAtlas/);assert.match(gameSource,/persistentSpellZoneVfxAtlasImage/);assert.match(spellSource,/createRadialGradient\(field\.pos\.x/);assert.match(spellSource,/createRadialGradient\(hole\.pos\.x/);});
+test('phase 2510 persistent zone audit is release-bound deterministic and presentation-only',async()=>{assert.equal(fs.existsSync(new URL('../src/game/persistent-spell-zone-vfx-audit.ts',import.meta.url)),true);const mod=await import('../dist/game/persistent-spell-zone-vfx-audit.js'),audit=mod.runPersistentSpellZoneVfxAudit();assert.equal(audit.samples.length,64);assert.equal(audit.actionCount,9);assert.equal(audit.presentationOnly,true);assert.equal(audit.gameplayFormulaMutation,false);assert.equal(audit.snapshotSchemaMutation,false);assert.equal(audit.passed,true);assert.match(freezeSource,/persistentSpellZoneVfxPassed/);assert.match(candidateSource,/persistentSpellZoneVfxPassed/);assert.match(candidateSource,/persistent-spell-zone-vfx/);});

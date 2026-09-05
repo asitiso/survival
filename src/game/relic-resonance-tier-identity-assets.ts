@@ -1,0 +1,11 @@
+import type { RelicResonanceTier } from './relic-resonance-recall-assets.js';
+export const RELIC_RESONANCE_TIER_IDENTITY_IDS=['dormant','tier1','tier2','tier3'] as const;
+export type RelicResonanceTierIdentityId=typeof RELIC_RESONANCE_TIER_IDENTITY_IDS[number];
+const CELL:Readonly<Record<RelicResonanceTierIdentityId,number>>={dormant:0,tier1:1,tier2:2,tier3:3};
+const META:Readonly<Record<RelicResonanceTierIdentityId,{label:string;accent:string}>>={dormant:{label:'DORMANT',accent:'#70809a'},tier1:{label:'RESONANCE I',accent:'#77deff'},tier2:{label:'RESONANCE II',accent:'#be97ff'},tier3:{label:'RESONANCE III',accent:'#ffd56b'}};
+export interface RelicResonanceTierIdentityIcon{id:RelicResonanceTierIdentityId;label:string;accent:string;sx:number;sy:0;sw:96;sh:96;animated:false;motionAmplitude:0;textFallbackPreserved:true;loadFailureBlocksGameplay:false;}
+export const RELIC_RESONANCE_TIER_IDENTITY_ATLAS={src:'./assets/ui/relic-resonance-tier-icons.png',columns:4,rows:1,cellSize:96,width:384,height:96} as const;
+export function relicResonanceTierIdentityForTier(tier:RelicResonanceTier):RelicResonanceTierIdentityId{return tier===0?'dormant':tier===1?'tier1':tier===2?'tier2':'tier3';}
+export function relicResonanceTierIdentityIcon(id:RelicResonanceTierIdentityId):RelicResonanceTierIdentityIcon{const meta=META[id];return{id,label:meta.label,accent:meta.accent,sx:CELL[id]*96,sy:0,sw:96,sh:96,animated:false,motionAmplitude:0,textFallbackPreserved:true,loadFailureBlocksGameplay:false};}
+export function relicResonanceTierIdentityStyle(id:RelicResonanceTierIdentityId):string{const cell=CELL[id];return`--secondary-icon-image:url('${RELIC_RESONANCE_TIER_IDENTITY_ATLAS.src}');--secondary-icon-bg-size:400% 100%;--secondary-icon-bg-position:${(cell/3)*100}% 0%`;}
+export function auditRelicResonanceTierIdentityAtlas(){const icons=RELIC_RESONANCE_TIER_IDENTITY_IDS.map(relicResonanceTierIdentityIcon),outOfBounds=icons.filter(icon=>icon.sx<0||icon.sx+icon.sw>RELIC_RESONANCE_TIER_IDENTITY_ATLAS.width||icon.sy+icon.sh>RELIC_RESONANCE_TIER_IDENTITY_ATLAS.height).map(icon=>icon.id),uniqueCellCount=new Set(icons.map(icon=>`${icon.sx}:${icon.sy}`)).size,coverage=icons.length/4;return{coverage,uniqueCellCount,outOfBounds,passed:coverage===1&&uniqueCellCount===4&&outOfBounds.length===0};}

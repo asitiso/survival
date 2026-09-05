@@ -1,0 +1,9 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { createLifecycleCheckpointState, advanceLifecycleCheckpoint, auditLifecycleIdempotency } from '../dist/game/lifecycle-idempotency-audit.js';
+
+test('phase 727 visibility pagehide and beforeunload in one burst collapse to one persistence write',()=>{let s=createLifecycleCheckpointState();let writes=0;for(const t of [1000,1050,1120]){const n=advanceLifecycleCheckpoint(s,t);s=n.state;if(n.shouldSave)writes++;}assert.equal(writes,1);});
+test('phase 728 a later lifecycle boundary is allowed to checkpoint again after the debounce window',()=>{let s=createLifecycleCheckpointState();let n=advanceLifecycleCheckpoint(s,1000);s=n.state;assert.equal(n.shouldSave,true);n=advanceLifecycleCheckpoint(s,1400);assert.equal(n.shouldSave,true);});
+test('phase 729 Game lifecycle checkpoint uses the idempotency gate while transient input reset remains unconditional',()=>{const source=fs.readFileSync(new URL('../src/game/game.ts',import.meta.url),'utf8');assert.match(source,/advanceLifecycleCheckpoint/);const body=source.match(/checkpointForLifecycle\([^)]*\)[\s\S]*?\n  }/)?.[0]??'';assert.match(body,/if \(decision\.shouldSave\)/);assert.match(body,/this\.resetTransientDecisionInput\(\)/);const resetBody=source.match(/\n  resetTransientDecisionInput\(\): void \{[\s\S]*?\n  \}/)?.[0]??'';assert.match(resetBody,/this\.input\.resetTransient\(\)/);});
+test('phase 730 lifecycle idempotency audit preserves one write per event burst and full transient reset coverage',()=>{const a=auditLifecycleIdempotency();assert.equal(a.burstCount,4);assert.equal(a.writeCount,4);assert.equal(a.duplicateWriteCount,0);assert.equal(a.transientResetCoverage,1);assert.equal(a.snapshotSchemaMutation,false);assert.equal(a.passed,true);});

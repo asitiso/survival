@@ -1,0 +1,12 @@
+export const SPELL_EVOLUTION_MODIFIER_IDENTITY_IDS=['damage','area','projectile','chain','cadence','duration','control','pierce'] as const;
+export type SpellEvolutionModifierIdentityId=typeof SPELL_EVOLUTION_MODIFIER_IDENTITY_IDS[number];
+const CELL:Readonly<Record<SpellEvolutionModifierIdentityId,readonly[number,number]>>={damage:[0,0],area:[1,0],projectile:[2,0],chain:[3,0],cadence:[0,1],duration:[1,1],control:[2,1],pierce:[3,1]};
+const META:Readonly<Record<SpellEvolutionModifierIdentityId,{label:string;accent:string}>>={
+  damage:{label:'피해',accent:'#ff806a'},area:{label:'범위',accent:'#c997ff'},projectile:{label:'투사체',accent:'#79d7ff'},chain:{label:'연쇄',accent:'#ffe06a'},cadence:{label:'영창 속도',accent:'#70d9ff'},duration:{label:'지속',accent:'#c9a8ff'},control:{label:'제어',accent:'#7fe2c7'},pierce:{label:'관통',accent:'#ffb56d'},
+};
+export interface SpellEvolutionModifierIdentityIcon{id:SpellEvolutionModifierIdentityId;label:string;accent:string;sx:number;sy:number;sw:96;sh:96;animated:false;motionAmplitude:0;textFallbackPreserved:true;loadFailureBlocksGameplay:false;}
+export const SPELL_EVOLUTION_MODIFIER_IDENTITY_ATLAS={src:'./assets/ui/spell-evolution-modifier-icons.png',columns:4,rows:2,cellSize:96,width:384,height:192} as const;
+const pct=(index:number,count:number)=>count<=1?0:(index/(count-1))*100;
+export function spellEvolutionModifierIdentityIcon(id:SpellEvolutionModifierIdentityId):SpellEvolutionModifierIdentityIcon{const[column,row]=CELL[id],meta=META[id];return{id,label:meta.label,accent:meta.accent,sx:column*96,sy:row*96,sw:96,sh:96,animated:false,motionAmplitude:0,textFallbackPreserved:true,loadFailureBlocksGameplay:false};}
+export function spellEvolutionModifierIdentityStyle(id:SpellEvolutionModifierIdentityId):string{const[column,row]=CELL[id];return`--secondary-icon-image:url('${SPELL_EVOLUTION_MODIFIER_IDENTITY_ATLAS.src}');--secondary-icon-bg-size:400% 200%;--secondary-icon-bg-position:${pct(column,4)}% ${pct(row,2)}%`;}
+export function auditSpellEvolutionModifierIdentityAtlas(){const icons=SPELL_EVOLUTION_MODIFIER_IDENTITY_IDS.map(spellEvolutionModifierIdentityIcon),outOfBounds=icons.filter(icon=>icon.sx<0||icon.sy<0||icon.sx+icon.sw>SPELL_EVOLUTION_MODIFIER_IDENTITY_ATLAS.width||icon.sy+icon.sh>SPELL_EVOLUTION_MODIFIER_IDENTITY_ATLAS.height).map(icon=>icon.id),uniqueCellCount=new Set(icons.map(icon=>`${icon.sx}:${icon.sy}`)).size,coverage=icons.length/8;return{coverage,uniqueCellCount,outOfBounds,passed:coverage===1&&uniqueCellCount===8&&outOfBounds.length===0};}

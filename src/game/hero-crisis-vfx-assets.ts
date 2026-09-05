@@ -1,0 +1,7 @@
+import type { HeroId } from './hero-profiles.js';
+export type HeroCrisisVfxState='hit'|'heavy'|'critical'|'nearDeath'|'recovery';
+export const HERO_CRISIS_VFX_HEROES:readonly HeroId[]=['arkan','seria','kain','edric'] as const;
+export const HERO_CRISIS_VFX_STATES:readonly HeroCrisisVfxState[]=['hit','heavy','critical','nearDeath','recovery'] as const;
+export const HERO_CRISIS_VFX_ATLAS={src:'./assets/heroes/hero-crisis-vfx.png',columns:5,rows:4,cellSize:128,width:640,height:512} as const;
+export function heroCrisisVfxSprite(heroId:HeroId,state:HeroCrisisVfxState){const row=HERO_CRISIS_VFX_HEROES.indexOf(heroId),col=HERO_CRISIS_VFX_STATES.indexOf(state);if(row<0||col<0)throw new Error(`Unknown hero crisis VFX: ${heroId}:${state}`);const size=128;return{sx:col*size,sy:row*size,sw:size,sh:size,presentationOnly:true as const,loadFailureBlocksGameplay:false as const};}
+export function auditHeroCrisisVfxAtlas(){const cells=new Set<string>(),outOfBounds:string[]=[];for(const hero of HERO_CRISIS_VFX_HEROES)for(const state of HERO_CRISIS_VFX_STATES){const r=heroCrisisVfxSprite(hero,state);cells.add(`${r.sx}:${r.sy}`);if(r.sx<0||r.sy<0||r.sx+r.sw>HERO_CRISIS_VFX_ATLAS.width||r.sy+r.sh>HERO_CRISIS_VFX_ATLAS.height)outOfBounds.push(`${hero}:${state}`);}const itemCount=20;return{heroCount:4,stateCount:5,itemCount,uniqueCellCount:cells.size,coverage:cells.size/itemCount,outOfBounds,passed:cells.size===itemCount&&outOfBounds.length===0};}

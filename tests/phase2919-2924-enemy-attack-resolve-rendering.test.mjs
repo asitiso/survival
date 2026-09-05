@@ -1,0 +1,14 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+
+const enemySource=fs.readFileSync(new URL('../src/game/enemies.ts',import.meta.url),'utf8');
+const moduleUrl=new URL('../src/game/enemy-attack-resolve-rendering.ts',import.meta.url);
+async function loadModule(){ assert.equal(fs.existsSync(moduleUrl),true); return import('../dist/game/enemy-attack-resolve-rendering.js'); }
+
+test('phase 2919 enemy attack resolve module exists',async()=>{const mod=await loadModule();assert.equal(typeof mod.advanceEnemyAttackResolveState,'function');});
+test('phase 2920 confirmed attack starts bounded resolve state',async()=>{const mod=await loadModule();const s=mod.advanceEnemyAttackResolveState(undefined,'shieldbearer',true,0.016);assert.ok(s.resolve>0.8);assert.ok(s.settle>=0);});
+test('phase 2921 assassin resolves faster than shieldbearer',async()=>{const mod=await loadModule();let a=mod.advanceEnemyAttackResolveState(undefined,'assassin',true,0.016);let h=mod.advanceEnemyAttackResolveState(undefined,'shieldbearer',true,0.016);a=mod.advanceEnemyAttackResolveState(a,'assassin',false,0.12);h=mod.advanceEnemyAttackResolveState(h,'shieldbearer',false,0.12);assert.ok(a.resolve<h.resolve);});
+test('phase 2922 siege golem and elite settle with heavier bounded displacement',async()=>{const mod=await loadModule();const g=mod.enemyAttackResolvePresentation('siegeGolem',{resolve:0.8,settle:0.7},1,0,false);const e=mod.enemyAttackResolvePresentation('elite',{resolve:0.8,settle:0.7},1,0,false);assert.ok(g.maxOffset<=4);assert.ok(e.maxOffset<=5);assert.ok(g.settleWeight>1);});
+test('phase 2923 reduced motion compresses resolve displacement without changing state identity',async()=>{const mod=await loadModule();const state={resolve:0.9,settle:0.6};const full=mod.enemyAttackResolvePresentation('brute',state,1,0,false);const reduced=mod.enemyAttackResolvePresentation('brute',state,1,0,true);assert.ok(Math.abs(reduced.offsetX)<Math.abs(full.offsetX));assert.equal(reduced.type,full.type);});
+test('phase 2924 enemy update triggers resolve only on real attacks and audit stays presentation-only',async()=>{assert.match(enemySource,/attackResolveMotion/);assert.match(enemySource,/advanceEnemyAttackResolveState/);assert.match(enemySource,/enemyAttackResolvePresentation/);assert.match(enemySource,/didAttackThisFrame/);assert.equal(fs.existsSync(new URL('../src/game/enemy-attack-resolve-audit.ts',import.meta.url)),true);const mod=await import('../dist/game/enemy-attack-resolve-audit.js');const audit=mod.runEnemyAttackResolveAudit();assert.equal(audit.samples.length,64);assert.equal(audit.actionCount,9);assert.equal(audit.presentationOnly,true);assert.equal(audit.gameplayFormulaMutation,false);assert.equal(audit.snapshotSchemaMutation,false);assert.equal(audit.passed,true);});

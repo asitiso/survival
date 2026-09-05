@@ -1,0 +1,19 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const freezeUrl=new URL('../dist/game/release-freeze-audit.js',import.meta.url);
+const candidateUrl=new URL('../dist/game/release-candidate-audit.js',import.meta.url);
+
+test('phase 2246 release freeze binds relic resonance projection identity evidence',async()=>{
+  assert.equal(fs.existsSync(freezeUrl),true);const {auditReleaseFreeze}=await import(freezeUrl.href);const f=auditReleaseFreeze();
+  assert.equal(f.relicResonanceProjectionIdentityAssetsPassed,true);assert.equal(f.relicResonanceProjectionIdentityAssetsSamples,60);assert.equal(f.passed,true);
+});
+
+test('phase 2246 candidate fails closed on forged relic resonance projection evidence and binds the sample count',async()=>{
+  const {releaseCandidateAudit}=await import(candidateUrl.href);const base=releaseCandidateAudit();
+  const forged=structuredClone(base.evidence);forged.releaseFreeze.relicResonanceProjectionIdentityAssetsPassed=false;forged.releaseFreeze.passed=true;
+  const bad=releaseCandidateAudit(forged);assert.equal(bad.status,'REVIEW');assert.ok(bad.issues.includes('release-freeze'));
+  const changed=structuredClone(base.evidence);changed.releaseFreeze.relicResonanceProjectionIdentityAssetsSamples+=1;
+  const mutated=releaseCandidateAudit(changed);assert.notEqual(mutated.signature,base.signature);
+  assert.match(base.markdown,/relic-resonance-projection-identity-assets safe \(60\)/);
+});

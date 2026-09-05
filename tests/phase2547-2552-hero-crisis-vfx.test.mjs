@@ -1,0 +1,16 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+const gameSource=fs.readFileSync(new URL('../src/game/game.ts',import.meta.url),'utf8');
+const freezeSource=fs.readFileSync(new URL('../src/game/release-freeze-audit.ts',import.meta.url),'utf8');
+const candidateSource=fs.readFileSync(new URL('../src/game/release-candidate-audit.ts',import.meta.url),'utf8');
+function pngDimensions(buffer){assert.equal(buffer.toString('ascii',1,4),'PNG');return{width:buffer.readUInt32BE(16),height:buffer.readUInt32BE(20)};}
+async function load(){assert.equal(fs.existsSync(new URL('../src/game/hero-crisis-vfx-assets.ts',import.meta.url)),true);return import('../dist/game/hero-crisis-vfx-assets.js');}
+
+test('phase 2547 hero crisis atlas covers four heroes x five crisis states',async()=>{const mod=await load(),audit=mod.auditHeroCrisisVfxAtlas();assert.equal(audit.heroCount,4);assert.equal(audit.stateCount,5);assert.equal(audit.itemCount,20);assert.equal(audit.uniqueCellCount,20);assert.equal(audit.passed,true);const b=fs.readFileSync(path.resolve(mod.HERO_CRISIS_VFX_ATLAS.src.replace(/^\.\//,'')));assert.deepEqual(pngDimensions(b),{width:640,height:512});assert.ok(b.length>6500);});
+test('phase 2548 hero damage queues normal heavy critical using existing severity thresholds',()=>{assert.match(gameSource,/const damageRatio=applied\/Math\.max\(1,this\.hero\.maxHp\)/);assert.match(gameSource,/damageRatio>=\.32\?'critical':damageRatio>=\.12\?'heavy':'hit'/);assert.match(gameSource,/queueHeroCrisisVfx\(crisisKind\)/);});
+test('phase 2549 near-death crossing overrides ordinary hit cue without changing hero hp math',()=>{assert.match(gameSource,/beforeHpRatio>\.22&&afterHpRatio<=\.22/);assert.match(gameSource,/queueHeroCrisisVfx\('nearDeath'\)/);assert.match(gameSource,/this\.hero\.hp = Math\.max\(0, this\.hero\.hp - applied\)/);});
+test('phase 2550 recovery crossing is edge-triggered from low hp and catches potion or passive healing',()=>{assert.match(gameSource,/lastHeroCrisisHpRatio/);assert.match(gameSource,/previous<=\.35&&current>\.35/);assert.match(gameSource,/queueHeroCrisisVfx\('recovery'\)/);});
+test('phase 2551 hero crisis queue is bounded resettable fail-open and reduced-flash capped',()=>{assert.match(gameSource,/heroCrisisVfx\.length>12/);assert.match(gameSource,/this\.heroCrisisVfx=\[\]/);assert.match(gameSource,/initializeHeroCrisisVfxAtlas/);assert.match(gameSource,/this\.presentationSettings\.reducedFlash\?0\.38:0\.7/);});
+test('phase 2552 hero crisis audit is deterministic release-bound and presentation-only',async()=>{assert.equal(fs.existsSync(new URL('../src/game/hero-crisis-vfx-audit.ts',import.meta.url)),true);const mod=await import('../dist/game/hero-crisis-vfx-audit.js'),audit=mod.runHeroCrisisVfxAudit();assert.equal(audit.samples.length,64);assert.equal(audit.actionCount,9);assert.equal(audit.presentationOnly,true);assert.equal(audit.gameplayFormulaMutation,false);assert.equal(audit.snapshotSchemaMutation,false);assert.equal(audit.passed,true);assert.match(freezeSource,/heroCrisisVfxPassed/);assert.match(candidateSource,/heroCrisisVfxPassed/);assert.match(candidateSource,/hero-crisis-vfx/);});

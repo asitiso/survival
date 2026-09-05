@@ -1,0 +1,5 @@
+import test from 'node:test'; import assert from 'node:assert/strict';
+import { auditReleaseFreeze } from '../dist/game/release-freeze-audit.js';
+import { releaseCandidateAudit } from '../dist/game/release-candidate-audit.js';
+test('phase 2126 release freeze binds run foundation identity evidence',()=>{const f=auditReleaseFreeze();assert.equal(f.runFoundationIdentityAssetsPassed,true);assert.equal(f.runFoundationIdentityAssetsSamples,60);assert.equal(f.passed,true);});
+test('phase 2126 candidate fails closed on forged foundation evidence and sample mutation changes signature',()=>{const base=releaseCandidateAudit();const forged=structuredClone(base.evidence);forged.releaseFreeze.runFoundationIdentityAssetsPassed=false;forged.releaseFreeze.passed=true;const bad=releaseCandidateAudit(forged);assert.equal(bad.status,'REVIEW');assert.ok(bad.issues.includes('release-freeze'));const changed=structuredClone(base.evidence);changed.releaseFreeze.runFoundationIdentityAssetsSamples+=1;const mutated=releaseCandidateAudit(changed);assert.notEqual(mutated.signature,base.signature);assert.match(base.markdown,/run-foundation-identity-assets safe \(60\)/);});

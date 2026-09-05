@@ -1,0 +1,7 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const freezeUrl=new URL('../dist/game/release-freeze-audit.js',import.meta.url);
+const candidateUrl=new URL('../dist/game/release-candidate-audit.js',import.meta.url);
+test('phase 2230 release freeze binds fate tradeoff cumulative identity evidence',async()=>{assert.equal(fs.existsSync(freezeUrl),true);const {auditReleaseFreeze}=await import(freezeUrl.href);const f=auditReleaseFreeze();assert.equal(f.fateTradeoffCumulativeIdentityAssetsPassed,true);assert.equal(f.fateTradeoffCumulativeIdentityAssetsSamples,60);assert.equal(f.passed,true);});
+test('phase 2230 candidate fails closed on forged fate tradeoff evidence and sample mutation changes signature',async()=>{const {releaseCandidateAudit}=await import(candidateUrl.href);const base=releaseCandidateAudit();const forged=structuredClone(base.evidence);forged.releaseFreeze.fateTradeoffCumulativeIdentityAssetsPassed=false;forged.releaseFreeze.passed=true;const bad=releaseCandidateAudit(forged);assert.equal(bad.status,'REVIEW');assert.ok(bad.issues.includes('release-freeze'));const changed=structuredClone(base.evidence);changed.releaseFreeze.fateTradeoffCumulativeIdentityAssetsSamples+=1;const mutated=releaseCandidateAudit(changed);assert.notEqual(mutated.signature,base.signature);assert.match(base.markdown,/fate-tradeoff-cumulative-identity-assets safe \(60\)/);});

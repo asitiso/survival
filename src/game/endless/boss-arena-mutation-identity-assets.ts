@@ -1,0 +1,12 @@
+import type { BossArenaMutationKind } from './boss-arena-mutations.js';
+
+export const BOSS_ARENA_MUTATION_IDENTITY_IDS=['rotating_front','fractured_ring','gravity_well','mirror_lanes','shrinking_sanctum'] as const satisfies readonly BossArenaMutationKind[];
+export type BossArenaMutationIdentityId=typeof BOSS_ARENA_MUTATION_IDENTITY_IDS[number];
+export const BOSS_ARENA_MUTATION_IDENTITY_ATLAS={src:'./assets/ui/boss-arena-mutation-icons.png',columns:3,rows:2,cellSize:96,width:288,height:192} as const;
+const CELL:Readonly<Record<BossArenaMutationIdentityId,readonly[number,number]>>={rotating_front:[0,0],fractured_ring:[1,0],gravity_well:[2,0],mirror_lanes:[0,1],shrinking_sanctum:[1,1]};
+const LABEL:Readonly<Record<BossArenaMutationIdentityId,string>>={rotating_front:'회전 전선',fractured_ring:'균열 고리',gravity_well:'중력 우물',mirror_lanes:'거울 통로',shrinking_sanctum:'수축 성역'};
+const ACCENT:Readonly<Record<BossArenaMutationIdentityId,string>>={rotating_front:'#61d8ff',fractured_ring:'#ffb36d',gravity_well:'#b88cff',mirror_lanes:'#79f0de',shrinking_sanctum:'#ff7188'};
+export interface BossArenaMutationIdentityIcon{id:BossArenaMutationIdentityId;label:string;accent:string;sx:number;sy:number;sw:96;sh:96;animated:false;motionAmplitude:0;normalToastIdentitySupported:true;mythicToastIdentitySupported:true;persistentRecallIdentitySupported:true;maxVisibleRecallIcons:1;textFallbackPreserved:true;loadFailureBlocksGameplay:false;}
+export function bossArenaMutationIdentityIcon(id:BossArenaMutationIdentityId):BossArenaMutationIdentityIcon{const[column,row]=CELL[id];return{id,label:LABEL[id],accent:ACCENT[id],sx:column*96,sy:row*96,sw:96,sh:96,animated:false,motionAmplitude:0,normalToastIdentitySupported:true,mythicToastIdentitySupported:true,persistentRecallIdentitySupported:true,maxVisibleRecallIcons:1,textFallbackPreserved:true,loadFailureBlocksGameplay:false};}
+export function bossArenaMutationIntensitySegments(intensity:number):1|2|3{return intensity>=.75?3:intensity>=.55?2:1;}
+export function auditBossArenaMutationIdentityAtlas(){const icons=BOSS_ARENA_MUTATION_IDENTITY_IDS.map(bossArenaMutationIdentityIcon);const outOfBounds=icons.filter(i=>i.sx<0||i.sy<0||i.sx+i.sw>BOSS_ARENA_MUTATION_IDENTITY_ATLAS.width||i.sy+i.sh>BOSS_ARENA_MUTATION_IDENTITY_ATLAS.height).map(i=>i.id);const uniqueCellCount=new Set(icons.map(i=>`${i.sx}:${i.sy}`)).size;const coverage=icons.length/5;return{coverage,uniqueCellCount,outOfBounds,passed:coverage===1&&uniqueCellCount===5&&outOfBounds.length===0};}

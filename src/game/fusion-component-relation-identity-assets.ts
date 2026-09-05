@@ -1,0 +1,9 @@
+export const FUSION_COMPONENT_RELATION_IDS=['fresh','linked'] as const;
+export type FusionComponentRelationId=typeof FUSION_COMPONENT_RELATION_IDS[number];
+const CELL:Readonly<Record<FusionComponentRelationId,number>>={fresh:0,linked:1};
+const META:Readonly<Record<FusionComponentRelationId,{label:string;accent:string}>>={fresh:{label:'신규 조합',accent:'#79efbc'},linked:{label:'1마법 연결',accent:'#8ec9ff'}};
+export interface FusionComponentRelationIdentityIcon{id:FusionComponentRelationId;label:string;accent:string;sx:number;sy:0;sw:96;sh:96;animated:false;motionAmplitude:0;textFallbackPreserved:true;loadFailureBlocksGameplay:false;}
+export const FUSION_COMPONENT_RELATION_ATLAS={src:'./assets/ui/fusion-component-relation-icons.png',columns:2,rows:1,cellSize:96,width:192,height:96} as const;
+export function fusionComponentRelationIdentityIcon(id:FusionComponentRelationId):FusionComponentRelationIdentityIcon{const meta=META[id];return{id,label:meta.label,accent:meta.accent,sx:CELL[id]*96,sy:0,sw:96,sh:96,animated:false,motionAmplitude:0,textFallbackPreserved:true,loadFailureBlocksGameplay:false};}
+export function fusionComponentRelationIdentityStyle(id:FusionComponentRelationId):string{return`--secondary-icon-image:url('${FUSION_COMPONENT_RELATION_ATLAS.src}');--secondary-icon-bg-size:200% 100%;--secondary-icon-bg-position:${CELL[id]*100}% 0%`;}
+export function auditFusionComponentRelationIdentityAtlas(){const icons=FUSION_COMPONENT_RELATION_IDS.map(fusionComponentRelationIdentityIcon),outOfBounds=icons.filter(icon=>icon.sx<0||icon.sx+icon.sw>FUSION_COMPONENT_RELATION_ATLAS.width||icon.sy+icon.sh>FUSION_COMPONENT_RELATION_ATLAS.height).map(icon=>icon.id),uniqueCellCount=new Set(icons.map(icon=>`${icon.sx}:${icon.sy}`)).size,coverage=icons.length/2;return{coverage,uniqueCellCount,outOfBounds,passed:coverage===1&&uniqueCellCount===2&&outOfBounds.length===0};}

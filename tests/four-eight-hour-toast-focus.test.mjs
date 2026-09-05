@@ -1,0 +1,5 @@
+import test from 'node:test';import assert from 'node:assert/strict';import { fourEightHourToastFocus } from '../dist/game/four-eight-hour-toast-focus.js';
+test('phase 671 routine economy and supply toasts are suppressed after four hours',()=>{for(const m of ['상점권 획득 · 추천 구매 1탭','보급 획득 · 체력 물약 +1','무료 보급 · Arcane'])assert.equal(fourEightHourToastFocus(5*3600,m).show,false);});
+test('phase 672 Mythic boss danger and Final Form toasts are always preserved',()=>{for(const m of ['MYTHIC · 패턴 결합','보스 전장전 · 약점을 파괴하세요','최종 변신 · Arcane Sovereign','SIGNATURE · Rift Crown','수호핵 위험'])assert.equal(fourEightHourToastFocus(7*3600,m).show,true);});
+test('phase 673 pre-four-hour runs do not suppress routine toasts',()=>{assert.equal(fourEightHourToastFocus(4*3600-1,'보급 획득 · 체력 물약 +1').show,true);});
+test('phase 674 toast quieting is presentation-only and reports material routine reduction',()=>{const p=fourEightHourToastFocus(6*3600,'황금 고블린 처치! +500G');assert.equal(p.combatMutation,false);assert.equal(p.economyMutation,false);assert.ok(p.estimatedRoutineReduction>=.5);});

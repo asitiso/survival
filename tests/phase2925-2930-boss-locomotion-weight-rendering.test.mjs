@@ -1,0 +1,14 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+
+const enemySource=fs.readFileSync(new URL('../src/game/enemies.ts',import.meta.url),'utf8');
+const moduleUrl=new URL('../src/game/boss-locomotion-weight-rendering.ts',import.meta.url);
+async function loadModule(){assert.equal(fs.existsSync(moduleUrl),true);return import('../dist/game/boss-locomotion-weight-rendering.js');}
+
+test('phase 2925 boss locomotion weight module exists',async()=>{const mod=await loadModule();assert.equal(typeof mod.bossLocomotionWeightPresentation,'function');});
+test('phase 2926 higher boss phase increases visual turn weight without changing movement speed',async()=>{const mod=await loadModule();const p1=mod.bossLocomotionWeightPresentation(1,0.8,0.4,0.5,false);const p3=mod.bossLocomotionWeightPresentation(3,0.8,0.4,0.5,false);assert.ok(p3.turnWeight>p1.turnWeight);assert.equal('speedMultiplier' in p3,false);});
+test('phase 2927 locomotion recovery creates bounded boss settle',async()=>{const mod=await loadModule();const p=mod.bossLocomotionWeightPresentation(2,0.05,0.95,0.2,false);assert.ok(p.settle>0.5);assert.ok(Math.abs(p.offsetY)<=5);assert.ok(Math.abs(p.rotation)<=0.08);});
+test('phase 2928 boss contact pulse appears on strong settle only',async()=>{const mod=await loadModule();const strong=mod.bossLocomotionWeightPresentation(3,0.03,1,0,false);const moving=mod.bossLocomotionWeightPresentation(3,0.9,0.1,0,false);assert.equal(strong.showContactPulse,true);assert.equal(moving.showContactPulse,false);assert.ok(strong.contactAlpha<=0.24);});
+test('phase 2929 reduced motion preserves weight cue while suppressing pulse motion',async()=>{const mod=await loadModule();const full=mod.bossLocomotionWeightPresentation(3,0.02,1,0.5,false);const reduced=mod.bossLocomotionWeightPresentation(3,0.02,1,0.5,true);assert.ok(reduced.settle>0);assert.ok(reduced.contactRadius<=full.contactRadius);assert.ok(reduced.rotation<full.rotation||Math.abs(reduced.rotation)<Math.abs(full.rotation));});
+test('phase 2930 boss render consumes weighted settle/contact pulse and deterministic audit',async()=>{assert.match(enemySource,/bossLocomotionWeightPresentation/);assert.match(enemySource,/showContactPulse/);assert.match(enemySource,/bossLocomotion\.offsetY/);assert.equal(fs.existsSync(new URL('../src/game/boss-locomotion-weight-audit.ts',import.meta.url)),true);const mod=await import('../dist/game/boss-locomotion-weight-audit.js');const audit=mod.runBossLocomotionWeightAudit();assert.equal(audit.samples.length,48);assert.equal(audit.actionCount,9);assert.equal(audit.presentationOnly,true);assert.equal(audit.gameplayFormulaMutation,false);assert.equal(audit.snapshotSchemaMutation,false);assert.equal(audit.newAtlasCount,0);assert.equal(audit.passed,true);});

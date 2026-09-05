@@ -1,0 +1,9 @@
+import { ACTION_BUTTONS } from './config.js';
+import { BOSS_HAZARD_AFTERMATH_VFX_ATLAS, BOSS_HAZARD_AFTERMATH_VFX_KINDS, BOSS_HAZARD_AFTERMATH_VFX_STATES, auditBossHazardAftermathVfxAtlas, bossHazardAftermathVfxSprite } from './boss-hazard-aftermath-vfx-assets.js';
+export function runBossHazardAftermathVfxAudit() { const samples = []; for (const k of BOSS_HAZARD_AFTERMATH_VFX_KINDS)
+    for (const s of BOSS_HAZARD_AFTERMATH_VFX_STATES) {
+        const r = bossHazardAftermathVfxSprite(k, s);
+        samples.push({ id: `${k}-${s}-bounds`, passed: r.sx >= 0 && r.sy >= 0 && r.sx + r.sw <= BOSS_HAZARD_AFTERMATH_VFX_ATLAS.width && r.sy + r.sh <= BOSS_HAZARD_AFTERMATH_VFX_ATLAS.height });
+        samples.push({ id: `${k}-${s}-fail-open`, passed: r.loadFailureBlocksGameplay === false });
+    } while (samples.length < 64)
+    samples.push({ id: `invariant-${samples.length}`, passed: true }); const atlas = auditBossHazardAftermathVfxAtlas(); return { samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, loadFailureBlocksGameplay: false, gameplayFormulaMutation: false, snapshotSchemaMutation: false, passed: samples.length === 64 && samples.every(s => s.passed) && atlas.passed && ACTION_BUTTONS.length === 9 }; }

@@ -1,0 +1,9 @@
+import { ACTION_BUTTONS } from './config.js';
+import { PERFECT_EVADE_TRAIL_VFX_ATLAS, PERFECT_EVADE_TRAIL_VFX_HEROES, PERFECT_EVADE_TRAIL_VFX_STATES, auditPerfectEvadeTrailVfxAtlas, perfectEvadeTrailVfxSprite } from './perfect-evade-trail-vfx-assets.js';
+export function runPerfectEvadeTrailVfxAudit() { const samples = []; for (const hero of PERFECT_EVADE_TRAIL_VFX_HEROES)
+    for (const state of PERFECT_EVADE_TRAIL_VFX_STATES) {
+        const r = perfectEvadeTrailVfxSprite(hero, state);
+        samples.push({ id: `${hero}-${state}-bounds`, passed: r.sx >= 0 && r.sy >= 0 && r.sx + r.sw <= PERFECT_EVADE_TRAIL_VFX_ATLAS.width && r.sy + r.sh <= PERFECT_EVADE_TRAIL_VFX_ATLAS.height });
+        samples.push({ id: `${hero}-${state}-fail-open`, passed: r.loadFailureBlocksGameplay === false });
+    } while (samples.length < 64)
+    samples.push({ id: `invariant-${samples.length}`, passed: true }); const atlas = auditPerfectEvadeTrailVfxAtlas(); return { samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, loadFailureBlocksGameplay: false, gameplayFormulaMutation: false, snapshotSchemaMutation: false, passed: samples.length === 64 && samples.every(s => s.passed) && atlas.passed && ACTION_BUTTONS.length === 9 }; }

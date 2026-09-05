@@ -1,0 +1,12 @@
+export const HERO_METER_WORLD_VFX_HEROES = ['arkan', 'seria', 'kain', 'edric'];
+export const HERO_METER_WORLD_VFX_STATES = ['activate', 'active'];
+export const HERO_METER_WORLD_VFX_ATLAS = { src: './assets/heroes/hero-meter-world-vfx.png', columns: 4, rows: 2, cellSize: 128, width: 512, height: 256 };
+export function heroMeterWorldVfxSprite(heroId, state) { const column = HERO_METER_WORLD_VFX_HEROES.indexOf(heroId), row = HERO_METER_WORLD_VFX_STATES.indexOf(state); if (column < 0 || row < 0)
+    throw new Error(`Unknown hero meter world VFX: ${heroId}:${state}`); const size = HERO_METER_WORLD_VFX_ATLAS.cellSize; return { sx: column * size, sy: row * size, sw: size, sh: size, presentationOnly: true, loadFailureBlocksGameplay: false }; }
+export function auditHeroMeterWorldVfxAtlas() { const cells = new Set(), outOfBounds = []; for (const heroId of HERO_METER_WORLD_VFX_HEROES)
+    for (const state of HERO_METER_WORLD_VFX_STATES) {
+        const r = heroMeterWorldVfxSprite(heroId, state);
+        cells.add(`${r.sx}:${r.sy}`);
+        if (r.sx < 0 || r.sy < 0 || r.sx + r.sw > HERO_METER_WORLD_VFX_ATLAS.width || r.sy + r.sh > HERO_METER_WORLD_VFX_ATLAS.height)
+            outOfBounds.push(`${heroId}:${state}`);
+    } const itemCount = HERO_METER_WORLD_VFX_HEROES.length * HERO_METER_WORLD_VFX_STATES.length; return { heroCount: HERO_METER_WORLD_VFX_HEROES.length, stateCount: HERO_METER_WORLD_VFX_STATES.length, itemCount, coverage: cells.size / itemCount, uniqueCellCount: cells.size, outOfBounds, passed: itemCount === 8 && cells.size === itemCount && outOfBounds.length === 0 }; }

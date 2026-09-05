@@ -1,0 +1,8 @@
+export const BOSS_REWARD_IMPACT_ROLE_IDS = ['offense', 'survival', 'growth', 'economy', 'pivot'];
+const CELL = { offense: 0, survival: 1, growth: 2, economy: 3, pivot: 4 };
+const META = { offense: { label: '화력', accent: '#ff7a61' }, survival: { label: '생존', accent: '#72e5bd' }, growth: { label: '성장', accent: '#86c7ff' }, economy: { label: '경제', accent: '#ffd66b' }, pivot: { label: '빌드전환', accent: '#c58cff' } };
+export const BOSS_REWARD_IMPACT_ROLE_ATLAS = { src: './assets/ui/boss-reward-impact-role-icons.png', columns: 5, rows: 1, cellSize: 96, width: 480, height: 96 };
+const pct = (index, count) => count <= 1 ? 0 : (index / (count - 1)) * 100;
+export function bossRewardImpactRoleIdentityIcon(id) { const meta = META[id]; return { id, label: meta.label, accent: meta.accent, sx: CELL[id] * 96, sy: 0, sw: 96, sh: 96, animated: false, motionAmplitude: 0, textFallbackPreserved: true, loadFailureBlocksGameplay: false }; }
+export function bossRewardImpactRoleIdentityStyle(id) { return `--impact-role-image:url('${BOSS_REWARD_IMPACT_ROLE_ATLAS.src}');--impact-role-bg-size:500% 100%;--impact-role-bg-position:${pct(CELL[id], 5)}% 0%`; }
+export function auditBossRewardImpactRoleIdentityAtlas() { const icons = BOSS_REWARD_IMPACT_ROLE_IDS.map(bossRewardImpactRoleIdentityIcon), outOfBounds = icons.filter(icon => icon.sx < 0 || icon.sx + icon.sw > BOSS_REWARD_IMPACT_ROLE_ATLAS.width || icon.sy + icon.sh > BOSS_REWARD_IMPACT_ROLE_ATLAS.height).map(icon => icon.id), uniqueCellCount = new Set(icons.map(icon => `${icon.sx}:${icon.sy}`)).size, coverage = icons.length / 5; return { coverage, uniqueCellCount, outOfBounds, passed: coverage === 1 && uniqueCellCount === 5 && outOfBounds.length === 0 }; }

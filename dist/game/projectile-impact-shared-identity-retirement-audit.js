@@ -1,0 +1,30 @@
+import { ACTION_BUTTONS } from './config.js';
+import { updateProjectileImpactIdentityCoherence } from './projectile-impact-identity-coherence.js';
+import { projectileImpactHeldCount, retireProjectileImpactCountHoldIdentities, updateProjectileImpactCountHold } from './projectile-impact-count-hold.js';
+import { projectileImpactAnchoredPlacements, retireProjectileImpactLabelAnchorIdentities, updateProjectileImpactLabelAnchorHold } from './projectile-impact-label-anchor-hold.js';
+const cluster = (x, count) => ({ impact: { x, y: 300 }, incoming: { x: 180, y: 0 }, count, sourceClass: 'archer', start: { x: x - 30, y: 300 }, end: { x, y: 300 }, alpha: .5, accent: '#fff', animated: false, motionAmplitude: 0 });
+const placement = (x) => ({ clusterIndex: 0, sourceClass: 'archer', pos: { x, y: 250 }, visible: true, animated: false, motionAmplitude: 0 });
+export function runProjectileImpactSharedIdentityRetirementAudit() {
+    const samples = [];
+    let passed = true;
+    for (let i = 0; i < 64; i++) {
+        const x = 300 + i % 7, c = cluster(x, 5);
+        let identity = updateProjectileImpactIdentityCoherence([], [c], .016);
+        let counts = updateProjectileImpactCountHold([], [c], .016, identity.keys);
+        let anchors = updateProjectileImpactLabelAnchorHold([], [c], [placement(x)], .016, identity.keys);
+        const oldId = identity.keys[0] ?? -1;
+        const retired = updateProjectileImpactIdentityCoherence(identity.memory, [], .016);
+        counts = retireProjectileImpactCountHoldIdentities(counts, retired.retiredIdentityIds);
+        anchors = retireProjectileImpactLabelAnchorIdentities(anchors, retired.retiredIdentityIds);
+        const next = cluster(x, 1);
+        identity = updateProjectileImpactIdentityCoherence(retired.memory, [next], .016);
+        counts = updateProjectileImpactCountHold(counts, [next], .016, identity.keys);
+        anchors = updateProjectileImpactLabelAnchorHold(anchors, [next], [{ ...placement(x + 40), pos: { x: x + 40, y: 270 } }], .016, identity.keys);
+        const held = projectileImpactHeldCount(counts, next, identity.keys[0] ?? null);
+        const placed = projectileImpactAnchoredPlacements(anchors, [next], [{ ...placement(x + 40), pos: { x: x + 40, y: 270 } }], identity.keys);
+        const ok = retired.retiredIdentityIds.includes(oldId) && retired.memory.length === 0 && held === 1 && placed[0]?.pos.x === x + 40;
+        passed &&= ok;
+        samples.push(`${i}:${oldId}:${retired.retiredIdentityIds.length}:${held}:${placed[0]?.pos.x}`);
+    }
+    return { passed, samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, gameplayFormulaMutation: false, snapshotSchemaMutation: false };
+}

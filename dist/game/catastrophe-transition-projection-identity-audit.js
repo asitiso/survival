@@ -1,0 +1,37 @@
+import { ACTION_BUTTONS } from './config.js';
+import { catastropheAt, catastropheModifiers } from '../domain/catastrophe.js';
+import { CATASTROPHE_TRANSITION_IDENTITY_IDS, auditCatastropheTransitionIdentityAtlas, catastropheTransitionIdentityIcon } from './catastrophe-transition-identity-assets.js';
+import { projectCatastropheTransitionByIds, projectCatastropheTransitionForecast } from './catastrophe-transition-projection.js';
+const EDGES = [['goldenNight', 'frenzy'], ['frenzy', 'arcaneSurge'], ['arcaneSurge', 'redMoon'], ['redMoon', 'guardianGrace'], ['guardianGrace', 'goldenNight']];
+export function auditCatastropheTransitionProjectionIdentityAssets() {
+    const samples = [], issues = [], states = new Set(), atlas = auditCatastropheTransitionIdentityAtlas();
+    for (const [from, to] of EDGES) {
+        const p = projectCatastropheTransitionByIds(from, to), a = catastropheModifiers(catastropheAt({ goldenNight: 1200, frenzy: 1380, arcaneSurge: 1560, redMoon: 1740, guardianGrace: 1920 }[to]));
+        states.add(p.status);
+        samples.push({ id: `edge:${from}:${to}:ids`, passed: p.from?.id === from && p.to.id === to });
+        samples.push({ id: `edge:${from}:${to}:state`, passed: ['helpful', 'harmful', 'mixed'].includes(p.status) });
+        samples.push({ id: `edge:${from}:${to}:changes`, passed: p.changes.length > 0 && p.primaryChanges.length <= 2 });
+        samples.push({ id: `edge:${from}:${to}:authoritative`, passed: p.changes.every(c => c.after === Math.round(((c.id === 'gold' ? a.goldMultiplier : c.id === 'enemy-speed' ? a.enemySpeedMultiplier : c.id === 'cooldown' ? a.cooldownMultiplier : c.id === 'spawn-pressure' ? a.spawnPressureMultiplier : c.id === 'elite-pressure' ? a.eliteIntervalMultiplier : a.coreDamageMultiplier) + Number.EPSILON) * 1000) / 1000) });
+    }
+    [1380, 1560, 1740, 1920, 2100].forEach((boundary, index) => { for (const [name, offset, visible] of [['outside', -61, false], ['edge', -60, true], ['imminent', -1, true]]) {
+        const p = projectCatastropheTransitionForecast(boundary + offset);
+        samples.push({ id: `forecast:${index}:${name}`, passed: p.secondsToNext === -offset && p.visible === visible });
+    } });
+    for (const id of CATASTROPHE_TRANSITION_IDENTITY_IDS) {
+        const i = catastropheTransitionIdentityIcon(id);
+        samples.push({ id: `identity:${id}`, passed: i.animated === false && i.motionAmplitude === 0 });
+    }
+    const inv = [atlas.passed, catastropheAt(1199) === null, catastropheAt(1200)?.id === 'goldenNight', catastropheAt(1380)?.id === 'frenzy', catastropheAt(1560)?.id === 'arcaneSurge', catastropheAt(1740)?.id === 'redMoon', catastropheAt(1920)?.id === 'guardianGrace', catastropheAt(2100)?.id === 'goldenNight', projectCatastropheTransitionForecast(1140).visible, projectCatastropheTransitionForecast(1139).visible === false, projectCatastropheTransitionForecast(1320).visible, projectCatastropheTransitionForecast(1319).visible === false, states.has('helpful'), states.has('harmful'), states.has('mixed'), ACTION_BUTTONS.length === 9, CATASTROPHE_TRANSITION_IDENTITY_IDS.length === 4, projectCatastropheTransitionByIds('goldenNight', 'frenzy').status === 'harmful', projectCatastropheTransitionByIds('frenzy', 'arcaneSurge').status === 'helpful', projectCatastropheTransitionByIds('arcaneSurge', 'redMoon').status === 'mixed', catastropheModifiers(null).goldMultiplier === 1];
+    inv.forEach((passed, i) => samples.push({ id: `invariant:${i}`, passed }));
+    for (const s of samples)
+        if (!s.passed)
+            issues.push(s.id);
+    const rotationCoverageComplete = EDGES.every(([f, t]) => samples.some(s => s.id === `edge:${f}:${t}:ids` && s.passed)), identityCoverageComplete = CATASTROPHE_TRANSITION_IDENTITY_IDS.every(id => samples.some(s => s.id === `identity:${id}` && s.passed));
+    if (!rotationCoverageComplete)
+        issues.push('rotation-coverage');
+    if (!identityCoverageComplete)
+        issues.push('identity-coverage');
+    if (samples.length !== 60)
+        issues.push(`sample-count:${samples.length}`);
+    return { passed: issues.length === 0, samples, transitionSamples: 20, forecastWindowSamples: 15, identityCount: 4, rotationCoverageComplete, identityCoverageComplete, outcomeStates: ['helpful', 'harmful', 'mixed'], startSeconds: 1200, rotationSeconds: 180, forecastWindowSeconds: 60, actionCount: ACTION_BUTTONS.length, snapshotSchemaMutation: false, gameplayMutation: false, issues };
+}

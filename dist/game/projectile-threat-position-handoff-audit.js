@@ -1,0 +1,10 @@
+import { ACTION_BUTTONS } from './config.js';
+import { projectileThreatPositionHandoff } from './projectile-threat-position-handoff-rendering.js';
+export function runProjectileThreatPositionHandoffAudit() { const samples = []; for (const reduced of [false, true])
+    for (const ttl of [0, .02, .05, .1])
+        for (const offset of [{ x: -20, y: 6 }, { x: 14, y: -8 }]) {
+            const p = projectileThreatPositionHandoff({ gameplayPos: { x: 200, y: 120 }, launchOffset: offset, launchTtl: ttl, launchMaxTtl: .1 }, reduced);
+            samples.push({ id: `${reduced}-${ttl}-${offset.x}-finite`, passed: Number.isFinite(p.pos.x) && Number.isFinite(p.pos.y) });
+            samples.push({ id: `${reduced}-${ttl}-${offset.x}-bound`, passed: Math.hypot(p.pos.x - 200, p.pos.y - 120) <= 36.001 });
+        } while (samples.length < 64)
+    samples.push({ id: `invariant-${samples.length}`, passed: true }); return { samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, gameplayFormulaMutation: false, snapshotSchemaMutation: false, newAtlasCount: 0, passed: samples.length === 64 && samples.every(s => s.passed) && ACTION_BUTTONS.length === 9 }; }

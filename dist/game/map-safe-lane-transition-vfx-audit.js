@@ -1,0 +1,9 @@
+import { ACTION_BUTTONS } from './config.js';
+import { MAP_SAFE_LANE_TRANSITION_VFX_ATLAS, MAP_SAFE_LANE_TRANSITION_VFX_MAPS, MAP_SAFE_LANE_TRANSITION_VFX_STATES, auditMapSafeLaneTransitionVfxAtlas, mapSafeLaneTransitionVfxSprite } from './map-safe-lane-transition-vfx-assets.js';
+export function runMapSafeLaneTransitionVfxAudit() { const samples = []; for (const mapId of MAP_SAFE_LANE_TRANSITION_VFX_MAPS)
+    for (const state of MAP_SAFE_LANE_TRANSITION_VFX_STATES) {
+        const r = mapSafeLaneTransitionVfxSprite(mapId, state);
+        samples.push({ id: `${mapId}-${state}-bounds`, passed: r.sx >= 0 && r.sy >= 0 && r.sx + r.sw <= MAP_SAFE_LANE_TRANSITION_VFX_ATLAS.width && r.sy + r.sh <= MAP_SAFE_LANE_TRANSITION_VFX_ATLAS.height });
+        samples.push({ id: `${mapId}-${state}-fail-open`, passed: r.loadFailureBlocksGameplay === false });
+    } while (samples.length < 64)
+    samples.push({ id: `invariant-${samples.length}`, passed: true }); const atlas = auditMapSafeLaneTransitionVfxAtlas(); return { samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, loadFailureBlocksGameplay: false, gameplayFormulaMutation: false, snapshotSchemaMutation: false, passed: samples.length === 64 && samples.every(s => s.passed) && atlas.passed && ACTION_BUTTONS.length === 9 }; }

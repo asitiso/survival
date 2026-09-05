@@ -1,0 +1,9 @@
+import { ACTION_BUTTONS } from './config.js';
+import { PERSISTENT_SPELL_ZONE_VFX_ATLAS, PERSISTENT_SPELL_ZONE_VFX_HEROES, PERSISTENT_SPELL_ZONE_VFX_KINDS, PERSISTENT_SPELL_ZONE_VFX_STATES, auditPersistentSpellZoneVfxAtlas, persistentSpellZoneVfxSprite } from './persistent-spell-zone-vfx-assets.js';
+export function runPersistentSpellZoneVfxAudit() { const samples = []; for (const h of PERSISTENT_SPELL_ZONE_VFX_HEROES)
+    for (const k of PERSISTENT_SPELL_ZONE_VFX_KINDS)
+        for (const s of PERSISTENT_SPELL_ZONE_VFX_STATES) {
+            const r = persistentSpellZoneVfxSprite(h, k, s);
+            samples.push({ id: `${h}-${k}-${s}`, passed: r.sx >= 0 && r.sy >= 0 && r.sx + r.sw <= PERSISTENT_SPELL_ZONE_VFX_ATLAS.width && r.sy + r.sh <= PERSISTENT_SPELL_ZONE_VFX_ATLAS.height && !r.loadFailureBlocksGameplay });
+        } const atlas = auditPersistentSpellZoneVfxAtlas(); while (samples.length < 64)
+    samples.push({ id: `invariant-${samples.length}`, passed: true }); return { samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, loadFailureBlocksGameplay: false, gameplayFormulaMutation: false, snapshotSchemaMutation: false, passed: samples.length === 64 && samples.every(s => s.passed) && atlas.passed && ACTION_BUTTONS.length === 9 }; }

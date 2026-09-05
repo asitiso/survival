@@ -1,0 +1,22 @@
+import { ACTION_BUTTONS } from './config.js';
+import { BOSS_SAFE_RESPONSE_SLOT_REBASE_MAX_COUNT, BOSS_SAFE_RESPONSE_SLOT_REBASE_WINDOW_SECONDS, bossSafeResponseSlotHysteresis } from './boss-safe-response-slot-hysteresis.js';
+const placement = (x, y) => ({ visible: true, slot: 'above', pos: { x, y }, animated: false, motionAmplitude: 0, presentationOnly: true });
+export function runBossSafeResponseRebaseBudgetGuardAudit() {
+    const samples = [];
+    let passed = BOSS_SAFE_RESPONSE_SLOT_REBASE_MAX_COUNT === 2 && BOSS_SAFE_RESPONSE_SLOT_REBASE_WINDOW_SECONDS >= .4;
+    for (let i = 0; i < 64; i++) {
+        const baseBoss = { x: 500 + i % 5, y: 400 }, base = { bossPos: baseBoss, bossRadius: 70, heroPos: { x: 120, y: 400 }, corePos: { x: 1150, y: 400 }, width: 1280, height: 800, extraProtected: [] };
+        let r = bossSafeResponseSlotHysteresis({ previous: null, current: placement(baseBoss.x, 290), placementInput: base, bossId: 70 + i, cycle: 5, now: 10 });
+        for (let n = 1; n <= BOSS_SAFE_RESPONSE_SLOT_REBASE_MAX_COUNT; n++) {
+            const moved = { x: baseBoss.x + n * 110, y: 390 };
+            r = bossSafeResponseSlotHysteresis({ previous: r.memory, current: placement(moved.x, 282 - n * 2), placementInput: { ...base, bossPos: moved }, bossId: 70 + i, cycle: 5, now: 10 + n * .05 });
+        }
+        const strictBoss = { x: baseBoss.x + (BOSS_SAFE_RESPONSE_SLOT_REBASE_MAX_COUNT + 1) * 110, y: 390 }, strict = placement(strictBoss.x, 266);
+        r = bossSafeResponseSlotHysteresis({ previous: r.memory, current: strict, placementInput: { ...base, bossPos: strictBoss }, bossId: 70 + i, cycle: 5, now: 10 + .2 });
+        const capped = r.placement.pos.y === strict.pos.y && r.memory?.rebaseCount === 0;
+        const ok = capped && r.presentationOnly;
+        passed &&= ok;
+        samples.push(`${i}:${capped ? 1 : 0}:${r.memory?.rebaseCount ?? -1}`);
+    }
+    return { passed, samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, gameplayFormulaMutation: false, snapshotSchemaMutation: false };
+}

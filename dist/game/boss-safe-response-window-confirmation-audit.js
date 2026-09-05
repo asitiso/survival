@@ -1,0 +1,5 @@
+import { bossSafeResponseWindowConfirmation } from './boss-safe-response-window-confirmation.js';
+export function runBossSafeResponseWindowConfirmationAudit() { const samples = []; for (let i = 0; i < 64; i++) {
+    const danger = i % 8 === 0, r = bossSafeResponseWindowConfirmation({ bossId: 1, currentCycle: 2, ackBossId: 1, ackCycle: 1, specialTimer: 2, heroCritical: danger, coreCritical: false, damageSeverity: null, dangerProjectileCount: 0 });
+    samples.push({ i, confirmed: r.confirmed, noGlobalSafety: r.claimsGlobalSafety === false, correct: danger ? !r.confirmed : r.confirmed });
+} return { samples, actionCount: 9, presentationOnly: true, gameplayFormulaMutation: false, snapshotSchemaMutation: false, passed: samples.every(s => s.noGlobalSafety && s.correct) }; }

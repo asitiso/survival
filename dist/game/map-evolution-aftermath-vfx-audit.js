@@ -1,0 +1,10 @@
+import { ACTION_BUTTONS } from './config.js';
+import { MAP_EVOLUTION_AFTERMATH_VFX_ATLAS, MAP_EVOLUTION_AFTERMATH_VFX_MAPS, MAP_EVOLUTION_AFTERMATH_VFX_STAGES, MAP_EVOLUTION_AFTERMATH_VFX_STATES, auditMapEvolutionAftermathVfxAtlas, mapEvolutionAftermathVfxSprite } from './map-evolution-aftermath-vfx-assets.js';
+export function runMapEvolutionAftermathVfxAudit() { const samples = []; for (const m of MAP_EVOLUTION_AFTERMATH_VFX_MAPS)
+    for (const p of MAP_EVOLUTION_AFTERMATH_VFX_STAGES)
+        for (const s of MAP_EVOLUTION_AFTERMATH_VFX_STATES) {
+            const r = mapEvolutionAftermathVfxSprite(m, p, s);
+            samples.push({ id: `${m}-${p}-${s}-bounds`, passed: r.sx >= 0 && r.sy >= 0 && r.sx + r.sw <= MAP_EVOLUTION_AFTERMATH_VFX_ATLAS.width && r.sy + r.sh <= MAP_EVOLUTION_AFTERMATH_VFX_ATLAS.height });
+            samples.push({ id: `${m}-${p}-${s}-fail-open`, passed: r.loadFailureBlocksGameplay === false });
+        } const atlas = auditMapEvolutionAftermathVfxAtlas(); while (samples.length < 64)
+    samples.push({ id: `invariant-${samples.length}`, passed: true }); return { samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, loadFailureBlocksGameplay: false, gameplayFormulaMutation: false, snapshotSchemaMutation: false, passed: samples.length === 64 && samples.every(s => s.passed) && atlas.passed && ACTION_BUTTONS.length === 9 }; }

@@ -1,0 +1,1 @@
+export function secondaryImpactCanonicalPresentation(kind, pos, reducedFlash = false) { const sizeScale = kind === 'splash' ? .68 : .58, alphaScale = (kind === 'splash' ? .72 : .64) * (reducedFlash ? .62 : 1); return { owner: 'canonical', kind, pos: { x: pos.x, y: pos.y }, entryOffset: { x: 0, y: 0 }, sizeScale, alphaScale, presentationOnly: true }; }

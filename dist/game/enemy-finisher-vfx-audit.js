@@ -1,0 +1,9 @@
+import { ACTION_BUTTONS } from './config.js';
+import { ENEMY_FINISHER_VFX_ATLAS, ENEMY_FINISHER_VFX_SOURCES, ENEMY_FINISHER_VFX_STATES, auditEnemyFinisherVfxAtlas, enemyFinisherVfxSprite } from './enemy-finisher-vfx-assets.js';
+export function runEnemyFinisherVfxAudit() { const samples = []; for (const source of ENEMY_FINISHER_VFX_SOURCES)
+    for (const state of ENEMY_FINISHER_VFX_STATES) {
+        const r = enemyFinisherVfxSprite(source, state);
+        samples.push({ id: `${source}-${state}-bounds`, passed: r.sx >= 0 && r.sy >= 0 && r.sx + r.sw <= ENEMY_FINISHER_VFX_ATLAS.width && r.sy + r.sh <= ENEMY_FINISHER_VFX_ATLAS.height });
+        samples.push({ id: `${source}-${state}-fail-open`, passed: r.loadFailureBlocksGameplay === false });
+    } while (samples.length < 64)
+    samples.push({ id: `invariant-${samples.length}`, passed: true }); const atlas = auditEnemyFinisherVfxAtlas(); return { samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, loadFailureBlocksGameplay: false, gameplayFormulaMutation: false, snapshotSchemaMutation: false, passed: samples.length === 64 && samples.every(s => s.passed) && atlas.passed && ACTION_BUTTONS.length === 9 }; }

@@ -1,0 +1,8 @@
+export const MYTHIC_PHASE_IDENTITY_IDS = [1, 2, 3];
+export const MYTHIC_PHASE_IDENTITY_ATLAS = { src: './assets/ui/mythic-phase-icons.png', columns: 3, rows: 2, cellSize: 96, width: 288, height: 192 };
+const CELL = { 1: [0, 0], 2: [1, 0], 3: [2, 0] };
+const LABEL = { 1: '각성 결집', 2: '압박 격화', 3: '최종 폭주' };
+const ACCENT = { 1: '#7edcff', 2: '#ffc66d', 3: '#ff6678' };
+export function mythicPhaseIdentityIcon(phase) { const [column, row] = CELL[phase]; return { phase, label: LABEL[phase], accent: ACCENT[phase], sx: column * 96, sy: row * 96, sw: 96, sh: 96, animated: false, motionAmplitude: 0, encounterToastIdentitySupported: true, transitionToastIdentitySupported: true, persistentRecallIdentitySupported: true, maxVisibleRecallIcons: 1, textFallbackPreserved: true, loadFailureBlocksGameplay: false }; }
+export function mythicPhasePressureSegments(weakpointRatio) { const ratio = Math.max(0, Math.min(1, Number.isFinite(weakpointRatio) ? weakpointRatio : 0)); return ratio >= .67 ? 3 : ratio >= .34 ? 2 : 1; }
+export function auditMythicPhaseIdentityAtlas() { const icons = MYTHIC_PHASE_IDENTITY_IDS.map(mythicPhaseIdentityIcon); const outOfBounds = icons.filter(i => i.sx < 0 || i.sy < 0 || i.sx + i.sw > MYTHIC_PHASE_IDENTITY_ATLAS.width || i.sy + i.sh > MYTHIC_PHASE_IDENTITY_ATLAS.height).map(i => i.phase); const uniqueCellCount = new Set(icons.map(i => `${i.sx}:${i.sy}`)).size; const coverage = icons.length / 3; return { coverage, uniqueCellCount, outOfBounds, passed: coverage === 1 && uniqueCellCount === 3 && outOfBounds.length === 0 }; }

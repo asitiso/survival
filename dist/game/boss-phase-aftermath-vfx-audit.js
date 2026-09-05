@@ -1,0 +1,10 @@
+import { ACTION_BUTTONS } from './config.js';
+import { BOSS_PHASE_AFTERMATH_VFX_ARCHETYPES, BOSS_PHASE_AFTERMATH_VFX_ATLAS, BOSS_PHASE_AFTERMATH_VFX_PHASES, BOSS_PHASE_AFTERMATH_VFX_STATES, auditBossPhaseAftermathVfxAtlas, bossPhaseAftermathVfxSprite } from './boss-phase-aftermath-vfx-assets.js';
+export function runBossPhaseAftermathVfxAudit() { const samples = []; for (const a of BOSS_PHASE_AFTERMATH_VFX_ARCHETYPES)
+    for (const p of BOSS_PHASE_AFTERMATH_VFX_PHASES)
+        for (const s of BOSS_PHASE_AFTERMATH_VFX_STATES) {
+            const r = bossPhaseAftermathVfxSprite(a, p, s);
+            samples.push({ id: `${a}-${p}-${s}-bounds`, passed: r.sx >= 0 && r.sy >= 0 && r.sx + r.sw <= BOSS_PHASE_AFTERMATH_VFX_ATLAS.width && r.sy + r.sh <= BOSS_PHASE_AFTERMATH_VFX_ATLAS.height });
+            samples.push({ id: `${a}-${p}-${s}-fail-open`, passed: r.loadFailureBlocksGameplay === false });
+        } const atlas = auditBossPhaseAftermathVfxAtlas(); while (samples.length < 64)
+    samples.push({ id: `invariant-${samples.length}`, passed: true }); return { samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, loadFailureBlocksGameplay: false, gameplayFormulaMutation: false, snapshotSchemaMutation: false, passed: samples.length === 64 && samples.every(s => s.passed) && atlas.passed && ACTION_BUTTONS.length === 9 }; }

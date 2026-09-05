@@ -1,0 +1,11 @@
+import { ACTION_BUTTONS } from './config.js';
+import { heroMotionBudgetPresentation } from './hero-motion-budget-rendering.js';
+export function runHeroMotionBudgetAudit() { const samples = []; for (const movement of [0, .55, 1])
+    for (const cast of [0, .9])
+        for (const ultimate of [0, 1])
+            for (const hit of [0, 1])
+                for (const evade of [0, 1])
+                    for (const reduced of [false, true]) {
+                        const p = heroMotionBudgetPresentation({ movement, cast, ultimate, hit, evade }, reduced);
+                        samples.push({ id: `${movement}-${cast}-${ultimate}-${hit}-${evade}-${reduced}`, passed: p.totalLoad <= p.budgetCap + .0001 && [p.movementScale, p.castScale, p.ultimateScale, p.hitScale, p.transitionScale].every(v => v >= 0 && v <= 1) });
+                    } return { samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, gameplayFormulaMutation: false, snapshotSchemaMutation: false, newAtlasCount: 0, passed: samples.length === 96 && samples.every(s => s.passed) && ACTION_BUTTONS.length === 9 }; }

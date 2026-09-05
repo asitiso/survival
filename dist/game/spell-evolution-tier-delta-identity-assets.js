@@ -1,0 +1,7 @@
+export const SPELL_EVOLUTION_TIER_DELTA_IDS = ['awaken', 'final'];
+const CELL = { awaken: 0, final: 1 };
+const META = { awaken: { label: '1차 진화', accent: '#79d7ff' }, final: { label: '최종 진화', accent: '#ffd66e' } };
+export const SPELL_EVOLUTION_TIER_DELTA_ATLAS = { src: './assets/ui/spell-evolution-tier-delta-icons.png', columns: 2, rows: 1, cellSize: 96, width: 192, height: 96 };
+export function spellEvolutionTierDeltaIdentityIcon(id) { const meta = META[id]; return { id, label: meta.label, accent: meta.accent, sx: CELL[id] * 96, sy: 0, sw: 96, sh: 96, animated: false, motionAmplitude: 0, textFallbackPreserved: true, loadFailureBlocksGameplay: false }; }
+export function spellEvolutionTierDeltaIdentityStyle(id) { return `--secondary-icon-image:url('${SPELL_EVOLUTION_TIER_DELTA_ATLAS.src}');--secondary-icon-bg-size:200% 100%;--secondary-icon-bg-position:${CELL[id] * 100}% 0%`; }
+export function auditSpellEvolutionTierDeltaIdentityAtlas() { const icons = SPELL_EVOLUTION_TIER_DELTA_IDS.map(spellEvolutionTierDeltaIdentityIcon), outOfBounds = icons.filter(icon => icon.sx < 0 || icon.sx + icon.sw > SPELL_EVOLUTION_TIER_DELTA_ATLAS.width || icon.sy + icon.sh > SPELL_EVOLUTION_TIER_DELTA_ATLAS.height).map(icon => icon.id), uniqueCellCount = new Set(icons.map(icon => `${icon.sx}:${icon.sy}`)).size, coverage = icons.length / 2; return { coverage, uniqueCellCount, outOfBounds, passed: coverage === 1 && uniqueCellCount === 2 && outOfBounds.length === 0 }; }

@@ -1,0 +1,10 @@
+import { ACTION_BUTTONS } from './config.js';
+import { rangedEnemyProjectileLaunchOriginPresentation } from './ranged-enemy-projectile-launch-origin-rendering.js';
+export function runRangedEnemyProjectileLaunchOriginAudit() { const samples = []; for (const reduced of [false, true])
+    for (const pullback of [0, .5, 1])
+        for (const resolve of [0, 1])
+            for (const facing of [[1, 0], [.7, .7]]) {
+                const p = rangedEnemyProjectileLaunchOriginPresentation({ type: 'archer', radius: 18, facingX: facing[0], facingY: facing[1], pullback, lunge: .35, resolve }, reduced);
+                samples.push({ id: `${reduced}-${pullback}-${resolve}-${facing[0]}-bound`, passed: Math.hypot(p.originOffsetX, p.originOffsetY) <= 36.001 });
+                samples.push({ id: `${reduced}-${pullback}-${resolve}-${facing[0]}-owner`, passed: p.owner === 'attack-pose' });
+            } return { samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, gameplayFormulaMutation: false, snapshotSchemaMutation: false, newAtlasCount: 0, passed: samples.length === 48 && samples.every(s => s.passed) && ACTION_BUTTONS.length === 9 }; }

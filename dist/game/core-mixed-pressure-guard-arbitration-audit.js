@@ -1,0 +1,8 @@
+import { ACTION_BUTTONS } from './config.js';
+import { advanceCoreMixedPressureGuardArbitration, coreMixedPressureGuardArbitrationPresentation, createCoreMixedPressureGuardArbitrationState } from './core-mixed-pressure-guard-arbitration-rendering.js';
+export function runCoreMixedPressureGuardArbitrationAudit() { const samples = []; for (const reduced of [false, true])
+    for (const projectile of [0, .25, .7, .95])
+        for (const contact of [0, .3, .68, .9]) {
+            const s = advanceCoreMixedPressureGuardArbitration(createCoreMixedPressureGuardArbitrationState(), { projectileStrength: projectile, contactStrength: contact }, .016), p = coreMixedPressureGuardArbitrationPresentation(s, reduced);
+            samples.push({ id: `${reduced}-${projectile}-${contact}`, passed: p.projectileAlphaScale >= 0 && p.projectileAlphaScale <= 1 && p.contactAlphaScale >= 0 && p.contactAlphaScale <= 1 && s.holdTtl >= 0 && s.holdTtl <= .14 });
+        } return { samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, gameplayFormulaMutation: false, snapshotSchemaMutation: false, newAtlasCount: 0, passed: samples.length === 32 && samples.every(s => s.passed) && ACTION_BUTTONS.length === 9 }; }

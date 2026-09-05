@@ -1,0 +1,12 @@
+export const BOSS_PROJECTILE_LIFECYCLE_VFX_ARCHETYPES = ['inferno', 'summoner', 'juggernaut', 'abyssWitch', 'twinMaw', 'timeEater'];
+export const BOSS_PROJECTILE_LIFECYCLE_VFX_STATES = ['travel', 'impact'];
+export const BOSS_PROJECTILE_LIFECYCLE_VFX_ATLAS = { src: './assets/bosses/boss-projectile-lifecycle-vfx.png', columns: 6, rows: 2, cellSize: 128, width: 768, height: 256 };
+export function bossProjectileLifecycleVfxSprite(archetype, state) { const col = BOSS_PROJECTILE_LIFECYCLE_VFX_ARCHETYPES.indexOf(archetype), row = BOSS_PROJECTILE_LIFECYCLE_VFX_STATES.indexOf(state); if (col < 0 || row < 0)
+    throw new Error(`Unknown boss projectile lifecycle VFX: ${archetype}:${state}`); const s = 128; return { sx: col * s, sy: row * s, sw: s, sh: s, presentationOnly: true, loadFailureBlocksGameplay: false }; }
+export function auditBossProjectileLifecycleVfxAtlas() { const cells = new Set(), outOfBounds = []; for (const a of BOSS_PROJECTILE_LIFECYCLE_VFX_ARCHETYPES)
+    for (const state of BOSS_PROJECTILE_LIFECYCLE_VFX_STATES) {
+        const r = bossProjectileLifecycleVfxSprite(a, state);
+        cells.add(`${r.sx}:${r.sy}`);
+        if (r.sx < 0 || r.sy < 0 || r.sx + r.sw > 768 || r.sy + r.sh > 256)
+            outOfBounds.push(`${a}:${state}`);
+    } const itemCount = 12; return { archetypeCount: 6, stateCount: 2, itemCount, uniqueCellCount: cells.size, coverage: cells.size / itemCount, outOfBounds, passed: cells.size === itemCount && outOfBounds.length === 0 }; }

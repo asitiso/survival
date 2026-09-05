@@ -1,0 +1,8 @@
+export function evaluatePackageRunCycleSmoke(input) { const commentMatch = input.sourceRevision.length > 0 && input.archiveComment === input.sourceRevision, issues = []; if (!input.newRunOk)
+    issues.push('package-new-run'); if (!input.checkpointOk)
+    issues.push('package-checkpoint'); if (!input.resumeOk)
+    issues.push('package-resume'); if (input.elapsedDrift !== 0)
+    issues.push('package-resume-drift'); if (!input.endlessStateMatch)
+    issues.push('package-endless-state'); if (input.processExitErrors > 0)
+    issues.push('package-run-cycle-process'); if (!commentMatch)
+    issues.push('package-run-cycle-comment'); return { ...input, commentMatch, passed: issues.length === 0, issues }; }

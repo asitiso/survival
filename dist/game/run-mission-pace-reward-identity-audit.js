@@ -1,0 +1,52 @@
+import { ACTION_BUTTONS } from './config.js';
+import { RunMissionDirector, missionProgress, missionTargetForDanger } from './run-missions.js';
+import { RUN_MISSION_PACE_IDENTITY_IDS, RUN_MISSION_PACE_THRESHOLDS, auditRunMissionPaceIdentityAtlas, runMissionPaceIdentityForRatios, runMissionPaceIdentityIcon } from './run-mission-pace-identity-assets.js';
+import { objectiveRewardIdentityIcon } from './objective-reward-identity-assets.js';
+const IDS = Object.freeze(['massacre', 'eliteHunt', 'goldRush']);
+const RNG = { massacre: 0, eliteHunt: .4, goldRush: .9 };
+const EXPECTED = {
+    massacre: { duration: 30, kind: 'shopToken', amount: 1, target1: 45, target11: 95 },
+    eliteHunt: { duration: 40, kind: 'gold', amount: 320, target1: 3, target11: 5 },
+    goldRush: { duration: 35, kind: 'potion', amount: 1, target1: 450, target11: 900 },
+};
+function snapshot(danger = 1) { return { kills: 0, eliteKills: 0, goldEarned: 0, danger }; }
+function startMission(id, danger = 1) { const director = new RunMissionDirector(() => RNG[id]); const started = director.update(0, 105, snapshot(danger), 99).started; if (!started)
+    throw new Error(`mission ${id} did not start`); return started; }
+function scheduleContractOk() { const first = new RunMissionDirector(() => 0); if (first.update(0, 104.999, snapshot(), 99).started !== null)
+    return false; if (first.update(0, 105, snapshot(), 12).started !== null)
+    return false; if (first.update(0, 105, snapshot(), 12.01).started === null)
+    return false; const min = new RunMissionDirector(() => 0); const a = min.update(0, 105, snapshot(), 99).started; if (!a)
+    return false; const doneSnap = { ...snapshot(), kills: a.id === 'massacre' ? a.target : 0, eliteKills: a.id === 'eliteHunt' ? a.target : 0, goldEarned: a.id === 'goldRush' ? a.target : 0 }; min.update(0, 120, doneSnap, 99); if (min.nextMissionAt !== 200)
+    return false; let calls = 0; const max = new RunMissionDirector(() => calls++ === 0 ? 0 : 1); const b = max.update(0, 105, snapshot(), 99).started; if (!b)
+    return false; const doneSnap2 = { ...snapshot(), kills: b.id === 'massacre' ? b.target : 0, eliteKills: b.id === 'eliteHunt' ? b.target : 0, goldEarned: b.id === 'goldRush' ? b.target : 0 }; max.update(0, 120, doneSnap2, 99); return max.nextMissionAt === 230; }
+export function auditRunMissionPaceRewardIdentityAssets() {
+    const atlas = auditRunMissionPaceIdentityAtlas(), samples = [];
+    const push = (caseId, missionId, passed) => samples.push({ caseId, missionId, passed });
+    let gameplayContractMutation = ACTION_BUTTONS.length !== 9;
+    for (const id of IDS) {
+        const mission = startMission(id), expected = EXPECTED[id], rewardIcon = objectiveRewardIdentityIcon(mission.reward.kind);
+        const halfProgress = mission.target * .5;
+        const progressSnapshots = [id === 'massacre' ? { ...snapshot(), kills: halfProgress } : id === 'eliteHunt' ? { ...snapshot(), eliteKills: halfProgress } : { ...snapshot(), goldEarned: halfProgress }];
+        const progress = missionProgress(mission, progressSnapshots[0]);
+        const checks = [
+            ['duration', mission.duration === expected.duration && mission.remaining === expected.duration], ['reward-kind', mission.reward.kind === expected.kind], ['reward-amount', mission.reward.amount === expected.amount], ['reward-icon-reuse', rewardIcon.id === expected.kind], ['target-danger-1', missionTargetForDanger(id, 1) === expected.target1], ['target-danger-11', missionTargetForDanger(id, 11) === expected.target11], ['progress-delta', Math.abs(progress - halfProgress) < 1e-9], ['pace-on-track', runMissionPaceIdentityForRatios(.5, .58) === 'onTrack'], ['pace-on-track-boundary', runMissionPaceIdentityForRatios(.5, .58) === 'onTrack'], ['pace-catch-up', runMissionPaceIdentityForRatios(.5, .59) === 'catchUp'], ['pace-catch-up-boundary', runMissionPaceIdentityForRatios(.5, .75) === 'catchUp'], ['pace-critical', runMissionPaceIdentityForRatios(.5, .76) === 'critical'], ['pace-static', RUN_MISSION_PACE_IDENTITY_IDS.every(p => { const icon = runMissionPaceIdentityIcon(p); return !icon.animated && icon.motionAmplitude === 0; })], ['pace-fallback', RUN_MISSION_PACE_IDENTITY_IDS.every(p => { const icon = runMissionPaceIdentityIcon(p); return icon.textFallbackPreserved && !icon.loadFailureBlocksGameplay; })], ['pace-count', RUN_MISSION_PACE_IDENTITY_IDS.length === 3], ['atlas', atlas.passed], ['schedule', scheduleContractOk()], ['actions', ACTION_BUTTONS.length === 9], ['reward-positive', mission.reward.amount > 0], ['identity-one-visible', RUN_MISSION_PACE_IDENTITY_IDS.every(p => runMissionPaceIdentityIcon(p).maxVisibleIcons === 1)],
+        ];
+        for (const [name, passed] of checks) {
+            push(`${id}:${name}`, id, passed);
+            if (!passed)
+                gameplayContractMutation = true;
+        }
+    }
+    const issues = [];
+    if (samples.length !== 60)
+        issues.push(`samples:${samples.length}`);
+    if (!atlas.passed)
+        issues.push('pace-atlas');
+    if (!scheduleContractOk())
+        issues.push('schedule');
+    if (gameplayContractMutation)
+        issues.push('gameplay-contract');
+    if (ACTION_BUTTONS.length !== 9)
+        issues.push('actions');
+    return { samples, paceIdentityCount: RUN_MISSION_PACE_IDENTITY_IDS.length, paceCoverage: atlas.coverage, paceUniqueCellCount: atlas.uniqueCellCount, paceThresholds: RUN_MISSION_PACE_THRESHOLDS, missionDurations: [30, 40, 35], scheduleContract: { firstMissionAt: 105, bossSafetyWindow: 12, minDelay: 80, maxDelay: 110 }, rewards: [{ id: 'massacre', kind: 'shopToken', amount: 1 }, { id: 'eliteHunt', kind: 'gold', amount: 320 }, { id: 'goldRush', kind: 'potion', amount: 1 }], gameplayContractMutation, actionCount: ACTION_BUTTONS.length, snapshotSchemaMutation: false, issues, passed: issues.length === 0 && samples.every(sample => sample.passed) };
+}

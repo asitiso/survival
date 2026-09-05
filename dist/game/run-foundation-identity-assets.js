@@ -1,0 +1,20 @@
+import { DECISION_PATH_ICON_ATLAS, decisionPathIconSprite } from './decision-path-icon-assets.js';
+import { BUILD_IDENTITY_ATLAS, buildIdentityIcon } from './build-identity-assets.js';
+import { DEEP_RUN_ASCENSION_IDS, DEEP_RUN_DECISION_ATLAS, deepRunDecisionIdentityIcon } from './deep-run-decision-identity-assets.js';
+export const RUN_FOUNDATION_TRAIT_IDS = ['destruction', 'rapidCasting', 'goldSense', 'guardianOath', 'infernalPact', 'glacialFocus', 'stormPursuit', 'bastionVow'];
+export const RUN_FOUNDATION_RELIC_IDS = ['abyss-eye', 'chrono-shard', 'guardian-heart', 'ember-crown', 'winter-heart', 'storm-core', 'oath-seal', 'inferno-heart', 'summoner-sigil', 'juggernaut-core', 'phoenix-brand', 'zero-crystal', 'storm-crown', 'citadel-sigil'];
+export const RUN_FOUNDATION_ASCENSION_IDS = [...DEEP_RUN_ASCENSION_IDS];
+export function runTraitIdentity(id) {
+    const sprite = decisionPathIconSprite(id);
+    if (!sprite)
+        throw new Error(`Unknown run trait identity: ${id}`);
+    return { id, atlasSrc: DECISION_PATH_ICON_ATLAS.src, ...sprite, animated: false, motionAmplitude: 0, textFallbackPreserved: true, loadFailureBlocksGameplay: false, persistentRecallSupported: true };
+}
+export function relicAcquisitionIdentity(id) {
+    const icon = buildIdentityIcon(id);
+    return { id, atlasSrc: BUILD_IDENTITY_ATLAS.src, sx: icon.sx, sy: icon.sy, sw: icon.sw, sh: icon.sh, animated: false, motionAmplitude: 0, textFallbackPreserved: true, loadFailureBlocksGameplay: false, acquisitionToastSupported: true };
+}
+export function ascensionSelectionIdentity(id) {
+    const icon = deepRunDecisionIdentityIcon({ kind: 'ascension', id });
+    return { id, atlasSrc: DEEP_RUN_DECISION_ATLAS.src, sx: icon.sx, sy: icon.sy, sw: icon.sw, sh: icon.sh, animated: false, motionAmplitude: 0, textFallbackPreserved: true, loadFailureBlocksGameplay: false, selectionToastSupported: true };
+}

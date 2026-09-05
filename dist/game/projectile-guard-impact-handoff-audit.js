@@ -1,0 +1,8 @@
+import { ACTION_BUTTONS } from './config.js';
+import { projectileGuardImpactHandoffPresentation } from './projectile-guard-impact-handoff-rendering.js';
+export function runProjectileGuardImpactHandoffAudit() { const samples = []; for (const reduced of [false, true])
+    for (const prevented of [0, .08, .2, .55, .9])
+        for (const ttl of [0, .08, .22, .36]) {
+            const p = projectileGuardImpactHandoffPresentation({ preventedRatio: prevented, impactTtl: ttl, impactMaxTtl: .36 }, reduced);
+            samples.push({ id: `${reduced}-${prevented}-${ttl}`, passed: [p.threatAlphaScale, p.ordinaryImpactAlphaScale, p.guardImpactAlpha].every(v => v >= 0 && v <= 1) && p.deflectDistance >= 0 && p.deflectDistance <= 22 });
+        } return { samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, gameplayFormulaMutation: false, snapshotSchemaMutation: false, newAtlasCount: 0, passed: samples.length === 40 && samples.every(s => s.passed) && ACTION_BUTTONS.length === 9 }; }

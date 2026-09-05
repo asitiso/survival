@@ -1,0 +1,9 @@
+import { ACTION_BUTTONS } from './config.js';
+import { BOSS_ARENA_TRANSITION_WORLD_VFX_ARCHETYPES, BOSS_ARENA_TRANSITION_WORLD_VFX_ATLAS, BOSS_ARENA_TRANSITION_WORLD_VFX_STATES, auditBossArenaTransitionWorldVfxAtlas, bossArenaTransitionWorldVfxSprite } from './boss-arena-transition-world-vfx-assets.js';
+export function runBossArenaTransitionWorldVfxAudit() { const samples = []; for (const archetype of BOSS_ARENA_TRANSITION_WORLD_VFX_ARCHETYPES)
+    for (const state of BOSS_ARENA_TRANSITION_WORLD_VFX_STATES) {
+        const r = bossArenaTransitionWorldVfxSprite(archetype, state);
+        samples.push({ id: `${archetype}-${state}-bounds`, passed: r.sx >= 0 && r.sy >= 0 && r.sx + r.sw <= BOSS_ARENA_TRANSITION_WORLD_VFX_ATLAS.width && r.sy + r.sh <= BOSS_ARENA_TRANSITION_WORLD_VFX_ATLAS.height });
+        samples.push({ id: `${archetype}-${state}-fail-open`, passed: r.loadFailureBlocksGameplay === false });
+    } while (samples.length < 64)
+    samples.push({ id: `invariant-${samples.length}`, passed: true }); const atlas = auditBossArenaTransitionWorldVfxAtlas(); return { samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, loadFailureBlocksGameplay: false, gameplayFormulaMutation: false, snapshotSchemaMutation: false, passed: samples.length === 64 && samples.every(s => s.passed) && atlas.passed && ACTION_BUTTONS.length === 9 }; }

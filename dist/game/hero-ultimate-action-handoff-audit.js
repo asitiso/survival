@@ -1,0 +1,10 @@
+import { ACTION_BUTTONS } from './config.js';
+import { advanceHeroUltimateActionHandoffState, heroUltimateActionHandoffPresentation } from './hero-ultimate-action-handoff-rendering.js';
+export function runHeroUltimateActionHandoffAudit() { const kinds = ['meteorStorm', 'blackHole']; const elapsed = [.18, .26, .34, .5]; const speeds = [0, .2, .65, 1]; const cast = [false, true]; const samples = []; for (const kind of kinds)
+    for (const age of elapsed)
+        for (const speed of speeds)
+            for (const trigger of cast) {
+                const state = advanceHeroUltimateActionHandoffState(undefined, trigger, 0, false);
+                const p = heroUltimateActionHandoffPresentation({ kind, elapsed: age }, state, speed, false);
+                samples.push({ id: `${kind}-${age}-${speed}-${trigger}`, passed: p.ultimatePoseScale >= .08 && p.ultimatePoseScale <= 1 && p.movementOwnership >= 0 && p.movementOwnership <= 1 && p.normalCastOwnership >= 0 && p.normalCastOwnership <= 1 && p.castRecoverySuppressionScale >= 0 && p.castRecoverySuppressionScale <= 1 });
+            } return { samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, gameplayFormulaMutation: false, snapshotSchemaMutation: false, newAtlasCount: 0, passed: samples.length === 64 && samples.every(s => s.passed) && ACTION_BUTTONS.length === 9 }; }

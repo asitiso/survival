@@ -1,4 +1,4 @@
-name: Phase 4191-4208 Threat Rhythm
+name: Phase 4191-4208 Integration Gate
 
 on:
   push:
@@ -7,10 +7,10 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  targeted:
+  regression-0:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,45 +19,110 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Apply approved presentation integration
-        run: node scripts/phase4191-4208-mutator.mjs
-      - name: Build
-        run: npm run build
-      - name: Targeted phase contracts and affected regression
-        shell: bash
-        run: |
-          set -euo pipefail
-          files=(
-            tests/phase4173-4178-final-readability-settle.test.mjs
-            tests/phase4179-4184-secondary-recovery-gate.test.mjs
-            tests/phase4185-4190-focus-transfer-coherence.test.mjs
-          )
-          for f in \
-            tests/phase4191-4196-threat-rhythm-peak-separation.test.mjs \
-            tests/phase4197-4202-threat-rhythm-recovery.test.mjs \
-            tests/phase4203-4208-threat-rhythm-temporal-arbitration.test.mjs; do
-            [[ -f "$f" ]] && files+=("$f")
-          done
-          node --test "${files[@]}"
-          git diff --check
-      - name: Commit verified generated/runtime integration
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "asitiso"
-          git config user.email "asitiso.woo@gmail.com"
-          git add src/game/enemies.ts src/game/spells.ts src/game/game.ts
-          git add -f dist/game
-          if git diff --cached --quiet; then
-            echo "Verified tree already committed."
-            exit 0
-          fi
-          if [[ -f tests/phase4203-4208-threat-rhythm-temporal-arbitration.test.mjs ]]; then
-            message="feat: integrate Phase 4203-4208 temporal arbitration"
-          elif [[ -f tests/phase4197-4202-threat-rhythm-recovery.test.mjs ]]; then
-            message="feat: integrate Phase 4197-4202 rhythm recovery"
-          else
-            message="feat: integrate Phase 4191-4196 peak separation"
-          fi
-          git commit -m "$message"
-          git push origin HEAD:work/phase4191-4208-threat-rhythm
+      - run: npm run build
+      - run: node scripts/run-regression-shard.mjs 0
+  regression-1:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: node scripts/run-regression-shard.mjs 1
+  regression-2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: node scripts/run-regression-shard.mjs 2
+  regression-3:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: node scripts/run-regression-shard.mjs 3
+  regression-4:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: node scripts/run-regression-shard.mjs 4
+  regression-5:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: node scripts/run-regression-shard.mjs 5
+  regression-6:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: node scripts/run-regression-shard.mjs 6
+  regression-7:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: node scripts/run-regression-shard.mjs 7
+  release-gates:
+    runs-on: ubuntu-latest
+    needs:
+      - regression-0
+      - regression-1
+      - regression-2
+      - regression-3
+      - regression-4
+      - regression-5
+      - regression-6
+      - regression-7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Fresh phase contracts
+        run: npm run build && node --test tests/phase4191-4196-threat-rhythm-peak-separation.test.mjs tests/phase4197-4202-threat-rhythm-recovery.test.mjs tests/phase4203-4208-threat-rhythm-temporal-arbitration.test.mjs
+      - name: Diff check
+        run: git diff --check
+      - name: Raster gate
+        run: npm run verify:raster
+      - name: Release gate
+        run: npm run verify:release
+      - name: Candidate gate
+        run: npm run verify:candidate

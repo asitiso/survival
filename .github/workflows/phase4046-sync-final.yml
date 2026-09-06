@@ -15,7 +15,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat sync/phase4046-v2/part-00.b64 sync/phase4046-v2/part-01.b64 sync/phase4046-v2/part-02.b64 sync/phase4046-v2/part-03.b64 sync/phase4046-v2/part-04.b64 sync/phase4046-v2/part-05.b64 sync/phase4046-v2/part-11.b64 sync/phase4046-v2/part-09.b64 sync/phase4046-v2/part-10.b64 sync/phase4046-v2/part-07.b64 sync/phase4046-v2/part-08.b64 > /tmp/p.b64
+          cat sync/phase4046-v2/part-00.b64 sync/phase4046-v2/part-01.b64 sync/phase4046-v2/part-02.b64 sync/phase4046-v2/part-12a.b64 sync/phase4046-v2/part-12b.b64 sync/phase4046-v2/part-04.b64 sync/phase4046-v2/part-05.b64 sync/phase4046-v2/part-11.b64 sync/phase4046-v2/part-09.b64 sync/phase4046-v2/part-10.b64 sync/phase4046-v2/part-07.b64 sync/phase4046-v2/part-08.b64 > /tmp/p.b64
           test "$(wc -c < /tmp/p.b64)" -eq 163264
           base64 -d /tmp/p.b64 > /tmp/p.xz
           echo 'e14da6d4b463f6e2144e80280db11982c0cf9ee2a42bc8f24459de6e33fcdae4  /tmp/p.xz' | sha256sum -c -

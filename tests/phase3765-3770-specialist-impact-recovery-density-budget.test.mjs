@@ -1,0 +1,9 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import * as finish from '../dist/game/specialist-strike-impact-side-finish-rendering.js';
+const fn=finish.specialistImpactRecoveryDensityBudgetPresentation;
+test('specialist recovery density budget helper exists',()=>assert.equal(typeof fn,'function'));
+test('sparse finish recovery keeps full transition',()=>{const p=fn?.({activeCount:2,indexFromNewest:1,owner:'handoff',type:'assassin',recoveryBlend:.5},false);assert.ok(p);assert.equal(p.visible,true);assert.equal(p.alphaScale,1);});
+test('dense locomotion-owned tail retires before finish-owned tail',()=>{const l=fn?.({activeCount:8,indexFromNewest:3,owner:'locomotion',type:'assassin',recoveryBlend:.95},false),f=fn?.({activeCount:8,indexFromNewest:3,owner:'finish',type:'assassin',recoveryBlend:.1},false);assert.ok(l&&f);assert.ok(Number(l.visible)<=Number(f.visible));});
+test('siege golem heavy finish keeps one extra dense slot',()=>{const a=fn?.({activeCount:8,indexFromNewest:3,owner:'handoff',type:'assassin',recoveryBlend:.6},false),s=fn?.({activeCount:8,indexFromNewest:3,owner:'handoff',type:'siegeGolem',recoveryBlend:.6},false);assert.ok(a&&s);assert.ok(Number(s.visible)>=Number(a.visible));});
+test('reduced motion tightens tail length scale',()=>{const a=fn?.({activeCount:7,indexFromNewest:2,owner:'handoff',type:'shieldbearer',recoveryBlend:.7},false),b=fn?.({activeCount:7,indexFromNewest:2,owner:'handoff',type:'shieldbearer',recoveryBlend:.7},true);assert.ok(a&&b);assert.ok(b.lengthScale<=a.lengthScale);});
+test('live specialist finish composes recovery density budget after owner resolution',()=>{const s=fs.readFileSync('src/game/enemies.ts','utf8');assert.match(s,/specialistImpactRecoveryDensityBudgetPresentation/);assert.match(s,/recoveryDensityBudget/);});

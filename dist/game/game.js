@@ -73,6 +73,12 @@ import { HERO_CAST_RENDER_ATLAS, heroCastRenderPresentation, heroCastRenderSprit
 import { advanceHeroKinematicRenderState, createHeroKinematicRenderState, heroKinematicRenderPresentation } from './hero-kinematic-rendering.js';
 import { heroCastOrientationPresentation } from './hero-cast-orientation-rendering.js';
 import { advanceHeroCastAimHoldState, createHeroCastAimHoldState, heroCastAimHoldPresentation } from './hero-cast-aim-hold-rendering.js';
+import { heroBodyFacingOwnerPresentation } from './hero-body-facing-owner-rendering.js';
+import { advanceHeroBodyFacingHysteresisState, createHeroBodyFacingHysteresisState, heroBodyFacingHysteresisPresentation } from './hero-body-facing-hysteresis-rendering.js';
+import { heroDirectionalOverlayOwnerPresentation } from './hero-directional-overlay-owner-rendering.js';
+import { heroActionPoseEmphasisPresentation } from './hero-action-pose-emphasis-rendering.js';
+import { heroActionPoseHandoffPresentation } from './hero-action-pose-handoff-rendering.js';
+import { heroActionLayerBudgetPresentation } from './hero-action-layer-budget-rendering.js';
 import { advanceHeroCastCadenceState, heroCastCadencePresentation } from './hero-cast-cadence-rendering.js';
 import { advanceHeroActionTransitionState, heroActionTransitionPresentation } from './hero-action-transition-rendering.js';
 import { advanceHeroUltimateBodyState, heroUltimateBodyPresentation } from './hero-ultimate-body-continuity-rendering.js';
@@ -82,12 +88,12 @@ import { heroMotionBudgetPresentation } from './hero-motion-budget-rendering.js'
 import { heroGroundContactOwnershipPresentation } from './hero-ground-contact-ownership-rendering.js';
 import { heroHitGroundHandoffPresentation } from './hero-hit-ground-handoff-rendering.js';
 import { advanceHeroCrisisGroundSettleState, heroCrisisGroundSettlePresentation } from './hero-crisis-ground-settle-rendering.js';
-import { heroProjectileLaunchOriginPresentation } from './hero-projectile-launch-origin-rendering.js';
+import { heroActionLaunchOriginCoherencePresentation } from './hero-action-launch-origin-coherence-rendering.js';
 import { bossSpecialLaunchOriginPresentation } from './boss-special-launch-origin-rendering.js';
-import { bossHazardTelegraphHandoffPresentation } from './boss-hazard-telegraph-handoff-rendering.js';
-import { bossHazardLifecycleOwnerPresentation } from './boss-hazard-lifecycle-owner-rendering.js';
+import { bossHazardActivationDensityBudgetPresentation, bossHazardFootprintDensityBudgetPresentation, bossHazardFootprintLifecycleHandoffPresentation, bossHazardMaterializationFootprintPresentation, bossHazardPersistentActivationSettlePresentation, bossHazardTelegraphHandoffPresentation } from './boss-hazard-telegraph-handoff-rendering.js';
+import { bossClearedGroundSafeLaneRecoveryCoherencePresentation, bossClearedGroundSafeLaneRecoveryHandoffPresentation, bossClearedGroundSafeLaneRecoveryDensityBudgetPresentation, bossHazardAftermathDensityBudgetPresentation, bossHazardAftermathOwnerArbitrationPresentation, bossHazardEndAftermathOwnershipPresentation, bossHazardExpirationGroundStateDensityBudgetPresentation, bossHazardExpirationGroundStateHandoffPresentation, bossHazardLifecycleOwnerPresentation, bossHazardPersistentExpirationGroundStatePresentation, bossHazardRespawnGroundCoherencePresentation, bossHazardRespawnGroundDensityBudgetPresentation, bossHazardRespawnGroundHandoffPresentation, bossHazardRespawnMaterializationDensityBudgetPresentation, bossHazardRespawnMaterializationOwnershipPresentation, bossHazardRespawnMaterializationSettlePresentation } from './boss-hazard-lifecycle-owner-rendering.js';
 import { bossGroundOriginRebasePresentation } from './boss-ground-origin-rebase-rendering.js';
-import { enemyDeathTransitionPresentation } from './enemy-hit-death-transition-rendering.js';
+import { enemyDeathTransitionPresentation, enemyFinisherDeathAfterglowContinuityPresentation, enemyFinisherDeathAfterglowHandoffPresentation, enemyFinisherDeathAfterglowDensityBudgetPresentation } from './enemy-hit-death-transition-rendering.js';
 import { specialistDefeatGroundRetirementPresentation } from './specialist-defeat-ground-retirement-rendering.js';
 import { regularDefeatGroundRetirementPresentation } from './regular-defeat-ground-retirement-rendering.js';
 import { characterGroundContactPresentation, characterHitRecoilPresentation } from './character-contact-recoil-rendering.js';
@@ -205,6 +211,9 @@ import { advanceSafeLaneAttentionRecoveryHysteresis, createSafeLaneAttentionReco
 import { safeLaneIdentityOwnerArbitrationPresentation } from './safe-lane-identity-owner-arbitration-rendering.js';
 import { safeLaneHazardPathOcclusionPresentation } from './safe-lane-hazard-path-occlusion-rendering.js';
 import { safeLaneHazardPathGapPresentation } from './safe-lane-hazard-path-gap-rendering.js';
+import { safeLaneGapFeatherPresentation } from './safe-lane-gap-feather-rendering.js';
+import { advanceSafeLaneGapFeatherHysteresisState, createSafeLaneGapFeatherHysteresisState } from './safe-lane-gap-feather-hysteresis-rendering.js';
+import { safeLaneGapHazardHandoffPresentation } from './safe-lane-gap-hazard-handoff-rendering.js';
 import { advanceSafeLaneHazardOcclusionRecovery, createSafeLaneHazardOcclusionRecoveryState, safeLaneHazardOcclusionRecoveryPresentation } from './safe-lane-hazard-occlusion-recovery-rendering.js';
 import { ENEMY_FINISHER_VFX_ATLAS, enemyFinisherVfxSprite } from './enemy-finisher-vfx-assets.js';
 import { HERO_CRISIS_VFX_ATLAS, heroCrisisVfxSprite } from './hero-crisis-vfx-assets.js';
@@ -584,6 +593,8 @@ export class Game {
     heroCastRenderRecover = 0;
     heroCastCadenceState = { chain: 0, bridge: 0, pulse: 0 };
     heroCastAimHoldState = createHeroCastAimHoldState();
+    heroBodyFacingHysteresisState = createHeroBodyFacingHysteresisState();
+    heroBodyFacingHysteresisLastAt = -99;
     heroActionTransitionState = { hit: 0, cast: 0, evade: 0, bridge: 0, last: 'neutral' };
     heroUltimateBodyState = { kind: null, elapsed: 0 };
     heroUltimateAimContinuityState = createHeroUltimateAimContinuityState();
@@ -592,6 +603,9 @@ export class Game {
     heroRenderHitRecoil = 0;
     heroCrisisGroundSettleState = { impact: 0, settle: 0 };
     heroLastRenderedBodyOffset = { x: 0, y: 0 };
+    heroLastRenderedActionFacing = { x: 1, y: 0 };
+    heroLastRenderedActionPoseStrength = 0;
+    heroLastRenderedActionOwner = 'movement';
     heroProjectileVfxAtlasImage = null;
     heroProjectileVfxAtlasReady = false;
     heroResponseVfxAtlasImage = null;
@@ -795,6 +809,7 @@ export class Game {
     safeLaneAttentionRecoveryHysteresisState = createSafeLaneAttentionRecoveryHysteresisState();
     safeLaneAttentionRecoveryLastAt = -99;
     safeLaneHazardOcclusionRecoveryState = createSafeLaneHazardOcclusionRecoveryState();
+    safeLaneGapFeatherHysteresisState = createSafeLaneGapFeatherHysteresisState();
     safeLaneHazardOcclusionRecoveryLastAt = -99;
     enemyFinisherVfxAtlasImage = null;
     enemyFinisherVfxAtlasReady = false;
@@ -2343,6 +2358,8 @@ export class Game {
         this.heroCastRenderRecover = 0;
         this.heroCastCadenceState = { chain: 0, bridge: 0, pulse: 0 };
         this.heroCastAimHoldState = createHeroCastAimHoldState();
+        this.heroBodyFacingHysteresisState = createHeroBodyFacingHysteresisState(this.hero.facing);
+        this.heroBodyFacingHysteresisLastAt = -99;
         this.heroActionTransitionState = { hit: 0, cast: 0, evade: 0, bridge: 0, last: 'neutral' };
         this.heroUltimateBodyState = { kind: null, elapsed: 0 };
         this.heroUltimateAimContinuityState = createHeroUltimateAimContinuityState();
@@ -2351,6 +2368,9 @@ export class Game {
         this.heroRenderHitRecoil = 0;
         this.heroCrisisGroundSettleState = { impact: 0, settle: 0 };
         this.heroLastRenderedBodyOffset = { x: 0, y: 0 };
+        this.heroLastRenderedActionFacing = { ...this.hero.facing };
+        this.heroLastRenderedActionPoseStrength = 0;
+        this.heroLastRenderedActionOwner = 'movement';
         this.survivalResponseVfx = [];
         this.survivalResponseLastAt = {};
         this.coreGuardDamageSourceHysteresisState = createCoreGuardDamageSourceHysteresisState();
@@ -2372,6 +2392,7 @@ export class Game {
         this.safeLaneAttentionRecoveryHysteresisState = createSafeLaneAttentionRecoveryHysteresisState();
         this.safeLaneAttentionRecoveryLastAt = -99;
         this.safeLaneHazardOcclusionRecoveryState = createSafeLaneHazardOcclusionRecoveryState();
+        this.safeLaneGapFeatherHysteresisState = createSafeLaneGapFeatherHysteresisState();
         this.safeLaneHazardOcclusionRecoveryLastAt = -99;
         this.enemyFinisherVfx = [];
         this.heroCrisisVfx = [];
@@ -2709,7 +2730,7 @@ export class Game {
             this.autoTargetId = chooseSpellTarget(this.enemies.enemies, this.hero.pos, this.core.pos, true, this.autoTargetId)?.id ?? null;
         else
             this.autoTargetId = null;
-        const spellWorld = { hero: this.hero, core: this.core, enemies: this.enemies, terrain: this.terrain, feedback: this.feedback, magicTargets: this.bossEncounter, weakpointAim: this.bossEncounter, fusions: this.fusionRuntime.equipped, preferredAutoTargetId: this.autoTargetId, preferredManualTargetId: null, visualBodyOffset: this.heroLastRenderedBodyOffset, reducedMotion: this.presentationSettings.reducedMotion, reducedFlash: this.presentationSettings.reducedFlash };
+        const spellWorld = { hero: this.hero, core: this.core, enemies: this.enemies, terrain: this.terrain, feedback: this.feedback, magicTargets: this.bossEncounter, weakpointAim: this.bossEncounter, fusions: this.fusionRuntime.equipped, preferredAutoTargetId: this.autoTargetId, preferredManualTargetId: null, visualBodyOffset: this.heroLastRenderedBodyOffset, visualActionFacing: this.heroLastRenderedActionFacing, visualActionPoseStrength: this.heroLastRenderedActionPoseStrength, visualActionOwner: this.heroLastRenderedActionOwner, reducedMotion: this.presentationSettings.reducedMotion, reducedFlash: this.presentationSettings.reducedFlash };
         this.flushBufferedManualCasts(spellWorld);
         for (const action of COMBAT_CAST_ACTIONS) {
             if (this.input.consumePressed(action))
@@ -2869,7 +2890,7 @@ export class Game {
                     this.presentation.emitScreenEffect({ kind: 'pulse', x: death.x, y: death.y, radius: 80 + killChainCue.tier * 34, color: chainVfx.color, ttl: 0.20 + killChainCue.tier * 0.035, alpha: chainVfx.pulseAlpha, width: 3 + killChainCue.tier });
                     this.feedback.addCameraPressure('killChain');
                 }
-                this.queueEnemyFinisherVfx(death.visualSource ?? 'normal', death.x, death.y, death.type);
+                this.queueEnemyFinisherVfx(death.visualSource ?? 'normal', death.x, death.y, death.type, death.deathPose?.tier ?? 'normal');
                 if (death.type !== 'boss' && death.deathPose)
                     this.enemyDefeatBodyTransitions.push({ death: death, startedAt: this.elapsed, until: this.elapsed + (this.presentationSettings.reducedMotion ? .22 : .34) });
                 if (this.enemyDefeatBodyTransitions.length > 20)
@@ -3844,7 +3865,7 @@ export class Game {
         if (!spellId)
             return;
         const descriptor = spellVfxDescriptor(this.hero.profileId, spellId, this.spells.levels[spellId]);
-        const launchPose = heroProjectileLaunchOriginPresentation({ bodyOffsetX: this.heroLastRenderedBodyOffset.x, bodyOffsetY: this.heroLastRenderedBodyOffset.y, facingX: this.hero.facing.x, facingY: this.hero.facing.y, radius: this.hero.radius, kind: descriptor.ultimate ? 'ultimate' : 'normal' }, this.presentationSettings.reducedMotion);
+        const launchPose = heroActionLaunchOriginCoherencePresentation({ owner: this.heroLastRenderedActionOwner, bodyOffsetX: this.heroLastRenderedBodyOffset.x, bodyOffsetY: this.heroLastRenderedBodyOffset.y, bodyFacingX: this.heroLastRenderedActionFacing.x, bodyFacingY: this.heroLastRenderedActionFacing.y, movementFacingX: this.hero.facing.x, movementFacingY: this.hero.facing.y, radius: this.hero.radius, poseStrength: this.heroLastRenderedActionPoseStrength, kind: descriptor.ultimate ? 'ultimate' : 'normal' }, this.presentationSettings.reducedMotion);
         const launchOrigin = { x: this.hero.pos.x + launchPose.originOffsetX, y: this.hero.pos.y + launchPose.originOffsetY };
         const density = criticalCuePolicy(this.presentation.quality).decorativeDensity;
         const alphaCap = this.presentationSettings.reducedFlash ? Math.min(0.58, descriptor.opacity) : descriptor.opacity;
@@ -4007,6 +4028,8 @@ export class Game {
                 continue;
             const duration = Math.max(.001, cue.until - cue.startedAt), progress = Math.max(0, Math.min(1, (this.elapsed - cue.startedAt) / duration));
             const body = enemyDeathTransitionPresentation(cue.death.type, pose, progress, this.presentationSettings.reducedMotion);
+            const deathAfterglowContinuity = enemyFinisherDeathAfterglowContinuityPresentation({ deathProgress: progress, finisherProgress: progress, tier: pose.tier }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
+            const deathAfterglowHandoff = enemyFinisherDeathAfterglowHandoffPresentation({ owner: deathAfterglowContinuity.owner, deathProgress: progress, afterglowAlpha: deathAfterglowContinuity.afterglowAlphaScale }, this.presentationSettings.reducedMotion);
             const spritePresentation = enemySpritePresentation(cue.death.type, pose.radius, this.enemySpriteAtlasReady);
             const specialistRetirement = (cue.death.type === 'shieldbearer' || cue.death.type === 'assassin' || cue.death.type === 'siegeGolem' || cue.death.type === 'nullifier') ? specialistDefeatGroundRetirementPresentation(cue.death.type, progress, { offsetX: body.offsetX, offsetY: body.offsetY, alpha: body.alpha, radius: pose.radius }, this.presentationSettings.reducedMotion) : null;
             const regularRetirement = specialistRetirement ? null : regularDefeatGroundRetirementPresentation(cue.death.type, progress, { offsetX: body.offsetX, offsetY: body.offsetY, alpha: body.alpha, radius: pose.radius }, this.presentationSettings.reducedMotion);
@@ -4035,7 +4058,7 @@ export class Game {
             ctx.translate(cue.death.x + body.offsetX, cue.death.y + body.offsetY);
             ctx.rotate(body.rotation);
             ctx.scale(body.scaleX, body.scaleY);
-            ctx.globalAlpha = body.alpha * (this.presentationSettings.reducedFlash ? .78 : .92);
+            ctx.globalAlpha = body.alpha * deathAfterglowContinuity.bodyAlphaScale * deathAfterglowHandoff.bodyScale * (this.presentationSettings.reducedFlash ? .78 : .92);
             if (spritePresentation.visible && this.enemySpriteAtlasImage) {
                 const sprite = enemySpriteRect(cue.death.type), size = spritePresentation.drawSize;
                 ctx.drawImage(this.enemySpriteAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, -size / 2, -size / 2, size, size);
@@ -4294,9 +4317,9 @@ export class Game {
         apply(this.bossHazardAftermathVfx.at(-1));
         apply(this.bossHazardClearedGroundMemory.at(-1));
     }
-    queueEnemyFinisherVfx(source, x, y, enemyType) {
+    queueEnemyFinisherVfx(source, x, y, enemyType, tier = 'normal') {
         const maxTtl = source === 'ultimate' || source === 'finalForm' || source === 'fusion' ? .66 : .52;
-        this.enemyFinisherVfx.push({ source, x, y, enemyType, ttl: maxTtl, maxTtl });
+        this.enemyFinisherVfx.push({ source, x, y, enemyType, tier, ttl: maxTtl, maxTtl });
         if (this.enemyFinisherVfx.length > 24)
             this.enemyFinisherVfx.splice(0, this.enemyFinisherVfx.length - 24);
     }
@@ -4311,31 +4334,53 @@ export class Game {
             return;
         if (!this.bossHazardAftermathVfxAtlasReady || !this.bossHazardAftermathVfxAtlasImage)
             return;
+        const activeAftermathCount = this.bossHazardAftermathVfx.length;
+        const aftermathRank = new Map(this.bossHazardAftermathVfx.map((cue, index) => [cue, Math.max(0, this.bossHazardAftermathVfx.length - 1 - index)]));
         for (const cue of this.bossHazardAftermathVfx) {
             const lifecycle = bossHazardLifecycleOwnerPresentation({ telegraph: 0, ttl: 0, aftermathTtl: cue.ttl, aftermathMaxTtl: cue.maxTtl }, this.presentationSettings.reducedFlash);
+            const matchingGroundMemory = this.bossHazardClearedGroundMemory.find((memory) => Math.hypot(memory.x - cue.x, memory.y - cue.y) <= Math.max(16, cue.radius * .2));
+            const expirationGroundState = bossHazardPersistentExpirationGroundStatePresentation({ aftermathTtl: cue.ttl, aftermathMaxTtl: cue.maxTtl, memoryTtl: matchingGroundMemory?.ttl ?? 0, memoryMaxTtl: matchingGroundMemory?.maxTtl ?? 1.25 }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
+            const expirationGroundHandoff = bossHazardExpirationGroundStateHandoffPresentation({ owner: expirationGroundState.owner, aftermathLife: Math.max(0, cue.ttl / Math.max(.001, cue.maxTtl)), memoryLife: Math.max(0, (matchingGroundMemory?.ttl ?? 0) / Math.max(.001, matchingGroundMemory?.maxTtl ?? 1.25)) }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
+            const expirationGroundDensity = bossHazardExpirationGroundStateDensityBudgetPresentation({ activeCount: activeAftermathCount, indexFromNewest: aftermathRank.get(cue) ?? activeAftermathCount, owner: expirationGroundState.owner }, this.presentationSettings.reducedMotion);
+            const aftermathOwnership = bossHazardEndAftermathOwnershipPresentation({ aftermathTtl: cue.ttl, aftermathMaxTtl: cue.maxTtl }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
             const nextHazard = this.bossArena.hazards.filter(h => h.telegraph > 0).reduce((best, h) => { const d = Math.hypot(h.pos.x - cue.x, h.pos.y - cue.y); return !best || d < Math.hypot(best.pos.x - cue.x, best.pos.y - cue.y) ? h : best; }, null);
             const retirement = bossHazardAftermathTerrainRetirementPresentation({ aftermathTtl: cue.ttl, aftermathMaxTtl: cue.maxTtl, nextHazardDistance: nextHazard ? Math.hypot(nextHazard.pos.x - cue.x, nextHazard.pos.y - cue.y) : 999, nextHazardTelegraph: nextHazard?.telegraph ?? 0 }, this.presentationSettings.reducedFlash);
+            const aftermathArbitration = bossHazardAftermathOwnerArbitrationPresentation({ endOwner: aftermathOwnership.owner, endAlpha: aftermathOwnership.aftermathAlphaScale, terrainOwner: retirement.owner, aftermathAlpha: retirement.aftermathAlphaScale, terrainAlpha: retirement.terrainAlphaScale }, this.presentationSettings.reducedFlash);
+            const aftermathDensityBudget = bossHazardAftermathDensityBudgetPresentation({ activeCount: activeAftermathCount, indexFromNewest: aftermathRank.get(cue) ?? activeAftermathCount, owner: aftermathArbitration.owner }, this.presentationSettings.reducedMotion);
+            const respawnGroundCoherence = bossHazardRespawnGroundCoherencePresentation({ memoryLife: Math.max(0, cue.ttl / Math.max(.001, cue.maxTtl)), aftermathActive: true, nextHazardDistance: nextHazard ? Math.hypot(nextHazard.pos.x - cue.x, nextHazard.pos.y - cue.y) : 999, nextHazardRadius: nextHazard?.radius ?? cue.radius, nextHazardTelegraph: nextHazard?.telegraph ?? 0 }, this.presentationSettings.reducedFlash);
+            const respawnGroundHandoff = bossHazardRespawnGroundHandoffPresentation({ coherenceOwner: respawnGroundCoherence.owner, memoryLife: Math.max(0, cue.ttl / Math.max(.001, cue.maxTtl)), nextHazardTelegraph: nextHazard?.telegraph ?? 0 }, this.presentationSettings.reducedFlash);
+            const respawnGroundDensityBudget = bossHazardRespawnGroundDensityBudgetPresentation({ activeTransitionCount: activeAftermathCount, indexFromNewest: aftermathRank.get(cue) ?? activeAftermathCount, owner: respawnGroundCoherence.owner }, this.presentationSettings.reducedMotion);
             const progress = 1 - Math.max(0, cue.ttl / cue.maxTtl);
-            const state = retirement.owner === 'terrain' ? 'residual' : progress < 0.32 ? 'detonate' : 'residual';
+            const state = aftermathArbitration.owner === 'terrain' ? 'residual' : progress < 0.32 ? 'detonate' : 'residual';
             const sprite = bossHazardAftermathVfxSprite(cue.kind, state);
-            const size = Math.max(112, cue.radius * 2.55) * (state === 'detonate' ? 1 + progress * .28 : 1.08 + progress * .16) * retirement.sizeScale, cueAlpha = this.worldVfxCueAlpha('tactical', cue.x, cue.y, size * .5);
-            if (cueAlpha <= 0 || retirement.owner === 'retired')
+            const size = Math.max(112, cue.radius * 2.55) * (state === 'detonate' ? 1 + progress * .28 : 1.08 + progress * .16) * retirement.sizeScale * aftermathOwnership.sizeScale * aftermathDensityBudget.sizeScale, cueAlpha = this.worldVfxCueAlpha('tactical', cue.x, cue.y, size * .5);
+            if (cueAlpha <= 0 || aftermathArbitration.owner === 'retired' || !aftermathDensityBudget.visible)
                 continue;
-            const ownerAlpha = retirement.owner === 'terrain' ? retirement.terrainAlphaScale : retirement.aftermathAlphaScale;
+            const ownerAlpha = aftermathArbitration.owner === 'terrain' ? Math.max(aftermathArbitration.terrainAlphaScale, aftermathArbitration.aftermathAlphaScale) : aftermathArbitration.aftermathAlphaScale;
             ctx.save();
-            ctx.globalAlpha = Math.min(this.presentationSettings.reducedFlash ? 0.36 : 0.64, (1 - progress) * .76 + .06) * cueAlpha * lifecycle.aftermathAlphaScale * ownerAlpha;
+            ctx.globalAlpha = Math.min(this.presentationSettings.reducedFlash ? 0.36 : 0.64, (1 - progress) * .76 + .06) * cueAlpha * lifecycle.aftermathAlphaScale * ownerAlpha * aftermathDensityBudget.alphaScale * respawnGroundCoherence.aftermathAlphaScale * respawnGroundHandoff.aftermathAlphaScale * respawnGroundDensityBudget.aftermathAlphaScale * expirationGroundState.aftermathAlphaScale * expirationGroundHandoff.aftermathAlphaScale * expirationGroundDensity.aftermathAlphaScale;
             ctx.drawImage(this.bossHazardAftermathVfxAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, cue.x - size / 2, cue.y - size / 2, size, size);
             ctx.restore();
         }
     }
     drawBossHazardClearedGroundMemory(ctx) {
+        const activeMemoryCount = this.bossHazardClearedGroundMemory.length;
+        const respawnMemoryRank = new Map(this.bossHazardClearedGroundMemory.map((cue, index) => [cue, Math.max(0, this.bossHazardClearedGroundMemory.length - 1 - index)]));
         for (const cue of this.bossHazardClearedGroundMemory) {
-            const aftermathActive = this.bossHazardAftermathVfx.some((after) => Math.hypot(after.x - cue.x, after.y - cue.y) <= Math.max(24, cue.radius * .35) && after.ttl > 0);
+            const matchingAftermath = this.bossHazardAftermathVfx.find((after) => Math.hypot(after.x - cue.x, after.y - cue.y) <= Math.max(24, cue.radius * .35) && after.ttl > 0);
+            const aftermathActive = Boolean(matchingAftermath);
+            const expirationGroundState = bossHazardPersistentExpirationGroundStatePresentation({ aftermathTtl: matchingAftermath?.ttl ?? 0, aftermathMaxTtl: matchingAftermath?.maxTtl ?? .78, memoryTtl: cue.ttl, memoryMaxTtl: cue.maxTtl }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
+            const expirationGroundHandoff = bossHazardExpirationGroundStateHandoffPresentation({ owner: expirationGroundState.owner, aftermathLife: Math.max(0, (matchingAftermath?.ttl ?? 0) / Math.max(.001, matchingAftermath?.maxTtl ?? .78)), memoryLife: Math.max(0, cue.ttl / Math.max(.001, cue.maxTtl)) }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
+            const expirationGroundDensity = bossHazardExpirationGroundStateDensityBudgetPresentation({ activeCount: activeMemoryCount, indexFromNewest: respawnMemoryRank.get(cue) ?? activeMemoryCount, owner: expirationGroundState.owner }, this.presentationSettings.reducedMotion);
+            const expirationGroundTransitionScale = 1 - (1 - expirationGroundState.groundAlphaScale * expirationGroundHandoff.groundAlphaScale) * expirationGroundDensity.effectStrength;
             const nextHazard = this.bossArena.hazards.filter((hazard) => hazard.telegraph > 0).reduce((best, hazard) => { const d = Math.hypot(hazard.pos.x - cue.x, hazard.pos.y - cue.y); return !best || d < Math.hypot(best.pos.x - cue.x, best.pos.y - cue.y) ? hazard : best; }, null);
             const memory = bossHazardClearedGroundMemoryPresentation({ memoryTtl: cue.ttl, memoryMaxTtl: cue.maxTtl, aftermathActive, nextHazardDistance: nextHazard ? Math.hypot(nextHazard.pos.x - cue.x, nextHazard.pos.y - cue.y) : 999, nextHazardTelegraph: nextHazard?.telegraph ?? 0 }, this.presentationSettings.reducedFlash);
-            if (memory.owner !== 'cleared' || memory.clearedAlpha <= 0)
+            const respawnGroundCoherence = bossHazardRespawnGroundCoherencePresentation({ memoryLife: Math.max(0, cue.ttl / Math.max(.001, cue.maxTtl)), aftermathActive, nextHazardDistance: nextHazard ? Math.hypot(nextHazard.pos.x - cue.x, nextHazard.pos.y - cue.y) : 999, nextHazardRadius: nextHazard?.radius ?? cue.radius, nextHazardTelegraph: nextHazard?.telegraph ?? 0 }, this.presentationSettings.reducedFlash);
+            const respawnGroundHandoff = bossHazardRespawnGroundHandoffPresentation({ coherenceOwner: respawnGroundCoherence.owner, memoryLife: Math.max(0, cue.ttl / Math.max(.001, cue.maxTtl)), nextHazardTelegraph: nextHazard?.telegraph ?? 0 }, this.presentationSettings.reducedFlash);
+            const respawnGroundDensityBudget = bossHazardRespawnGroundDensityBudgetPresentation({ activeTransitionCount: activeMemoryCount, indexFromNewest: respawnMemoryRank.get(cue) ?? activeMemoryCount, owner: respawnGroundCoherence.owner }, this.presentationSettings.reducedMotion);
+            if (memory.owner !== 'cleared' || memory.clearedAlpha <= 0 || respawnGroundCoherence.memoryAlphaScale <= 0 || respawnGroundHandoff.memoryAlphaScale <= 0 || respawnGroundDensityBudget.memoryAlphaScale <= 0 || expirationGroundTransitionScale <= 0)
                 continue;
-            const radius = cue.radius * memory.radiusScale, cueAlpha = this.worldVfxCueAlpha('informational', cue.x, cue.y, radius);
+            const radius = cue.radius * memory.radiusScale * expirationGroundState.groundRadiusScale, cueAlpha = this.worldVfxCueAlpha('informational', cue.x, cue.y, radius);
             if (cueAlpha <= 0)
                 continue;
             const geometry = bossClearedGroundGeometryPresentation({ geometryShape: cue.geometryShape, radius, angle: cue.angle ?? 0, length: cue.length ?? 0, alpha: memory.clearedAlpha }, this.presentationSettings.reducedFlash);
@@ -4346,7 +4391,7 @@ export class Game {
             ctx.save();
             ctx.translate(cue.x, cue.y);
             ctx.rotate(geometry.angle);
-            ctx.globalAlpha = geometry.alpha * cueAlpha * clearedAlphaScale;
+            ctx.globalAlpha = geometry.alpha * cueAlpha * clearedAlphaScale * respawnGroundCoherence.memoryAlphaScale * respawnGroundHandoff.memoryAlphaScale * respawnGroundDensityBudget.memoryAlphaScale * expirationGroundTransitionScale * expirationGroundDensity.groundAlphaScale;
             ctx.strokeStyle = '#8fffd3';
             ctx.lineWidth = 1.5;
             ctx.setLineDash([5, 9]);
@@ -4369,14 +4414,19 @@ export class Game {
     drawEnemyFinisherVfx(ctx) {
         if (!this.enemyFinisherVfxAtlasReady || !this.enemyFinisherVfxAtlasImage)
             return;
+        const activeFinisherCount = this.enemyFinisherVfx.length;
+        const finisherRank = new Map(this.enemyFinisherVfx.map((cue, index) => [cue, Math.max(0, this.enemyFinisherVfx.length - 1 - index)]));
         for (const cue of this.enemyFinisherVfx) {
             const progress = 1 - Math.max(0, cue.ttl / cue.maxTtl);
             const state = progress < 0.38 ? 'burst' : 'afterglow';
             const sprite = enemyFinisherVfxSprite(cue.source, state);
             const eliteScale = cue.enemyType === 'boss' ? 1.55 : cue.enemyType === 'elite' ? 1.28 : 1;
             const size = (state === 'burst' ? 92 : 108) * eliteScale * (1 + progress * .18);
+            const deathAfterglowContinuity = enemyFinisherDeathAfterglowContinuityPresentation({ deathProgress: progress, finisherProgress: progress, tier: cue.tier }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
+            const deathAfterglowHandoff = enemyFinisherDeathAfterglowHandoffPresentation({ owner: deathAfterglowContinuity.owner, deathProgress: progress, afterglowAlpha: deathAfterglowContinuity.afterglowAlphaScale }, this.presentationSettings.reducedMotion);
+            const deathAfterglowDensity = enemyFinisherDeathAfterglowDensityBudgetPresentation({ activeCount: activeFinisherCount, indexFromNewest: finisherRank.get(cue) ?? activeFinisherCount, tier: cue.tier, owner: deathAfterglowHandoff.owner }, this.presentationSettings.reducedMotion);
             ctx.save();
-            ctx.globalAlpha = Math.min(this.presentationSettings.reducedFlash ? 0.42 : 0.72, (1 - progress) * .82 + .05);
+            ctx.globalAlpha = Math.min(this.presentationSettings.reducedFlash ? 0.42 : 0.72, (1 - progress) * .82 + .05) * (state === 'afterglow' ? deathAfterglowContinuity.afterglowAlphaScale * deathAfterglowHandoff.afterglowScale * deathAfterglowDensity.effectStrength : deathAfterglowContinuity.finisherAlphaScale * deathAfterglowHandoff.finisherScale * Math.max(.62, deathAfterglowDensity.effectStrength));
             ctx.drawImage(this.enemyFinisherVfxAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, cue.x - size / 2, cue.y - size / 2, size, size);
             ctx.restore();
         }
@@ -5044,23 +5094,36 @@ export class Game {
         const recoveryBlend = castCadence.recoverBlend * (1 - actionTransition.recoverSuppression * transitionScale) * (1 - ultimateBody.castRecoverySuppression * ultimateHandoff.castRecoverySuppressionScale * motionBudget.ultimateScale);
         const kinematicPresentation = heroKinematicRenderPresentation(this.heroRenderKinematicState, this.presentationSettings.reducedMotion, castBlend);
         const castAimHold = heroCastAimHoldPresentation(this.heroCastAimHoldState, this.hero.facing.x, this.hero.facing.y, castBlend, recoveryBlend, this.presentationSettings.reducedMotion);
+        const desiredBodyFacing = heroBodyFacingOwnerPresentation({ currentFacing: this.hero.facing, cast: castAimHold, ultimate: ultimateAim }, this.presentationSettings.reducedMotion);
+        const heroBodyFacingHysteresisDt = this.heroBodyFacingHysteresisLastAt < 0 ? 0 : Math.max(0, this.elapsed - this.heroBodyFacingHysteresisLastAt);
+        this.heroBodyFacingHysteresisState = advanceHeroBodyFacingHysteresisState(this.heroBodyFacingHysteresisState, desiredBodyFacing, heroBodyFacingHysteresisDt, this.presentationSettings.reducedMotion);
+        this.heroBodyFacingHysteresisLastAt = this.elapsed;
+        const bodyFacing = heroBodyFacingHysteresisPresentation(this.heroBodyFacingHysteresisState);
         const castOrientation = heroCastOrientationPresentation({ facingX: castAimHold.facingX, facingY: castAimHold.facingY, speed: this.heroRenderKinematicState.speed, turn: this.heroRenderKinematicState.turn, cast: castBlend, recover: recoveryBlend }, this.presentationSettings.reducedMotion);
         const { accelerationLean, turnAnticipation, decelerationSettle, castFocus } = kinematicPresentation;
         const hitRecoilScale = actionTransition.hitRecoilScale * motionBudget.hitScale;
         const hitRecoil = { ...baseHitRecoil, intensity: baseHitRecoil.intensity * motionBudget.hitScale, offsetX: baseHitRecoil.offsetX * hitRecoilScale, offsetY: baseHitRecoil.offsetY * hitRecoilScale, rotation: baseHitRecoil.rotation * hitRecoilScale, flashAlpha: baseHitRecoil.flashAlpha * (0.72 + hitRecoilScale * 0.28) };
         const groundContact = characterGroundContactPresentation(this.hero.radius, renderMovementBlend, hitRecoil.intensity, this.hero.facing.x, this.presentationSettings.reducedMotion, 1);
-        const facingAngle = Math.atan2(this.hero.facing.y, this.hero.facing.x);
+        const facingAngle = bodyFacing.bodyAngle;
+        const movementFacingAngle = Math.atan2(this.hero.facing.y, this.hero.facing.x);
+        const directionalOverlay = heroDirectionalOverlayOwnerPresentation({ owner: bodyFacing.owner, bodyAngle: facingAngle, movementAngle: movementFacingAngle, castAngle: castOrientation.overlayAngle, actionRetention: bodyFacing.owner === 'movement' ? 0 : Math.max(desiredBodyFacing.actionRetention, Math.min(1, bodyFacing.hold / .12)), movementBlend: renderMovementBlend, castBlend }, this.presentationSettings.reducedMotion);
+        const heroActionPose = heroActionPoseEmphasisPresentation({ owner: bodyFacing.owner, cast: castBlend, recovery: Math.max(recoveryBlend, this.heroRenderRecoveryBlend), ultimateWindup: ultimateBody.windup * ultimatePoseScale, ultimateRelease: ultimateBody.release * ultimatePoseScale, ultimateRecovery: ultimateBody.recovery * ultimatePoseScale, hit: hitRecoil.intensity, facingX: bodyFacing.facingX, facingY: bodyFacing.facingY }, this.presentationSettings.reducedMotion);
+        const heroActionPoseHandoff = heroActionPoseHandoffPresentation({ owner: bodyFacing.owner, cast: castBlend, recovery: Math.max(recoveryBlend, this.heroRenderRecoveryBlend), ultimateWindup: ultimateBody.windup * ultimatePoseScale, ultimateRelease: ultimateBody.release * ultimatePoseScale, ultimateRecovery: ultimateBody.recovery * ultimatePoseScale, hit: hitRecoil.intensity, releaseAccent: heroActionPose.releaseAccentScale }, this.presentationSettings.reducedMotion);
+        const heroActionLayerBudget = heroActionLayerBudgetPresentation({ owner: heroActionPoseHandoff.owner, movement: renderMovementBlend, cast: castBlend, recovery: Math.max(recoveryBlend, this.heroRenderRecoveryBlend), ultimate: Math.max(ultimateBody.windup, ultimateBody.release, ultimateBody.recovery) * ultimatePoseScale, hit: hitRecoil.intensity, meter: heroMeterPulse }, this.presentationSettings.reducedMotion);
         const bobOffset = Math.sin(this.heroRenderStride) * (0.8 + renderMovementBlend * 1.8);
-        const lift = renderMovementBlend * 2.4 + (heroMeterPulse > 0.92 ? 0.9 : 0) + castBlend * 2.2;
+        const lift = renderMovementBlend * 2.4 + (heroMeterPulse > 0.92 ? 0.9 : 0) + castBlend * 2.2 + heroActionPose.lift * heroActionPoseHandoff.actionPoseScale + heroActionPoseHandoff.releaseCarry * .7;
         const cadenceBodyScale = 1 + (castCadence.bodyScale - 1) * motionBudget.castScale;
         const transitionScaleX = 1 + (actionTransition.scaleX - 1) * transitionScale;
         const transitionScaleY = 1 + (actionTransition.scaleY - 1) * transitionScale;
-        const bodyScaleX = (1 + renderMovementBlend * 0.04 + castBlend * 0.02) * kinematicPresentation.scaleX * cadenceBodyScale * transitionScaleX * ultimateScaleX;
-        const bodyScaleY = (1 - renderMovementBlend * 0.03 - castBlend * 0.015 + recoveryBlend * 0.02) * kinematicPresentation.scaleY * transitionScaleY * ultimateScaleY / Math.max(1, cadenceBodyScale * 0.995);
-        const movementLeadX = this.hero.facing.x * (renderMovementBlend * 3.8 + castBlend * 4.4 + castCadence.chainLead * motionBudget.castScale) + this.hero.facing.y * this.heroRenderTurnTilt * 2.8 * motionBudget.movementScale + kinematicPresentation.leadX + castOrientation.leadX * castBlend * 0.38 + hitRecoil.offsetX + actionTransition.offsetX * transitionScale + ultimateBody.offsetX * ultimatePoseScale;
-        const movementLeadY = this.hero.facing.y * (renderMovementBlend * 2.6 + castBlend * 2.2) - this.heroRenderRecoveryBlend * 1.8 * motionBudget.movementScale + recoveryBlend * 1.4 + kinematicPresentation.leadY + castOrientation.leadY * castBlend * 0.32 + hitRecoil.offsetY + actionTransition.offsetY * transitionScale + ultimateBody.offsetY * ultimatePoseScale;
-        const bodyRotation = this.heroRenderTurnTilt * 0.18 * motionBudget.movementScale + castBlend * 0.11 - (this.heroRenderRecoveryBlend * motionBudget.movementScale + recoveryBlend) * 0.05 + kinematicPresentation.rotation + castOrientation.bodyRotation + hitRecoil.rotation + actionTransition.rotation * transitionScale + ultimateBody.rotation * ultimatePoseScale;
+        const bodyScaleX = (1 + renderMovementBlend * 0.04 + castBlend * 0.02) * kinematicPresentation.scaleX * cadenceBodyScale * transitionScaleX * ultimateScaleX * (1 + (heroActionPose.scaleX - 1) * heroActionPoseHandoff.actionPoseScale);
+        const bodyScaleY = (1 - renderMovementBlend * 0.03 - castBlend * 0.015 + recoveryBlend * 0.02) * kinematicPresentation.scaleY * transitionScaleY * ultimateScaleY * (1 + (heroActionPose.scaleY - 1) * heroActionPoseHandoff.actionPoseScale) / Math.max(1, cadenceBodyScale * 0.995);
+        const movementLeadX = this.hero.facing.x * (renderMovementBlend * 3.8 + castBlend * 4.4 + castCadence.chainLead * motionBudget.castScale) + this.hero.facing.y * this.heroRenderTurnTilt * 2.8 * motionBudget.movementScale + kinematicPresentation.leadX + castOrientation.leadX * castBlend * 0.38 + hitRecoil.offsetX + actionTransition.offsetX * transitionScale + ultimateBody.offsetX * ultimatePoseScale + bodyFacing.facingX * heroActionPose.forwardLead * heroActionPoseHandoff.actionPoseScale;
+        const movementLeadY = this.hero.facing.y * (renderMovementBlend * 2.6 + castBlend * 2.2) - this.heroRenderRecoveryBlend * 1.8 * motionBudget.movementScale + recoveryBlend * 1.4 + kinematicPresentation.leadY + castOrientation.leadY * castBlend * 0.32 + hitRecoil.offsetY + actionTransition.offsetY * transitionScale + ultimateBody.offsetY * ultimatePoseScale + bodyFacing.facingY * heroActionPose.forwardLead * heroActionPoseHandoff.actionPoseScale;
+        const bodyRotation = this.heroRenderTurnTilt * 0.18 * motionBudget.movementScale + castBlend * 0.11 - (this.heroRenderRecoveryBlend * motionBudget.movementScale + recoveryBlend) * 0.05 + kinematicPresentation.rotation + castOrientation.bodyRotation + hitRecoil.rotation + actionTransition.rotation * transitionScale + ultimateBody.rotation * ultimatePoseScale + heroActionPose.rotation * heroActionPoseHandoff.actionPoseScale;
         this.heroLastRenderedBodyOffset = { x: movementLeadX, y: movementLeadY - bobOffset - lift };
+        this.heroLastRenderedActionFacing = { x: bodyFacing.facingX, y: bodyFacing.facingY };
+        this.heroLastRenderedActionPoseStrength = heroActionPose.poseStrength * heroActionPoseHandoff.actionPoseScale;
+        this.heroLastRenderedActionOwner = heroActionPoseHandoff.owner === 'ultimate' ? 'ultimate' : heroActionPoseHandoff.owner === 'cast' ? 'cast' : heroActionPoseHandoff.owner === 'recovery' ? 'recovery' : 'movement';
         const heroActionGroundOffsetX = this.hero.facing.x * (castBlend * 4.4 + castCadence.chainLead * motionBudget.castScale) + castOrientation.leadX * castBlend * .38 + actionTransition.offsetX * transitionScale + ultimateBody.offsetX * ultimatePoseScale;
         const heroActionGroundOffsetY = this.hero.facing.y * (castBlend * 2.2) + recoveryBlend * 1.4 + castOrientation.leadY * castBlend * .32 + actionTransition.offsetY * transitionScale + ultimateBody.offsetY * ultimatePoseScale;
         const heroGroundOwnership = heroGroundContactOwnershipPresentation({ movement: renderMovementBlend, cast: castBlend, evade: actionTransition.evadeContinuity * transitionScale, ultimate: Math.max(ultimateBody.windup, ultimateBody.release, ultimateBody.recovery) * ultimatePoseScale, actionOffsetX: heroActionGroundOffsetX, actionOffsetY: heroActionGroundOffsetY, lift: Math.max(0, castBlend * 2.2 - Math.min(0, ultimateBody.offsetY * ultimatePoseScale)) }, this.presentationSettings.reducedMotion);
@@ -5089,7 +5152,7 @@ export class Game {
         if (idlePresentation.visible && this.heroMotionRenderAtlasImage) {
             const idleSprite = heroMotionRenderSprite(this.hero.profileId, 'idle');
             ctx.save();
-            ctx.globalAlpha = Math.min(this.presentationSettings.reducedFlash ? 0.18 : 0.36, idlePresentation.alpha * (finalForm ? 1.14 : 1));
+            ctx.globalAlpha = Math.min(this.presentationSettings.reducedFlash ? 0.18 : 0.36, idlePresentation.alpha * (finalForm ? 1.14 : 1) * heroActionLayerBudget.idleScale);
             ctx.drawImage(this.heroMotionRenderAtlasImage, idleSprite.sx, idleSprite.sy, idleSprite.sw, idleSprite.sh, -idlePresentation.size / 2, -idlePresentation.size / 2 + 2, idlePresentation.size, idlePresentation.size);
             ctx.restore();
         }
@@ -5097,8 +5160,8 @@ export class Game {
             const castSprite = heroCastRenderSprite(this.hero.profileId, 'cast');
             const castLead = castPresentation.focusOffset;
             ctx.save();
-            ctx.rotate(castOrientation.overlayAngle);
-            ctx.globalAlpha = Math.min(this.presentationSettings.reducedFlash ? 0.24 : 0.68, castPresentation.alpha * castBlend + castCadence.overlayAlphaBoost);
+            ctx.rotate(directionalOverlay.castAngle);
+            ctx.globalAlpha = Math.min(this.presentationSettings.reducedFlash ? 0.24 : 0.68, castPresentation.alpha * castBlend + castCadence.overlayAlphaBoost) * directionalOverlay.castAlphaScale * heroActionPose.castOverlayAlphaScale * heroActionPoseHandoff.castOverlayScale * heroActionLayerBudget.castScale;
             ctx.drawImage(this.heroCastRenderAtlasImage, castSprite.sx, castSprite.sy, castSprite.sw, castSprite.sh, -castPresentation.size / 2 + castLead * 0.12, -castPresentation.size / 2 - castLead * 0.16, castPresentation.size, castPresentation.size);
             ctx.restore();
         }
@@ -5127,8 +5190,8 @@ export class Game {
             const moveSprite = heroMotionRenderSprite(this.hero.profileId, 'move');
             const moveOffset = movePresentation.motionAmplitude * movementBlend;
             ctx.save();
-            ctx.rotate(facingAngle);
-            ctx.globalAlpha = Math.min(this.presentationSettings.reducedFlash ? 0.18 : 0.40, movePresentation.alpha * movementBlend);
+            ctx.rotate(directionalOverlay.movementAngle);
+            ctx.globalAlpha = Math.min(this.presentationSettings.reducedFlash ? 0.18 : 0.40, movePresentation.alpha * movementBlend) * directionalOverlay.movementAlphaScale * heroActionLayerBudget.movementScale;
             ctx.drawImage(this.heroMotionRenderAtlasImage, moveSprite.sx, moveSprite.sy, moveSprite.sw, moveSprite.sh, -movePresentation.size / 2 - moveOffset * 0.3, -movePresentation.size / 2 + 4, movePresentation.size, movePresentation.size);
             ctx.restore();
         }
@@ -5159,6 +5222,7 @@ export class Game {
             const sprite = heroBattleSpriteRect(this.hero.profileId);
             const size = spritePresentation.drawSize;
             ctx.save();
+            ctx.scale(bodyFacing.mirrorX, 1);
             ctx.globalAlpha = 0.99;
             ctx.drawImage(this.heroBattleSpriteAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, -size / 2, -size / 2, size, size);
             ctx.restore();
@@ -5177,7 +5241,7 @@ export class Game {
             const recoverSprite = heroCastRenderSprite(this.hero.profileId, 'recover');
             ctx.save();
             ctx.rotate(castOrientation.overlayAngle - castOrientation.bodyRotation * 0.35);
-            ctx.globalAlpha = Math.min(this.presentationSettings.reducedFlash ? 0.18 : 0.42, recoverPresentation.alpha * Math.max(recoveryBlend, this.heroRenderRecoveryBlend * 0.75));
+            ctx.globalAlpha = Math.min(this.presentationSettings.reducedFlash ? 0.18 : 0.42, recoverPresentation.alpha * Math.max(recoveryBlend, this.heroRenderRecoveryBlend * 0.75)) * heroActionPose.recoverOverlayAlphaScale * heroActionPoseHandoff.recoverOverlayScale * heroActionLayerBudget.recoveryScale;
             ctx.drawImage(this.heroCastRenderAtlasImage, recoverSprite.sx, recoverSprite.sy, recoverSprite.sw, recoverSprite.sh, -recoverPresentation.size / 2 - recoverPresentation.focusOffset * 0.1, -recoverPresentation.size / 2 + recoverPresentation.focusOffset * 0.05, recoverPresentation.size, recoverPresentation.size);
             ctx.restore();
         }
@@ -5186,7 +5250,7 @@ export class Game {
             const crestPulse = 1 + Math.sin(this.elapsed * 4.8) * (this.presentationSettings.reducedMotion ? 0.02 : 0.045);
             const crestSize = crestPresentation.size * crestPulse;
             ctx.save();
-            ctx.globalAlpha = Math.min(this.presentationSettings.reducedFlash ? 0.16 : 0.34, crestPresentation.alpha * (finalForm ? 1.05 : 0.9));
+            ctx.globalAlpha = Math.min(this.presentationSettings.reducedFlash ? 0.16 : 0.34, crestPresentation.alpha * (finalForm ? 1.05 : 0.9) * heroActionLayerBudget.crestScale);
             ctx.drawImage(this.heroMotionRenderAtlasImage, crestSprite.sx, crestSprite.sy, crestSprite.sw, crestSprite.sh, -crestSize / 2, -crestSize / 2 + 1, crestSize, crestSize);
             ctx.restore();
         }
@@ -6874,6 +6938,7 @@ export class Game {
             this.safeLaneAttentionRecoveryHysteresisState = createSafeLaneAttentionRecoveryHysteresisState();
             this.safeLaneAttentionRecoveryLastAt = this.elapsed;
             this.safeLaneHazardOcclusionRecoveryState = createSafeLaneHazardOcclusionRecoveryState();
+            this.safeLaneGapFeatherHysteresisState = createSafeLaneGapFeatherHysteresisState();
             this.safeLaneHazardOcclusionRecoveryLastAt = this.elapsed;
         }
         if (safeLane) {
@@ -6882,11 +6947,19 @@ export class Game {
             const safeLaneVisual = safeLaneForecastVisualCoherencePresentation({ currentTarget: safeLane.target, currentConfidence: safeLane.confidence, ...(forecast ? { nextTarget: forecast.nextTarget, forecastUrgency: forecast.urgency, transitionMs: forecast.transitionMs } : {}), promotionOwner: this.safeLaneForecastPromotionHysteresisState.owner }, this.presentationSettings.reducedFlash), safeLaneAttention = safeLaneCombatAttentionBudgetPresentation({ heroCritical: this.dangerState.heroCritical, coreCritical: this.dangerState.coreCritical, lawActive: Boolean(lawIdentity?.active) }, this.presentationSettings.reducedFlash), safeLaneAttentionTarget = this.dangerState.coreCritical ? 1 : this.dangerState.heroCritical ? .86 : lawIdentity?.active ? .72 : 0, safeLaneAttentionDt = this.safeLaneAttentionRecoveryLastAt < 0 ? 0 : Math.max(0, this.elapsed - this.safeLaneAttentionRecoveryLastAt);
             this.safeLaneAttentionRecoveryHysteresisState = advanceSafeLaneAttentionRecoveryHysteresis(this.safeLaneAttentionRecoveryHysteresisState, safeLaneAttentionTarget, safeLaneAttentionDt, this.presentationSettings.reducedMotion);
             this.safeLaneAttentionRecoveryLastAt = this.elapsed;
-            const safeLaneAttentionRecovery = safeLaneAttentionRecoveryPresentation(this.safeLaneAttentionRecoveryHysteresisState), safeLaneIdentity = safeLaneIdentityOwnerArbitrationPresentation({ lawActive: Boolean(lawIdentity?.active), lawIdAvailable: Boolean(lawIdentity && lawIdentity.lawId !== 'none'), mythic: Boolean(boss?.isMythic), directionVisible: Boolean(safeLaneVisual.directionVisible && safeLaneAttention.directionVisible && safeLaneAttentionRecovery.secondaryRecovered), attentionOwner: safeLaneAttention.identityOwner }), safeLaneVisualTarget = safeLaneVisual.target, safeLaneHazardOcclusion = safeLaneHazardPathOcclusionPresentation({ from: this.hero.pos, to: safeLaneVisualTarget, hazards: this.bossArena.hazards }, this.presentationSettings.reducedFlash), safeLanePathGap = safeLaneHazardPathGapPresentation({ from: this.hero.pos, to: safeLaneVisualTarget, hazards: this.bossArena.hazards }), safeLaneHazardRecoveryDt = this.safeLaneHazardOcclusionRecoveryLastAt < 0 ? 0 : Math.max(0, this.elapsed - this.safeLaneHazardOcclusionRecoveryLastAt);
+            const safeLaneAttentionRecovery = safeLaneAttentionRecoveryPresentation(this.safeLaneAttentionRecoveryHysteresisState), safeLaneIdentity = safeLaneIdentityOwnerArbitrationPresentation({ lawActive: Boolean(lawIdentity?.active), lawIdAvailable: Boolean(lawIdentity && lawIdentity.lawId !== 'none'), mythic: Boolean(boss?.isMythic), directionVisible: Boolean(safeLaneVisual.directionVisible && safeLaneAttention.directionVisible && safeLaneAttentionRecovery.secondaryRecovered), attentionOwner: safeLaneAttention.identityOwner }), safeLaneVisualTarget = safeLaneVisual.target, safeLaneHazardOcclusion = safeLaneHazardPathOcclusionPresentation({ from: this.hero.pos, to: safeLaneVisualTarget, hazards: this.bossArena.hazards }, this.presentationSettings.reducedFlash), safeLanePathGap = safeLaneHazardPathGapPresentation({ from: this.hero.pos, to: safeLaneVisualTarget, hazards: this.bossArena.hazards }), safeLaneRawGap = 'gap' in safeLanePathGap ? { start: safeLanePathGap.gap.start, end: safeLanePathGap.gap.end } : null, gapHandoff = safeLaneGapHazardHandoffPresentation({ current: this.safeLaneGapFeatherHysteresisState.visible ? { visible: true, start: this.safeLaneGapFeatherHysteresisState.start, end: this.safeLaneGapFeatherHysteresisState.end, release: this.safeLaneGapFeatherHysteresisState.release } : null, next: safeLaneRawGap }, this.presentationSettings.reducedMotion);
+            if (gapHandoff.resetBeforeAdvance)
+                this.safeLaneGapFeatherHysteresisState = createSafeLaneGapFeatherHysteresisState();
+            this.safeLaneGapFeatherHysteresisState = advanceSafeLaneGapFeatherHysteresisState(this.safeLaneGapFeatherHysteresisState, gapHandoff.nextGap, this.elapsed, this.presentationSettings.reducedMotion);
+            const safeLaneGapFeatherState = this.safeLaneGapFeatherHysteresisState, safeLaneGapFeather = safeLaneGapFeatherPresentation({ from: this.hero.pos, to: safeLaneVisualTarget, gap: safeLaneGapFeatherState.visible ? { start: safeLaneGapFeatherState.start, end: safeLaneGapFeatherState.end } : null }, this.presentationSettings.reducedFlash), safeLaneHazardRecoveryDt = this.safeLaneHazardOcclusionRecoveryLastAt < 0 ? 0 : Math.max(0, this.elapsed - this.safeLaneHazardOcclusionRecoveryLastAt);
             this.safeLaneHazardOcclusionRecoveryState = advanceSafeLaneHazardOcclusionRecovery(this.safeLaneHazardOcclusionRecoveryState, { pathAlphaScale: safeLaneHazardOcclusion.pathAlphaScale, bridgeAlphaScale: safeLaneHazardOcclusion.bridgeAlphaScale }, safeLaneHazardRecoveryDt, this.presentationSettings.reducedMotion);
             this.safeLaneHazardOcclusionRecoveryLastAt = this.elapsed;
             const safeLaneHazardRecovery = safeLaneHazardOcclusionRecoveryPresentation(this.safeLaneHazardOcclusionRecoveryState);
-            const safeLaneBaseAlpha = (.26 + safeLane.confidence * .18) * safeLaneVisual.primaryAlphaScale * safeLaneAttention.primaryAlphaScale * safeLaneAttentionRecovery.recoveryAlphaScale;
+            const nearbyClearedSafeLaneMemory = this.bossHazardClearedGroundMemory.filter((cue) => cue.ttl > 0).sort((a, b) => Math.hypot(a.x - safeLaneVisualTarget.x, a.y - safeLaneVisualTarget.y) - Math.hypot(b.x - safeLaneVisualTarget.x, b.y - safeLaneVisualTarget.y))[0];
+            const clearedGroundSafeLaneRecovery = bossClearedGroundSafeLaneRecoveryCoherencePresentation({ memoryLife: nearbyClearedSafeLaneMemory ? nearbyClearedSafeLaneMemory.ttl / Math.max(.001, nearbyClearedSafeLaneMemory.maxTtl) : 0, safeLaneConfidence: safeLane.confidence, nearLane: Boolean(nearbyClearedSafeLaneMemory && Math.hypot(nearbyClearedSafeLaneMemory.x - safeLaneVisualTarget.x, nearbyClearedSafeLaneMemory.y - safeLaneVisualTarget.y) <= Math.max(80, nearbyClearedSafeLaneMemory.radius * 1.4)), hazardOccluded: safeLaneHazardOcclusion.pathAlphaScale < .78 }, this.presentationSettings.reducedMotion);
+            const clearedGroundSafeLaneHandoff = bossClearedGroundSafeLaneRecoveryHandoffPresentation({ owner: clearedGroundSafeLaneRecovery.owner, memoryLife: nearbyClearedSafeLaneMemory ? nearbyClearedSafeLaneMemory.ttl / Math.max(.001, nearbyClearedSafeLaneMemory.maxTtl) : 0, safeLaneConfidence: safeLane.confidence, hazardOccluded: safeLaneHazardOcclusion.pathAlphaScale < .78 }, this.presentationSettings.reducedMotion);
+            const clearedGroundSafeLaneDensity = bossClearedGroundSafeLaneRecoveryDensityBudgetPresentation({ activeCount: this.bossHazardClearedGroundMemory.length, indexFromNewest: nearbyClearedSafeLaneMemory ? Math.max(0, this.bossHazardClearedGroundMemory.length - 1 - this.bossHazardClearedGroundMemory.indexOf(nearbyClearedSafeLaneMemory)) : this.bossHazardClearedGroundMemory.length, owner: clearedGroundSafeLaneHandoff.owner }, this.presentationSettings.reducedMotion);
+            const safeLaneBaseAlpha = (.26 + safeLane.confidence * .18) * safeLaneVisual.primaryAlphaScale * safeLaneAttention.primaryAlphaScale * safeLaneAttentionRecovery.recoveryAlphaScale * (1 - (1 - clearedGroundSafeLaneRecovery.safeLaneAlphaScale * clearedGroundSafeLaneHandoff.safeLaneAlphaScale) * clearedGroundSafeLaneDensity.effectStrength) * clearedGroundSafeLaneDensity.safeLaneAlphaScale;
             ctx.save();
             ctx.globalAlpha = safeLaneBaseAlpha * safeLaneHazardRecovery.pathAlphaScale;
             ctx.strokeStyle = '#8fffd3';
@@ -6894,13 +6967,20 @@ export class Game {
             ctx.lineWidth = 2;
             ctx.setLineDash([7, 7]);
             ctx.beginPath();
-            for (const segment of safeLanePathGap.segments) {
+            for (const segment of safeLaneGapFeather.bodySegments) {
                 ctx.moveTo(segment.from.x, segment.from.y);
                 ctx.lineTo(segment.to.x, segment.to.y);
             }
             ctx.stroke();
+            for (const feather of safeLaneGapFeather.featherSegments) {
+                ctx.globalAlpha = safeLaneBaseAlpha * safeLaneHazardRecovery.pathAlphaScale * feather.alphaScale;
+                ctx.beginPath();
+                ctx.moveTo(feather.from.x, feather.from.y);
+                ctx.lineTo(feather.to.x, feather.to.y);
+                ctx.stroke();
+            }
             ctx.setLineDash([]);
-            if (safeLanePathGap.locatorVisible) {
+            if (safeLaneGapFeather.locatorVisible) {
                 ctx.globalAlpha = safeLaneBaseAlpha * safeLaneHazardOcclusion.locatorAlphaScale * safeLaneHazardRecovery.locatorAlphaScale;
                 ctx.beginPath();
                 ctx.arc(safeLaneVisualTarget.x, safeLaneVisualTarget.y, 14, 0, Math.PI * 2);
@@ -6949,16 +7029,35 @@ export class Game {
             ctx.restore();
         }
         const telegraphedHazards = this.bossArena.hazards.filter((hazard) => hazard.telegraph > 0);
+        const respawnHazardRank = new Map(telegraphedHazards.map((hazard, index) => [hazard, Math.max(0, telegraphedHazards.length - 1 - index)]));
         const earliestTelegraphHazard = telegraphedHazards.reduce((best, hazard) => !best || hazard.telegraph < best.telegraph || hazard.telegraph === best.telegraph && hazard.id < best.id ? hazard : best, null);
         const primaryTelegraphHazardId = motion.owner === 'boss-hazard' ? earliestTelegraphHazard?.id ?? null : null;
         const primaryHazardIdentityId = !boss?.isMythic && !this.dangerState.heroCritical && !this.dangerState.coreCritical ? earliestTelegraphHazard?.id ?? null : null;
+        const activeHazardFootprints = this.bossArena.hazards.filter((hazard) => Boolean(hazard.launchOrigin && (hazard.launchTtl ?? 0) > 0));
+        const hazardFootprintRank = new Map(activeHazardFootprints.map((hazard, index) => [hazard, Math.max(0, activeHazardFootprints.length - 1 - index)]));
+        const activeActivationHazards = this.bossArena.hazards.filter((hazard) => Boolean((hazard.visualActivationTtl ?? 0) > 0));
+        const activationHazardRank = new Map(activeActivationHazards.map((hazard, index) => [hazard, Math.max(0, activeActivationHazards.length - 1 - index)]));
         for (const hazard of this.bossArena.hazards) {
             const color = hazard.kind === 'firePool' ? '#ff5b38' : hazard.kind === 'summonSigil' ? '#70e7a4' : hazard.kind === 'shockLane' ? '#ffd05a' : hazard.kind === 'cursePool' ? '#cf72ff' : hazard.kind === 'twinCross' ? '#ff6fa7' : '#62caff';
             const hazardHandoff = bossHazardTelegraphHandoffPresentation({ telegraph: hazard.telegraph, launchTtl: hazard.launchTtl, launchMaxTtl: hazard.launchMaxTtl }, this.presentationSettings.reducedFlash);
+            const hazardFootprint = hazard.launchOrigin && hazard.launchTtl !== undefined && hazard.launchMaxTtl ? bossHazardMaterializationFootprintPresentation({ launchOrigin: hazard.launchOrigin, hazardPos: hazard.pos, radius: hazard.radius, launchTtl: hazard.launchTtl, launchMaxTtl: hazard.launchMaxTtl }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash) : null;
+            const footprintTelegraphScale = hazardFootprint?.telegraphAlphaScale ?? 1;
+            const hazardFootprintBudget = bossHazardFootprintDensityBudgetPresentation({ activeCount: activeHazardFootprints.length, indexFromNewest: hazardFootprintRank.get(hazard) ?? activeHazardFootprints.length, progress: hazardFootprint?.progress ?? 1 }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
+            const footprintLifecycle = bossHazardFootprintLifecycleHandoffPresentation({ footprintVisible: Boolean(hazardFootprint?.visible), footprintProgress: hazardFootprint?.progress ?? 1, telegraph: hazard.telegraph, ttl: hazard.ttl }, this.presentationSettings.reducedFlash);
+            const activationSettle = bossHazardPersistentActivationSettlePresentation({ telegraph: hazard.telegraph, ttl: hazard.ttl, activationTtl: hazard.visualActivationTtl, activationMaxTtl: hazard.visualActivationMaxTtl }, this.presentationSettings.reducedFlash), activationDensityBudget = bossHazardActivationDensityBudgetPresentation({ activeActivationCount: activeActivationHazards.length, indexFromNewest: activationHazardRank.get(hazard) ?? activeActivationHazards.length, owner: activationSettle.owner }, this.presentationSettings.reducedMotion), activationActiveScale = 1 - (1 - activationSettle.activeAlphaScale) * activationDensityBudget.effectStrength;
             const hazardLifecycle = bossHazardLifecycleOwnerPresentation({ telegraph: hazard.telegraph, ttl: hazard.ttl, aftermathTtl: 0, aftermathMaxTtl: 0 }, this.presentationSettings.reducedFlash);
             const nearbyClearedMemory = this.bossHazardClearedGroundMemory.filter((cue) => cue.ttl > 0).reduce((best, cue) => { const d = Math.hypot(cue.x - hazard.pos.x, cue.y - hazard.pos.y); return !best || d < Math.hypot(best.x - hazard.pos.x, best.y - hazard.pos.y) ? cue : best; }, null);
-            const clearedHandoff = nearbyClearedMemory ? bossHazardClearedGroundMemoryPresentation({ memoryTtl: nearbyClearedMemory.ttl, memoryMaxTtl: nearbyClearedMemory.maxTtl, aftermathActive: this.bossHazardAftermathVfx.some((after) => Math.hypot(after.x - nearbyClearedMemory.x, after.y - nearbyClearedMemory.y) <= Math.max(24, nearbyClearedMemory.radius * .35) && after.ttl > 0), nextHazardDistance: Math.hypot(nearbyClearedMemory.x - hazard.pos.x, nearbyClearedMemory.y - hazard.pos.y), nextHazardTelegraph: hazard.telegraph }, this.presentationSettings.reducedFlash) : null;
-            const telegraphAlphaScale = clearedHandoff?.telegraphAlphaScale ?? 1;
+            const nearbyAftermathActive = nearbyClearedMemory ? this.bossHazardAftermathVfx.some((after) => Math.hypot(after.x - nearbyClearedMemory.x, after.y - nearbyClearedMemory.y) <= Math.max(24, nearbyClearedMemory.radius * .35) && after.ttl > 0) : false;
+            const clearedHandoff = nearbyClearedMemory ? bossHazardClearedGroundMemoryPresentation({ memoryTtl: nearbyClearedMemory.ttl, memoryMaxTtl: nearbyClearedMemory.maxTtl, aftermathActive: nearbyAftermathActive, nextHazardDistance: Math.hypot(nearbyClearedMemory.x - hazard.pos.x, nearbyClearedMemory.y - hazard.pos.y), nextHazardTelegraph: hazard.telegraph }, this.presentationSettings.reducedFlash) : null;
+            const respawnGroundCoherence = nearbyClearedMemory ? bossHazardRespawnGroundCoherencePresentation({ memoryLife: Math.max(0, nearbyClearedMemory.ttl / Math.max(.001, nearbyClearedMemory.maxTtl)), aftermathActive: nearbyAftermathActive, nextHazardDistance: Math.hypot(nearbyClearedMemory.x - hazard.pos.x, nearbyClearedMemory.y - hazard.pos.y), nextHazardRadius: hazard.radius, nextHazardTelegraph: hazard.telegraph }, this.presentationSettings.reducedFlash) : null;
+            const respawnGroundHandoff = respawnGroundCoherence && nearbyClearedMemory ? bossHazardRespawnGroundHandoffPresentation({ coherenceOwner: respawnGroundCoherence.owner, memoryLife: Math.max(0, nearbyClearedMemory.ttl / Math.max(.001, nearbyClearedMemory.maxTtl)), nextHazardTelegraph: hazard.telegraph }, this.presentationSettings.reducedFlash) : null;
+            const respawnGroundDensityBudget = respawnGroundCoherence ? bossHazardRespawnGroundDensityBudgetPresentation({ activeTransitionCount: telegraphedHazards.length, indexFromNewest: respawnHazardRank.get(hazard) ?? telegraphedHazards.length, owner: respawnGroundCoherence.owner }, this.presentationSettings.reducedMotion) : null;
+            const respawnMaterializationOwner = bossHazardRespawnMaterializationOwnershipPresentation({ respawnOwner: respawnGroundCoherence?.owner ?? 'spawn', footprintOwner: footprintLifecycle.owner, activationOwner: activationSettle.owner, footprintProgress: hazardFootprint?.progress ?? 1 }, this.presentationSettings.reducedFlash);
+            const respawnMaterializationSettle = bossHazardRespawnMaterializationSettlePresentation({ owner: respawnMaterializationOwner.owner, activationTtl: hazard.visualActivationTtl ?? 0, activationMaxTtl: hazard.visualActivationMaxTtl ?? .08, ttl: hazard.ttl }, this.presentationSettings.reducedFlash);
+            const materializationTransitionCount = respawnMaterializationOwner.owner === 'footprint' ? activeHazardFootprints.length : respawnMaterializationOwner.owner === 'activation' ? activeActivationHazards.length : 0;
+            const materializationTransitionRank = respawnMaterializationOwner.owner === 'footprint' ? (hazardFootprintRank.get(hazard) ?? materializationTransitionCount) : respawnMaterializationOwner.owner === 'activation' ? (activationHazardRank.get(hazard) ?? materializationTransitionCount) : 0;
+            const respawnMaterializationDensityBudget = bossHazardRespawnMaterializationDensityBudgetPresentation({ activeCount: materializationTransitionCount, indexFromNewest: materializationTransitionRank, owner: respawnMaterializationOwner.owner }, this.presentationSettings.reducedMotion);
+            const telegraphAlphaScale = (clearedHandoff?.telegraphAlphaScale ?? 1) * (respawnGroundCoherence?.telegraphAlphaScale ?? 1) * (respawnGroundHandoff?.telegraphAlphaScale ?? 1) * (respawnGroundDensityBudget?.telegraphAlphaScale ?? 1) * respawnMaterializationOwner.telegraphAlphaScale;
             if (hazard.launchOrigin && hazardHandoff.launchCueAlpha > 0) {
                 ctx.save();
                 ctx.globalAlpha = hazardHandoff.launchCueAlpha;
@@ -6972,9 +7071,21 @@ export class Game {
                 ctx.setLineDash([]);
                 ctx.restore();
             }
+            if (hazardFootprint?.visible && hazardFootprintBudget.visible) {
+                ctx.save();
+                ctx.globalAlpha = hazardFootprint.alphaScale * hazardFootprintBudget.alphaScale * footprintLifecycle.footprintAlphaScale * respawnMaterializationOwner.footprintAlphaScale * respawnMaterializationSettle.materializationAlphaScale * respawnMaterializationDensityBudget.effectStrength;
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1.8;
+                ctx.setLineDash([4, 7]);
+                ctx.beginPath();
+                ctx.arc(hazardFootprint.center.x, hazardFootprint.center.y, hazardFootprint.radius, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.restore();
+            }
             const amplitude = hazard.id === primaryTelegraphHazardId ? motion.bossHazardMotionAmplitude : 0;
             ctx.save();
-            ctx.globalAlpha = hazard.telegraph > 0 ? (0.34 + amplitude * Math.sin(this.elapsed * 10)) * hazardHandoff.telegraphAlphaScale * hazardLifecycle.telegraphAlphaScale * telegraphAlphaScale : 0.34 * hazardLifecycle.activeAlphaScale;
+            ctx.globalAlpha = hazard.telegraph > 0 ? (0.34 + amplitude * Math.sin(this.elapsed * 10)) * hazardHandoff.telegraphAlphaScale * footprintTelegraphScale * hazardLifecycle.telegraphAlphaScale * footprintLifecycle.telegraphAlphaScale * telegraphAlphaScale : 0.34 * hazardLifecycle.activeAlphaScale * footprintLifecycle.activeAlphaScale * activationActiveScale * respawnMaterializationOwner.activeAlphaScale * respawnMaterializationSettle.persistentAlphaScale;
             ctx.fillStyle = color;
             ctx.strokeStyle = color;
             ctx.lineWidth = hazard.telegraph > 0 ? 4 : 2;
@@ -7051,7 +7162,7 @@ export class Game {
                 const life = bossArenaLifecycleVfxSprite(hazard.kind, hazard.telegraph > 0 ? 'telegraph' : 'active');
                 const lifeSize = Math.max(108, hazard.radius * 2.34);
                 ctx.save();
-                ctx.globalAlpha = hazard.telegraph > 0 ? (this.presentationSettings.reducedFlash ? .24 : .4) * hazardLifecycle.telegraphAlphaScale * telegraphAlphaScale : (this.presentationSettings.reducedFlash ? .32 : .54) * hazardLifecycle.activeAlphaScale;
+                ctx.globalAlpha = hazard.telegraph > 0 ? (this.presentationSettings.reducedFlash ? .24 : .4) * hazardLifecycle.telegraphAlphaScale * footprintTelegraphScale * telegraphAlphaScale : (this.presentationSettings.reducedFlash ? .32 : .54) * hazardLifecycle.activeAlphaScale;
                 ctx.drawImage(this.bossArenaLifecycleVfxAtlasImage, life.sx, life.sy, life.sw, life.sh, hazard.pos.x - lifeSize / 2, hazard.pos.y - lifeSize / 2, lifeSize, lifeSize);
                 ctx.restore();
             }

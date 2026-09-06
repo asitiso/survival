@@ -1,0 +1,9 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import * as retirement from '../dist/game/projectile-multihit-impact-retirement-rendering.js';
+const fn=retirement.projectileImpactResponseDirectionDensityBudgetPresentation;
+test('impact response direction density budget helper exists',()=>assert.equal(typeof fn,'function'));
+test('sparse response direction keeps full transition cue',()=>{const p=fn?.({activeResponseCount:2,indexFromNewest:1,responseOwner:'guard',releaseOwner:'response'},false);assert.ok(p);assert.equal(p.visible,true);assert.equal(p.alphaScale,1);assert.equal(p.lengthScale,1);});
+test('dense weakpoint direction uses tighter capacity than guard direction',()=>{const w=fn?.({activeResponseCount:7,indexFromNewest:2,responseOwner:'weakpoint',releaseOwner:'response'},false),g=fn?.({activeResponseCount:7,indexFromNewest:2,responseOwner:'guard',releaseOwner:'response'},false);assert.ok(w&&g);assert.ok(w.capacity<g.capacity);assert.ok(Number(w.visible)<=Number(g.visible));});
+test('newest response direction remains visible under dense impact stack',()=>{const p=fn?.({activeResponseCount:9,indexFromNewest:0,responseOwner:'weakpoint',releaseOwner:'response'},false);assert.ok(p);assert.equal(p.visible,true);assert.ok(p.alphaScale>0);});
+test('reduced motion never increases response direction capacity',()=>{const a=fn?.({activeResponseCount:8,indexFromNewest:2,responseOwner:'guard',releaseOwner:'response'},false),b=fn?.({activeResponseCount:8,indexFromNewest:2,responseOwner:'guard',releaseOwner:'response'},true);assert.ok(a&&b);assert.ok(b.capacity<=a.capacity);assert.ok(b.lengthScale<=a.lengthScale);});
+test('live response density budget only scales impact direction decoration',()=>{const s=fs.readFileSync('src/game/spells.ts','utf8');assert.match(s,/projectileImpactResponseDirectionDensityBudgetPresentation/);assert.match(s,/impactResponseDensityBudget/);});

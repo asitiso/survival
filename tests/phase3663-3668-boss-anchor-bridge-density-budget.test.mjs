@@ -1,0 +1,8 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import { bossAnchorBridgeDensityBudgetPresentation } from '../dist/game/boss-anchor-bridge-density-budget-rendering.js';
+test('few boss projectiles keep anchor bridge',()=>{const p=bossAnchorBridgeDensityBudgetPresentation({activeCount:3,indexFromNewest:0,life:.8},false,false);assert.equal(p.visible,true);});
+test('large ring caps anchor bridge count',()=>{const p=bossAnchorBridgeDensityBudgetPresentation({activeCount:14,indexFromNewest:8,life:.8},false,false);assert.equal(p.visible,false);});
+test('newest boss projectile bridge remains visible',()=>{const p=bossAnchorBridgeDensityBudgetPresentation({activeCount:14,indexFromNewest:1,life:.8},false,false);assert.equal(p.visible,true);});
+test('old life loses alpha before slot',()=>{const a=bossAnchorBridgeDensityBudgetPresentation({activeCount:5,indexFromNewest:1,life:.9},false,false),b=bossAnchorBridgeDensityBudgetPresentation({activeCount:5,indexFromNewest:1,life:.2},false,false);assert.ok(b.alphaScale<a.alphaScale);});
+test('reduced motion tightens boss bridge capacity',()=>{const f=bossAnchorBridgeDensityBudgetPresentation({activeCount:7,indexFromNewest:4,life:.8},false,false),r=bossAnchorBridgeDensityBudgetPresentation({activeCount:7,indexFromNewest:4,life:.8},true,false);assert.ok(Number(r.visible)<=Number(f.visible));});
+test('live boss projectile render applies anchor bridge budget',()=>{const s=fs.readFileSync('src/game/enemies.ts','utf8');assert.match(s,/bossAnchorBridgeDensityBudgetPresentation/);assert.match(s,/bossBridgeBudget\.visible/);});

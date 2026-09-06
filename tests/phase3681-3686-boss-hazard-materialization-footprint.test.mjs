@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import * as handoff from '../dist/game/boss-hazard-telegraph-handoff-rendering.js';
+const fn=handoff.bossHazardMaterializationFootprintPresentation;
+const input={launchOrigin:{x:20,y:20},hazardPos:{x:120,y:60},radius:70,launchTtl:.18,launchMaxTtl:.22};
+test('materialization footprint helper exists',()=>{assert.equal(typeof fn,'function');});
+test('early footprint remains biased toward shared launch anchor',()=>{const p=fn?.(input,false,false);assert.ok(p);assert.ok(p.center.x<80);});
+test('footprint expands as hazard materializes',()=>{const early=fn?.(input,false,false),late=fn?.({...input,launchTtl:.03},false,false);assert.ok(early&&late);assert.ok(late.radius>early.radius);});
+test('late footprint converges toward final hazard position',()=>{const p=fn?.({...input,launchTtl:.01},false,false);assert.ok(p);assert.ok(Math.hypot(p.center.x-120,p.center.y-60)<20);});
+test('reduced flash lowers footprint alpha without moving footprint',()=>{const a=fn?.(input,false,false),b=fn?.(input,false,true);assert.ok(a&&b);assert.deepEqual(a.center,b.center);assert.ok(b.alphaScale<a.alphaScale);});
+test('live boss hazard draw consumes materialization footprint from launch origin',()=>{const s=fs.readFileSync('src/game/game.ts','utf8');assert.match(s,/bossHazardMaterializationFootprintPresentation/);assert.match(s,/hazardFootprint(?:\?\.)?visible/);assert.match(s,/hazard\.launchOrigin/);});

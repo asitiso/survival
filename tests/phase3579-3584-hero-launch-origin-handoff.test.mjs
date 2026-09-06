@@ -1,0 +1,9 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import { heroLaunchOriginHandoffPresentation } from '../dist/game/hero-launch-origin-handoff-rendering.js';
+const previous={offsetX:18,offsetY:-3,kind:'normal',ttl:.12};
+test('fresh launch uses desired origin directly',()=>{const p=heroLaunchOriginHandoffPresentation(null,{offsetX:-14,offsetY:5,kind:'normal'},false);assert.equal(p.originOffsetX,-14);assert.equal(p.owner,'desired');});
+test('rapid chained opposite cast caps origin jump',()=>{const p=heroLaunchOriginHandoffPresentation(previous,{offsetX:-18,offsetY:4,kind:'normal'},false);assert.ok(Math.hypot(p.originOffsetX-18,p.originOffsetY+3)<=12.001);assert.equal(p.owner,'handoff');});
+test('ultimate handoff allows a little more travel than normal',()=>{const n=heroLaunchOriginHandoffPresentation(previous,{offsetX:-18,offsetY:4,kind:'normal'},false),u=heroLaunchOriginHandoffPresentation(previous,{offsetX:-18,offsetY:4,kind:'ultimate'},false);assert.ok(Math.hypot(u.originOffsetX-18,u.originOffsetY+3)>Math.hypot(n.originOffsetX-18,n.originOffsetY+3));});
+test('expired previous memory does not constrain new launch',()=>{const p=heroLaunchOriginHandoffPresentation({...previous,ttl:0},{offsetX:-18,offsetY:4,kind:'normal'},false);assert.equal(p.owner,'desired');});
+test('reduced motion tightens chained jump',()=>{const f=heroLaunchOriginHandoffPresentation(previous,{offsetX:-18,offsetY:4,kind:'normal'},false),r=heroLaunchOriginHandoffPresentation(previous,{offsetX:-18,offsetY:4,kind:'normal'},true);assert.ok(Math.hypot(r.originOffsetX-18,r.originOffsetY+3)<Math.hypot(f.originOffsetX-18,f.originOffsetY+3));});
+test('live spell system keeps visual launch memory',()=>{const src=fs.readFileSync('src/game/spells.ts','utf8');assert.match(src,/heroVisualLaunchMemory/);assert.match(src,/heroLaunchOriginHandoffPresentation/);});

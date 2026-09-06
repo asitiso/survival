@@ -1,0 +1,9 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import * as finish from '../dist/game/specialist-strike-impact-side-finish-rendering.js';
+const fn=finish.specialistAnticipationSilhouetteHandoffPresentation;
+test('anticipation silhouette handoff helper exists',()=>assert.equal(typeof fn,'function'));
+test('anticipation owns preview shape before windup',()=>{const p=fn?.({anticipationVisible:true,pullback:0,lunge:0,resolve:0},false);assert.ok(p);assert.equal(p.owner,'preview');assert.equal(p.previewShapeScale,1);assert.equal(p.attackShapeScale,0);});
+test('early windup crossfades preview into attack silhouette',()=>{const p=fn?.({anticipationVisible:true,pullback:.22,lunge:0,resolve:0},false),c=finish.specialistAnticipationSilhouettePoseContinuityPresentation?.({type:'assassin',anticipationVisible:true,urgency:1,pullback:.22,lunge:0,resolve:0},false);assert.ok(p&&c);assert.equal(p.owner,'handoff');assert.ok(p.previewShapeScale>0&&p.previewShapeScale<1);assert.ok(p.attackShapeScale>0&&p.attackShapeScale<1);assert.ok(c.widthScale!==1||c.heightScale!==1||Math.abs(c.lateralOffset)>0);});
+test('committed windup strongly favors attack silhouette',()=>{const p=fn?.({anticipationVisible:true,pullback:.65,lunge:0,resolve:0},false);assert.ok(p);assert.ok(p.attackShapeScale>.8);assert.ok(p.previewShapeScale<.25);});
+test('strike fully retires preview shape',()=>{const p=fn?.({anticipationVisible:true,pullback:.1,lunge:.75,resolve:0},false);assert.ok(p);assert.equal(p.owner,'attack');assert.equal(p.previewShapeScale,0);assert.equal(p.attackShapeScale,1);});
+test('live specialist silhouette applies preview attack shape handoff',()=>{const s=fs.readFileSync('src/game/enemies.ts','utf8');assert.match(s,/specialistAnticipationSilhouetteHandoffPresentation/);assert.match(s,/anticipationSilhouetteHandoff/);});

@@ -1,0 +1,9 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import * as retirement from '../dist/game/projectile-multihit-impact-retirement-rendering.js';
+const fn=retirement.projectileImpactResponsePriorityPresentation;
+test('impact response priority helper exists',()=>assert.equal(typeof fn,'function'));
+test('canonical response preserves directional cue',()=>{const p=fn?.({responseOwner:'canonical',directionOwner:'source',responseStrength:0},false,false);assert.ok(p);assert.equal(p.owner,'direction');assert.equal(p.directionAlphaScale,1);assert.equal(p.directionLengthScale,1);});
+test('guard response yields direction while keeping it readable',()=>{const p=fn?.({responseOwner:'guard',directionOwner:'source',responseStrength:.7},false,false);assert.ok(p);assert.equal(p.owner,'guard');assert.ok(p.directionAlphaScale>0&&p.directionAlphaScale<.7);assert.ok(p.directionLengthScale<1);});
+test('weakpoint response owns more attention than guard',()=>{const g=fn?.({responseOwner:'guard',directionOwner:'secondary',responseStrength:.8},false,false),w=fn?.({responseOwner:'weakpoint',directionOwner:'secondary',responseStrength:.8},false,false);assert.ok(g&&w);assert.equal(w.owner,'weakpoint');assert.ok(w.directionAlphaScale<g.directionAlphaScale);assert.ok(w.responseAlphaScale>=g.responseAlphaScale);});
+test('settling direction cannot overpower a response',()=>{const p=fn?.({responseOwner:'weakpoint',directionOwner:'settle',responseStrength:1},false,false);assert.ok(p);assert.ok(p.directionAlphaScale<=.22);});
+test('live projectile impacts store response owner and compose response priority',()=>{const s=fs.readFileSync('src/game/spells.ts','utf8');assert.match(s,/impactResponseOwner/);assert.match(s,/projectileImpactResponsePriorityPresentation/);});

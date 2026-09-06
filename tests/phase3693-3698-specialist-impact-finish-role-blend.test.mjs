@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import { specialistStrikeImpactSideFinishPresentation } from '../dist/game/specialist-strike-impact-side-finish-rendering.js';
+const q=(type,ttl)=>specialistStrikeImpactSideFinishPresentation({origin:{x:0,y:0},target:{x:100,y:0},ttl,maxTtl:.14,type},false,false);
+const v=(p)=>({x:p.end.x-p.start.x,y:p.end.y-p.start.y});
+test('assassin finish rotates toward tangent through late strike window',()=>{const a=v(q('assassin',.043)),b=v(q('assassin',.005));assert.ok(Math.abs(b.y/b.x)>Math.abs(a.y/a.x));});
+test('nullifier finish rotates toward opposite tangent through late window',()=>{const a=v(q('nullifier',.043)),b=v(q('nullifier',.005));assert.ok(Math.abs(b.y/b.x)>Math.abs(a.y/a.x));assert.ok(b.y<0);});
+test('siege golem stays normal throughout blend window',()=>{for(const ttl of [.043,.02,.005])assert.ok(Math.abs(v(q('siegeGolem',ttl)).y)<.01);});
+test('role blend remains bounded between zero and one',()=>{for(const type of ['shieldbearer','assassin','siegeGolem','nullifier']){const p=q(type,.02);assert.ok(p.roleBlend>=0&&p.roleBlend<=1);}});
+test('reduced motion does not change role ownership direction sign',()=>{const a=specialistStrikeImpactSideFinishPresentation({origin:{x:0,y:0},target:{x:100,y:0},ttl:.01,maxTtl:.14,type:'assassin'},false,false),b=specialistStrikeImpactSideFinishPresentation({origin:{x:0,y:0},target:{x:100,y:0},ttl:.01,maxTtl:.14,type:'assassin'},true,false);assert.equal(Math.sign(v(a).y),Math.sign(v(b).y));});
+test('role blend is computed in specialist finish presentation helper',()=>{const s=fs.readFileSync('src/game/specialist-strike-impact-side-finish-rendering.ts','utf8');assert.match(s,/roleBlend/);});

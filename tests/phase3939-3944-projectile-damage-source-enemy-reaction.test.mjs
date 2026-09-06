@@ -1,0 +1,9 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import * as retirement from '../dist/game/projectile-multihit-impact-retirement-rendering.js';
+const fn=retirement.projectileDamageSourceEnemyReactionContinuityPresentation;
+test('damage-source enemy reaction continuity helper exists',()=>assert.equal(typeof fn,'function'));
+test('live hit keeps aftermath and hit reaction jointly readable',()=>{const p=fn?.({aftermathOwner:'aftermath',sourceClass:'projectile',reactionOwner:'hit',ttl:.13,maxTtl:.18},false,false);assert.ok(p);assert.equal(p.owner,'hit-handoff');assert.ok(p.aftermathAlphaScale>0&&p.reactionAlphaScale>0);});
+test('death reaction takes visual priority over damage-source decoration',()=>{const p=fn?.({aftermathOwner:'aftermath',sourceClass:'explosion',reactionOwner:'death',ttl:.12,maxTtl:.18},false,false);assert.ok(p);assert.equal(p.owner,'death');assert.ok(p.aftermathAlphaScale<.5);assert.equal(p.reactionAlphaScale,1);});
+test('no enemy reaction preserves source aftermath',()=>{const p=fn?.({aftermathOwner:'aftermath',sourceClass:'projectile',reactionOwner:'none',ttl:.12,maxTtl:.18},false,false);assert.ok(p);assert.equal(p.owner,'aftermath');assert.equal(p.aftermathAlphaScale,1);});
+test('reduced motion never increases reaction carry',()=>{const a=fn?.({aftermathOwner:'aftermath',sourceClass:'projectile',reactionOwner:'hit',ttl:.1,maxTtl:.18},false,false),b=fn?.({aftermathOwner:'aftermath',sourceClass:'projectile',reactionOwner:'hit',ttl:.1,maxTtl:.18},true,false);assert.ok(a&&b);assert.ok(b.reactionCarryScale<=a.reactionCarryScale);});
+test('live projectile impact stores and consumes actual enemy reaction owner',()=>{const s=fs.readFileSync('src/game/spells.ts','utf8');assert.match(s,/enemyReactionOwner/);assert.match(s,/projectileDamageSourceEnemyReactionContinuityPresentation/);assert.match(s,/impactDamageSourceReaction/);});

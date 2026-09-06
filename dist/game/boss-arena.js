@@ -10,10 +10,17 @@ export class BossArenaSystem {
     }
     reset() { this.hazards = []; this.timer = 2.6; this.nextId = 1; }
     update(dt, ctx) { const safe = Math.max(0, dt); for (const h of this.hazards) {
+        const priorTelegraph = h.telegraph;
         h.telegraph = Math.max(0, h.telegraph - safe);
         h.ttl -= safe;
         if (h.launchTtl !== undefined)
             h.launchTtl = Math.max(0, h.launchTtl - safe);
+        if (priorTelegraph > 0 && h.telegraph <= 0) {
+            h.visualActivationTtl = .08;
+            h.visualActivationMaxTtl = .08;
+        }
+        else if (h.visualActivationTtl !== undefined)
+            h.visualActivationTtl = Math.max(0, h.visualActivationTtl - safe);
         if ((h.launchTtl ?? 0) <= 0 || h.telegraph <= 0) {
             delete h.launchOrigin;
             delete h.launchTtl;

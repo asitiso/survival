@@ -1,0 +1,11 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import * as finish from '../dist/game/specialist-strike-impact-side-finish-rendering.js';
+const fn=finish.specialistImpactFinishLocomotionRecoveryPresentation;
+const input=(ttl)=>({start:{x:100,y:0},end:{x:100,y:16},locomotionFacingX:1,locomotionFacingY:0,ttl,maxTtl:.14,type:'assassin'});
+test('specialist impact locomotion recovery helper exists',()=>assert.equal(typeof fn,'function'));
+test('early finish retains finish ownership',()=>{const p=fn?.(input(.04),false);assert.ok(p);assert.equal(p.owner,'finish');});
+test('late finish hands direction back toward locomotion',()=>{const p=fn?.(input(.005),false);assert.ok(p);const dx=p.end.x-p.start.x,dy=p.end.y-p.start.y;assert.ok(Math.abs(dx)>Math.abs(dy));});
+test('recovery blend grows monotonically through late window',()=>{const a=fn?.(input(.035),false),b=fn?.(input(.015),false),c=fn?.(input(.002),false);assert.ok(a&&b&&c);assert.ok(a.recoveryBlend<=b.recoveryBlend&&b.recoveryBlend<=c.recoveryBlend);});
+test('late recovery shortens stale impact finish length',()=>{const a=fn?.(input(.035),false),b=fn?.(input(.002),false);assert.ok(a&&b);assert.ok(b.length<a.length);});
+test('reduced motion reaches locomotion ownership no later',()=>{const a=fn?.(input(.018),false),b=fn?.(input(.018),true);assert.ok(a&&b);assert.ok(b.recoveryBlend>=a.recoveryBlend);});
+test('live specialist strike cue stores and consumes recovery facing',()=>{const s=fs.readFileSync('src/game/enemies.ts','utf8');assert.match(s,/recoveryFacing/);assert.match(s,/specialistImpactFinishLocomotionRecoveryPresentation/);});

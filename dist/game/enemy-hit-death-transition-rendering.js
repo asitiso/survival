@@ -37,3 +37,39 @@ export function enemyDeathTransitionPresentation(type, snapshot, progress, reduc
     const alpha = clamp(1 - t * .96, 0, .98);
     return { role: p.role, carry, alpha, offsetX, offsetY, rotation, scaleX, scaleY };
 }
+export function enemyFinisherDeathAfterglowContinuityPresentation(input, reducedMotion = false, reducedFlash = false) {
+    const death = clamp(input.deathProgress, 0, 1), finisher = clamp(input.finisherProgress, 0, 1), tier = TIER[input.tier], flashScale = reducedFlash ? .72 : 1, motionScale = reducedMotion ? .82 : 1;
+    if (death < .34) {
+        const body = clamp(1 - death * .34, 0, 1);
+        return { owner: 'reaction', bodyAlphaScale: body, finisherAlphaScale: (.64 + .22 * tier) * motionScale, afterglowAlphaScale: (.12 + .16 * finisher) * flashScale, presentationOnly: true };
+    }
+    if (death < .78) {
+        const t = clamp((death - .34) / .44, 0, 1), body = clamp(.88 - .7 * t, 0, 1), after = clamp((.42 + .46 * t) * (.82 + .18 * tier) * flashScale, 0, 1);
+        return { owner: 'afterglow', bodyAlphaScale: body, finisherAlphaScale: clamp(.76 - .28 * t, 0, 1), afterglowAlphaScale: after, presentationOnly: true };
+    }
+    const tail = clamp((1 - death) / .22, 0, 1);
+    return { owner: 'afterglow', bodyAlphaScale: .18 * tail, finisherAlphaScale: .24 * tail, afterglowAlphaScale: clamp((.26 + .26 * (1 - finisher)) * flashScale, 0, 1), presentationOnly: true };
+}
+export function enemyFinisherDeathAfterglowHandoffPresentation(input, reducedMotion = false) {
+    const progress = clamp(input.deathProgress, 0, 1), after = clamp(input.afterglowAlpha, 0, 1);
+    if (input.owner === 'reaction' || progress < .34)
+        return { owner: 'reaction', bodyScale: 1, finisherScale: 1, afterglowScale: Math.min(.32, after), presentationOnly: true };
+    if (progress >= .8)
+        return { owner: 'afterglow', bodyScale: .12 * clamp((1 - progress) / .2, 0, 1), finisherScale: .34, afterglowScale: Math.max(.46, after), presentationOnly: true };
+    const t = clamp((progress - .34) / .46, 0, 1), overlap = reducedMotion ? .72 : 1, body = (.72 * (1 - t) + .08) * overlap, glow = .3 + .62 * t, finisher = .72 - .24 * t, total = body + glow, scale = total > 1.35 ? 1.35 / total : 1;
+    return { owner: 'handoff', bodyScale: body * scale, finisherScale: finisher, afterglowScale: glow * scale, presentationOnly: true };
+}
+export function enemyFinisherDeathAfterglowDensityBudgetPresentation(input, reducedMotion = false) {
+    const count = Math.max(0, Math.floor(input.activeCount)), index = Math.max(0, Math.floor(input.indexFromNewest));
+    if (input.owner === 'reaction')
+        return { effectStrength: 0, bodyAlphaScale: 1, afterglowAlphaScale: 1, capacity: 0, presentationOnly: true };
+    if (count <= 2)
+        return { effectStrength: 1, bodyAlphaScale: 1, afterglowAlphaScale: 1, capacity: count, presentationOnly: true };
+    let capacity = input.tier === 'critical' ? 4 : input.tier === 'heavy' ? 3 : 2;
+    if (input.owner === 'handoff')
+        capacity += 1;
+    if (reducedMotion)
+        capacity = Math.max(1, capacity - 1);
+    const visible = index < capacity, effectStrength = visible ? Math.max(.56, .88 - index * .08) : 0;
+    return { effectStrength, bodyAlphaScale: 1, afterglowAlphaScale: effectStrength, capacity, presentationOnly: true };
+}

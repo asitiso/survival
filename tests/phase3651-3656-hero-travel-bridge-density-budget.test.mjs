@@ -1,0 +1,8 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import { heroTravelBridgeDensityBudgetPresentation } from '../dist/game/hero-travel-bridge-density-budget-rendering.js';
+test('sparse hero bridges remain visible',()=>{const p=heroTravelBridgeDensityBudgetPresentation({activeCount:2,indexFromNewest:0,life:.8,evolutionTier:0},false,false);assert.equal(p.visible,true);assert.equal(p.alphaScale,1);});
+test('dense volley limits old bridges',()=>{const p=heroTravelBridgeDensityBudgetPresentation({activeCount:10,indexFromNewest:8,life:.8,evolutionTier:0},false,false);assert.equal(p.visible,false);});
+test('newest bridges win dense budget',()=>{const p=heroTravelBridgeDensityBudgetPresentation({activeCount:10,indexFromNewest:1,life:.8,evolutionTier:0},false,false);assert.equal(p.visible,true);});
+test('evolved projectile keeps readability preference',()=>{const a=heroTravelBridgeDensityBudgetPresentation({activeCount:8,indexFromNewest:4,life:.8,evolutionTier:2},false,false),b=heroTravelBridgeDensityBudgetPresentation({activeCount:8,indexFromNewest:4,life:.8,evolutionTier:0},false,false);assert.ok(a.alphaScale>=b.alphaScale);});
+test('reduced flash lowers bridge alpha only',()=>{const f=heroTravelBridgeDensityBudgetPresentation({activeCount:5,indexFromNewest:1,life:.8,evolutionTier:1},false,false),r=heroTravelBridgeDensityBudgetPresentation({activeCount:5,indexFromNewest:1,life:.8,evolutionTier:1},false,true);assert.equal(f.visible,r.visible);assert.ok(r.alphaScale<f.alphaScale);});
+test('live hero render applies travel bridge density budget',()=>{const s=fs.readFileSync('src/game/spells.ts','utf8');assert.match(s,/heroTravelBridgeDensityBudgetPresentation/);assert.match(s,/travelBudget\.visible/);});

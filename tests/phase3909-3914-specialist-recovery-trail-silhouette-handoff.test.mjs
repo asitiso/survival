@@ -1,0 +1,9 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import * as finish from '../dist/game/specialist-strike-impact-side-finish-rendering.js';
+const fn=finish.specialistRecoveryTrailSilhouetteHandoffPresentation;
+test('specialist recovery trail silhouette handoff helper exists',()=>assert.equal(typeof fn,'function'));
+test('attack keeps silhouette trail ownership',()=>{const p=fn?.({trailOwner:'attack',recoveryBlend:0,silhouetteOwner:'attack'},false);assert.ok(p);assert.equal(p.owner,'attack');assert.equal(p.recoveryTrailAlphaScale,1);});
+test('handoff shares ownership without double strength',()=>{const p=fn?.({trailOwner:'handoff',recoveryBlend:.58,silhouetteOwner:'recovery'},false);assert.ok(p);assert.equal(p.owner,'handoff');assert.ok(p.recoveryTrailAlphaScale<1);assert.ok(p.locomotionTrailAlphaScale>0);assert.ok(p.recoveryTrailAlphaScale+p.locomotionTrailAlphaScale<=1.25);});
+test('late recovery fully returns trail ownership to locomotion silhouette',()=>{const p=fn?.({trailOwner:'recovery',recoveryBlend:.96,silhouetteOwner:'locomotion'},false);assert.ok(p);assert.equal(p.owner,'locomotion');assert.ok(p.recoveryTrailAlphaScale<.3);assert.equal(p.locomotionTrailAlphaScale,1);});
+test('reduced motion does not increase overlap during handoff',()=>{const a=fn?.({trailOwner:'handoff',recoveryBlend:.62,silhouetteOwner:'recovery'},false),b=fn?.({trailOwner:'handoff',recoveryBlend:.62,silhouetteOwner:'recovery'},true);assert.ok(a&&b);assert.ok(b.recoveryTrailAlphaScale<=a.recoveryTrailAlphaScale);});
+test('live specialist silhouette composes recovery trail ownership handoff',()=>{const s=fs.readFileSync('src/game/enemies.ts','utf8');assert.match(s,/specialistRecoveryTrailSilhouetteHandoffPresentation/);assert.match(s,/specialistRecoveryTrailHandoff/);});

@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import * as life from '../dist/game/boss-hazard-lifecycle-owner-rendering.js';
+const fn=life.bossHazardAftermathDensityBudgetPresentation;
+test('boss aftermath density budget helper exists',()=>assert.equal(typeof fn,'function'));
+test('sparse aftermath cues keep full effect',()=>{const p=fn?.({activeCount:2,indexFromNewest:1,owner:'aftermath'},false);assert.ok(p);assert.equal(p.visible,true);assert.equal(p.alphaScale,1);});
+test('dense old terrain-owned aftermath retires before fresh handoff',()=>{const t=fn?.({activeCount:7,indexFromNewest:4,owner:'terrain'},false),h=fn?.({activeCount:7,indexFromNewest:4,owner:'handoff'},false);assert.ok(t&&h);assert.ok(Number(t.visible)<=Number(h.visible));});
+test('newest aftermath remains visible under dense hazard history',()=>{const p=fn?.({activeCount:8,indexFromNewest:0,owner:'handoff'},false);assert.ok(p);assert.equal(p.visible,true);assert.ok(p.alphaScale>0);});
+test('retired aftermath never consumes density capacity',()=>{const p=fn?.({activeCount:8,indexFromNewest:0,owner:'retired'},false);assert.ok(p);assert.equal(p.visible,false);assert.equal(p.alphaScale,0);});
+test('reduced motion does not increase aftermath capacity',()=>{const a=fn?.({activeCount:8,indexFromNewest:2,owner:'aftermath'},false),b=fn?.({activeCount:8,indexFromNewest:2,owner:'aftermath'},true);assert.ok(a&&b);assert.ok(Number(b.visible)<=Number(a.visible));});
+test('live aftermath draw composes density budget while cleared ground memory remains separate',()=>{const s=fs.readFileSync('src/game/game.ts','utf8');assert.match(s,/bossHazardAftermathDensityBudgetPresentation/);assert.match(s,/aftermathDensityBudget/);assert.match(s,/drawBossHazardClearedGroundMemory/);});

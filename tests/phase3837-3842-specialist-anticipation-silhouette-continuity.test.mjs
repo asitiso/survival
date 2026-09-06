@@ -1,0 +1,9 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import * as finish from '../dist/game/specialist-strike-impact-side-finish-rendering.js';
+const fn=finish.specialistAnticipationSilhouettePoseContinuityPresentation;
+test('specialist anticipation silhouette continuity helper exists',()=>assert.equal(typeof fn,'function'));
+test('idle anticipation previews upcoming pose without stealing body ownership',()=>{const p=fn?.({type:'assassin',anticipationVisible:true,urgency:.8,pullback:0,lunge:0,resolve:0},false);assert.ok(p);assert.equal(p.owner,'anticipation');assert.equal(p.anticipationAlphaScale,1);assert.ok(p.widthScale!==1||p.heightScale!==1||Math.abs(p.lateralOffset)>0);});
+test('windup hands pose ownership into attack silhouette',()=>{const p=fn?.({type:'assassin',anticipationVisible:true,urgency:1,pullback:.55,lunge:0,resolve:0},false);assert.ok(p);assert.equal(p.owner,'windup');assert.ok(p.anticipationAlphaScale<.6);assert.ok(p.poseWeight<1);});
+test('strike fully retires anticipation preview',()=>{const p=fn?.({type:'siegeGolem',anticipationVisible:true,urgency:1,pullback:.1,lunge:.8,resolve:0},false);assert.ok(p);assert.equal(p.owner,'strike');assert.equal(p.anticipationAlphaScale,0);assert.equal(p.poseWeight,0);});
+test('specialist types keep distinct anticipation pose silhouettes',()=>{const a=fn?.({type:'assassin',anticipationVisible:true,urgency:1,pullback:0,lunge:0,resolve:0},false),s=fn?.({type:'siegeGolem',anticipationVisible:true,urgency:1,pullback:0,lunge:0,resolve:0},false);assert.ok(a&&s);assert.notEqual(a.widthScale,s.widthScale);assert.notEqual(a.lateralOffset,s.lateralOffset);});
+test('live specialist rendering applies continuity to cue and silhouette',()=>{const s=fs.readFileSync('src/game/enemies.ts','utf8');assert.match(s,/specialistAnticipationSilhouettePoseContinuityPresentation/);assert.match(s,/anticipationSilhouetteContinuity/);});

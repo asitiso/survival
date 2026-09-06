@@ -1,0 +1,11 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import * as finish from '../dist/game/specialist-strike-impact-side-finish-rendering.js';
+const fn=finish.specialistNextAttackAnticipationPresentation;
+const base={recoveryBlend:1,attackTimer:.12,attackInterval:1.1,inAttackRange:true,facingX:1,facingY:0,type:'assassin'};
+test('specialist next attack anticipation helper exists',()=>assert.equal(typeof fn,'function'));
+test('unfinished impact recovery suppresses next attack anticipation',()=>{const p=fn?.({...base,recoveryBlend:.35},false,false);assert.ok(p);assert.equal(p.visible,false);});
+test('recovered specialist near next attack shows anticipation',()=>{const p=fn?.(base,false,false);assert.ok(p);assert.equal(p.visible,true);assert.ok(p.alpha>0);});
+test('out of range specialist never shows anticipation cue',()=>{const p=fn?.({...base,inAttackRange:false},false,false);assert.ok(p);assert.equal(p.visible,false);});
+test('role identity changes anticipation reach while facing remains normalized',()=>{const a=fn?.({...base,type:'assassin'},false,false),g=fn?.({...base,type:'siegeGolem'},false,false);assert.ok(a&&g);assert.ok(Math.abs(Math.hypot(a.facingX,a.facingY)-1)<1e-6);assert.notEqual(a.reach,g.reach);});
+test('reduced motion and flash never amplify anticipation',()=>{const a=fn?.(base,false,false),b=fn?.(base,true,true);assert.ok(a&&b);assert.ok(b.reach<=a.reach);assert.ok(b.alpha<=a.alpha);});
+test('live specialist rendering composes next attack anticipation from attack timer and target facing',()=>{const s=fs.readFileSync('src/game/enemies.ts','utf8');assert.match(s,/specialistNextAttackAnticipationPresentation/);assert.match(s,/nextAttackAnticipation/);});

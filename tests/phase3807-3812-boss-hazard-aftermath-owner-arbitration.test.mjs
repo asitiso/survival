@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import * as life from '../dist/game/boss-hazard-lifecycle-owner-rendering.js';
+const fn=life.bossHazardAftermathOwnerArbitrationPresentation;
+test('boss aftermath owner arbitration helper exists',()=>assert.equal(typeof fn,'function'));
+test('fresh handoff keeps aftermath owner over terrain memory',()=>{const p=fn?.({endOwner:'handoff',endAlpha:.6,terrainOwner:'aftermath',aftermathAlpha:.8,terrainAlpha:0},false);assert.ok(p);assert.equal(p.owner,'handoff');assert.ok(p.aftermathAlphaScale>0);assert.equal(p.terrainAlphaScale,0);});
+test('canonical aftermath remains single visual owner',()=>{const p=fn?.({endOwner:'aftermath',endAlpha:1,terrainOwner:'aftermath',aftermathAlpha:.9,terrainAlpha:0},false);assert.ok(p);assert.equal(p.owner,'aftermath');assert.ok(p.aftermathAlphaScale<=1);assert.equal(p.terrainAlphaScale,0);});
+test('terrain retirement takes ownership late without full aftermath overlap',()=>{const p=fn?.({endOwner:'aftermath',endAlpha:.45,terrainOwner:'terrain',aftermathAlpha:.22,terrainAlpha:.64},false);assert.ok(p);assert.equal(p.owner,'terrain');assert.ok(p.terrainAlphaScale>p.aftermathAlphaScale);});
+test('retired owner hides all transition decoration',()=>{const p=fn?.({endOwner:'retired',endAlpha:0,terrainOwner:'retired',aftermathAlpha:0,terrainAlpha:0},false);assert.ok(p);assert.equal(p.owner,'retired');assert.equal(p.aftermathAlphaScale,0);assert.equal(p.terrainAlphaScale,0);});
+test('reduced flash cannot increase arbitration alpha',()=>{const a=fn?.({endOwner:'aftermath',endAlpha:1,terrainOwner:'aftermath',aftermathAlpha:.9,terrainAlpha:0},false),b=fn?.({endOwner:'aftermath',endAlpha:1,terrainOwner:'aftermath',aftermathAlpha:.9,terrainAlpha:0},true);assert.ok(a&&b);assert.ok(b.aftermathAlphaScale<=a.aftermathAlphaScale);});
+test('live aftermath draw uses final owner arbitration',()=>{const s=fs.readFileSync('src/game/game.ts','utf8');assert.match(s,/bossHazardAftermathOwnerArbitrationPresentation/);assert.match(s,/aftermathArbitration/);});

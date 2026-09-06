@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import { bossAnticipationOriginCoherencePresentation } from '../dist/game/boss-anticipation-origin-coherence-rendering.js';
+
+const base={bodyOffsetX:10,bodyOffsetY:-4,rebaseOffsetX:-18,rebaseOffsetY:7,displacementStrength:.8,charge:.85,recovery:.05,stagger:0,radius:58};
+test('active anticipation follows authoritative ground rebase',()=>{const p=bossAnticipationOriginCoherencePresentation(base,false);assert.equal(p.owner,'ground-rebase');assert.ok(p.ringOffsetX<0);});
+test('weak displacement keeps ring closer to body',()=>{const p=bossAnticipationOriginCoherencePresentation({...base,rebaseOffsetX:-1,rebaseOffsetY:0,displacementStrength:.1},false);assert.equal(p.owner,'body');assert.ok(Math.abs(p.ringOffsetX)<=14);});
+test('charge raises ground lock without increasing displacement bound',()=>{const a=bossAnticipationOriginCoherencePresentation({...base,charge:.2},false),b=bossAnticipationOriginCoherencePresentation({...base,charge:1},false);assert.ok(b.groundLock>=a.groundLock);assert.ok(Math.hypot(b.ringOffsetX,b.ringOffsetY)<=28.001);});
+test('recovery yields ring lock toward body',()=>{const a=bossAnticipationOriginCoherencePresentation(base,false),r=bossAnticipationOriginCoherencePresentation({...base,recovery:.9,charge:.1},false);assert.ok(r.groundLock<a.groundLock);});
+test('stagger suppresses displacement ownership',()=>{const p=bossAnticipationOriginCoherencePresentation({...base,stagger:.9},false);assert.equal(p.owner,'body');});
+test('reduced motion retains authoritative origin and live ring uses coherence offset',()=>{const f=bossAnticipationOriginCoherencePresentation(base,false),r=bossAnticipationOriginCoherencePresentation(base,true);assert.ok(Math.hypot(r.ringOffsetX,r.ringOffsetY)<=Math.hypot(f.ringOffsetX,f.ringOffsetY));assert.equal(r.presentationOnly,true);const src=fs.readFileSync('src/game/enemies.ts','utf8');assert.match(src,/bossAnticipationOriginCoherencePresentation/);assert.match(src,/bossAnticipationOrigin\.ringOffsetX/);});

@@ -1,0 +1,9 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import * as retirement from '../dist/game/projectile-multihit-impact-retirement-rendering.js';
+const fn=retirement.projectileImpactDirectionDensityBudgetPresentation;
+test('impact direction density budget helper exists',()=>assert.equal(typeof fn,'function'));
+test('sparse impact directions keep full cue',()=>{const p=fn?.({activeCount:2,indexFromNewest:1,owner:'secondary',secondaryKind:'chain'},false);assert.ok(p);assert.equal(p.visible,true);assert.equal(p.alphaScale,1);assert.equal(p.lengthScale,1);});
+test('dense old settle direction retires before source direction',()=>{const a=fn?.({activeCount:9,indexFromNewest:4,owner:'settle',secondaryKind:'splash'},false),b=fn?.({activeCount:9,indexFromNewest:4,owner:'source',secondaryKind:undefined},false);assert.ok(a&&b);assert.ok(Number(a.visible)<=Number(b.visible));});
+test('splash directions receive tighter dense capacity than chain directions',()=>{const s=fn?.({activeCount:8,indexFromNewest:3,owner:'secondary',secondaryKind:'splash'},false),c=fn?.({activeCount:8,indexFromNewest:3,owner:'secondary',secondaryKind:'chain'},false);assert.ok(s&&c);assert.ok(Number(s.visible)<=Number(c.visible));});
+test('reduced motion never increases direction cue budget',()=>{const a=fn?.({activeCount:8,indexFromNewest:2,owner:'secondary',secondaryKind:'chain'},false),b=fn?.({activeCount:8,indexFromNewest:2,owner:'secondary',secondaryKind:'chain'},true);assert.ok(a&&b);assert.ok(Number(b.visible)<=Number(a.visible));assert.ok(b.lengthScale<=a.lengthScale);});
+test('live impact direction applies density budget only to directional decoration',()=>{const s=fs.readFileSync('src/game/spells.ts','utf8');assert.match(s,/projectileImpactDirectionDensityBudgetPresentation/);assert.match(s,/impactDirectionBudget/);});

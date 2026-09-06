@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import * as life from '../dist/game/boss-hazard-lifecycle-owner-rendering.js';
+const fn=life.bossHazardEndAftermathOwnershipPresentation;
+test('boss hazard end aftermath ownership helper exists',()=>assert.equal(typeof fn,'function'));
+test('fresh aftermath begins in active-to-aftermath handoff',()=>{const p=fn?.({aftermathTtl:.77,aftermathMaxTtl:.78},false,false);assert.ok(p);assert.equal(p.owner,'handoff');assert.ok(p.aftermathAlphaScale>0&&p.aftermathAlphaScale<1);});
+test('middle aftermath owns the residual cue',()=>{const p=fn?.({aftermathTtl:.42,aftermathMaxTtl:.78},false,false);assert.ok(p);assert.equal(p.owner,'aftermath');assert.ok(p.aftermathAlphaScale>.7);});
+test('late aftermath fades toward retirement',()=>{const a=fn?.({aftermathTtl:.18,aftermathMaxTtl:.78},false,false),b=fn?.({aftermathTtl:.02,aftermathMaxTtl:.78},false,false);assert.ok(a&&b);assert.ok(b.aftermathAlphaScale<a.aftermathAlphaScale);});
+test('expired aftermath retires completely',()=>{const p=fn?.({aftermathTtl:0,aftermathMaxTtl:.78},false,false);assert.ok(p);assert.equal(p.owner,'retired');assert.equal(p.aftermathAlphaScale,0);});
+test('reduced flash lowers aftermath ownership alpha without changing owner',()=>{const a=fn?.({aftermathTtl:.42,aftermathMaxTtl:.78},false,false),b=fn?.({aftermathTtl:.42,aftermathMaxTtl:.78},false,true);assert.ok(a&&b);assert.equal(a.owner,b.owner);assert.ok(b.aftermathAlphaScale<a.aftermathAlphaScale);});
+test('live aftermath draw composes explicit end ownership handoff',()=>{const s=fs.readFileSync('src/game/game.ts','utf8');assert.match(s,/bossHazardEndAftermathOwnershipPresentation/);assert.match(s,/aftermathOwnership/);});

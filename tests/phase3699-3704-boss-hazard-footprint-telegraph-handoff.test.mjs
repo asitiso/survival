@@ -1,0 +1,9 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import { bossHazardMaterializationFootprintPresentation } from '../dist/game/boss-hazard-telegraph-handoff-rendering.js';
+const base={launchOrigin:{x:20,y:20},hazardPos:{x:120,y:60},radius:70,launchMaxTtl:.22};
+test('early materialization footprint owns more visual weight than late footprint',()=>{const a=bossHazardMaterializationFootprintPresentation({...base,launchTtl:.19},false,false),b=bossHazardMaterializationFootprintPresentation({...base,launchTtl:.02},false,false);assert.ok(a.alphaScale>b.alphaScale);});
+test('telegraph ownership rises as footprint reaches destination',()=>{const a=bossHazardMaterializationFootprintPresentation({...base,launchTtl:.19},false,false),b=bossHazardMaterializationFootprintPresentation({...base,launchTtl:.02},false,false);assert.ok(b.telegraphAlphaScale>a.telegraphAlphaScale);});
+test('handoff never fully hides destination telegraph',()=>{for(const ttl of [.21,.15,.08,.01])assert.ok(bossHazardMaterializationFootprintPresentation({...base,launchTtl:ttl},false,false).telegraphAlphaScale>=.5);});
+test('reduced flash only lowers footprint secondary cue',()=>{const a=bossHazardMaterializationFootprintPresentation({...base,launchTtl:.12},false,false),b=bossHazardMaterializationFootprintPresentation({...base,launchTtl:.12},false,true);assert.equal(a.telegraphAlphaScale,b.telegraphAlphaScale);assert.ok(b.alphaScale<a.alphaScale);});
+test('expired footprint yields full telegraph ownership',()=>{const p=bossHazardMaterializationFootprintPresentation({...base,launchTtl:0},false,false);assert.equal(p.visible,false);assert.equal(p.telegraphAlphaScale,1);});
+test('live hazard telegraph multiplies by footprint handoff ownership',()=>{const s=fs.readFileSync('src/game/game.ts','utf8');assert.match(s,/hazardFootprint\?\.telegraphAlphaScale/);});

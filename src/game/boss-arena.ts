@@ -8,7 +8,7 @@ export type BossArenaHazardKind = 'firePool' | 'summonSigil' | 'shockLane' | 'cu
 export interface BossArenaHazard {
   id:number; kind:BossArenaHazardKind; pos:Vec2; radius:number; telegraph:number; ttl:number; damage:number;
   geometryShape?:MythicArenaGeometryShape; angle?:number; length?:number;
-  launchOrigin?:Vec2; launchTtl?:number; launchMaxTtl?:number;
+  launchOrigin?:Vec2; launchTtl?:number; launchMaxTtl?:number; visualActivationTtl?:number; visualActivationMaxTtl?:number;
 }
 export interface BossArenaContext {
   bossPos:Vec2; heroPos:Vec2; archetype:BossArchetype; phase:BossPhase; variantTier:BossVariantTier;
@@ -19,7 +19,7 @@ export class BossArenaSystem {
   hazards:BossArenaHazard[]=[]; private timer=2.6; private nextId=1;
   constructor(private readonly rng:()=>number=Math.random){}
   reset():void{this.hazards=[];this.timer=2.6;this.nextId=1;}
-  update(dt:number,ctx:BossArenaContext):void{const safe=Math.max(0,dt);for(const h of this.hazards){h.telegraph=Math.max(0,h.telegraph-safe);h.ttl-=safe;if(h.launchTtl!==undefined)h.launchTtl=Math.max(0,h.launchTtl-safe);if((h.launchTtl??0)<=0||h.telegraph<=0){delete h.launchOrigin;delete h.launchTtl;delete h.launchMaxTtl;}}this.hazards=this.hazards.filter(h=>h.ttl>0);this.timer-=safe;if(this.timer>0)return;this.spawn(ctx);const phasePressure=(ctx.phase-1)*.35+ctx.variantTier*.28;const cadence=ctx.mutation?.cadenceMultiplier??1;const geometryCadence=ctx.geometry?Math.max(.86,Math.min(1.08,2-ctx.geometry.pressure)):1;this.timer=Math.max(1.7,(4.8-phasePressure)*cadence*geometryCadence);}
+  update(dt:number,ctx:BossArenaContext):void{const safe=Math.max(0,dt);for(const h of this.hazards){const priorTelegraph=h.telegraph;h.telegraph=Math.max(0,h.telegraph-safe);h.ttl-=safe;if(h.launchTtl!==undefined)h.launchTtl=Math.max(0,h.launchTtl-safe);if(priorTelegraph>0&&h.telegraph<=0){h.visualActivationTtl=.08;h.visualActivationMaxTtl=.08;}else if(h.visualActivationTtl!==undefined)h.visualActivationTtl=Math.max(0,h.visualActivationTtl-safe);if((h.launchTtl??0)<=0||h.telegraph<=0){delete h.launchOrigin;delete h.launchTtl;delete h.launchMaxTtl;}}this.hazards=this.hazards.filter(h=>h.ttl>0);this.timer-=safe;if(this.timer>0)return;this.spawn(ctx);const phasePressure=(ctx.phase-1)*.35+ctx.variantTier*.28;const cadence=ctx.mutation?.cadenceMultiplier??1;const geometryCadence=ctx.geometry?Math.max(.86,Math.min(1.08,2-ctx.geometry.pressure)):1;this.timer=Math.max(1.7,(4.8-phasePressure)*cadence*geometryCadence);}
   contactAt(pos:Vec2,radius:number):MythicArenaHazardContact{let best:MythicArenaHazardContact={hit:false,penetration:0,slowMultiplier:1,push:{x:0,y:0}};for(const h of this.hazards){if(h.telegraph>0)continue;const contact=mythicArenaHazardContact(h,pos,radius);if(contact.hit&&contact.penetration>=best.penetration)best=contact;}return best;}
   damageAt(pos:Vec2,radius:number):number{let damage=0;for(const h of this.hazards){if(h.telegraph>0)continue;const contact=mythicArenaHazardContact(h,pos,radius);if(contact.hit)damage=Math.max(damage,h.damage);}return Math.min(28,damage);}
   private spawn(ctx:BossArenaContext):void{

@@ -1,0 +1,8 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import { specialistImpactFinishResponseArbitrationPresentation } from '../dist/game/specialist-impact-finish-response-arbitration-rendering.js';
+test('no response keeps impact finish fully owned',()=>{const p=specialistImpactFinishResponseArbitrationPresentation({finishAlpha:.6,responseStrength:0},false);assert.equal(p.owner,'finish');assert.equal(p.alphaScale,1);});
+test('strong response yields finish ownership',()=>{const p=specialistImpactFinishResponseArbitrationPresentation({finishAlpha:.6,responseStrength:.9},false);assert.equal(p.owner,'response');assert.ok(p.alphaScale<.5);});
+test('partial response reduces but does not erase finish',()=>{const p=specialistImpactFinishResponseArbitrationPresentation({finishAlpha:.6,responseStrength:.45},false);assert.ok(p.alphaScale>0&&p.alphaScale<1);});
+test('response strength is clamped',()=>{const p=specialistImpactFinishResponseArbitrationPresentation({finishAlpha:.6,responseStrength:9},false);assert.ok(p.alphaScale>=0);});
+test('reduced flash further lowers secondary finish',()=>{const f=specialistImpactFinishResponseArbitrationPresentation({finishAlpha:.6,responseStrength:.3},false),r=specialistImpactFinishResponseArbitrationPresentation({finishAlpha:.6,responseStrength:.3},true);assert.ok(r.alphaScale<f.alphaScale);});
+test('live specialist finish checks active guard response',()=>{const s=fs.readFileSync('src/game/enemies.ts','utf8');assert.match(s,/specialistImpactFinishResponseArbitrationPresentation/);assert.match(s,/impactResponse\.alphaScale/);});

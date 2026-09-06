@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import { specialistStrikeImpactSideFinishPresentation } from '../dist/game/specialist-strike-impact-side-finish-rendering.js';
+const p=(type)=>specialistStrikeImpactSideFinishPresentation({origin:{x:0,y:0},target:{x:100,y:0},ttl:.03,maxTtl:.14,type},false,false);
+const vec=(x)=>({x:x.end.x-x.start.x,y:x.end.y-x.start.y});
+test('siege golem finish remains heavy normal to impact side',()=>{const v=vec(p('siegeGolem'));assert.ok(v.x>0);assert.ok(Math.abs(v.y)<1);});
+test('assassin finish becomes strongly tangential',()=>{const v=vec(p('assassin'));assert.ok(Math.abs(v.y)>Math.abs(v.x));});
+test('shieldbearer finish keeps mostly normal deflection',()=>{const v=vec(p('shieldbearer'));assert.ok(v.x>Math.abs(v.y));assert.ok(Math.abs(v.y)>0.1);});
+test('nullifier finish uses opposite tangent signature',()=>{const a=vec(p('assassin')),n=vec(p('nullifier'));assert.ok(a.y*n.y<0);});
+test('all specialist finishes still begin beyond target impact side',()=>{for(const type of ['shieldbearer','assassin','siegeGolem','nullifier'])assert.ok(p(type).start.x>100);});
+test('live strike draw uses role-varied finish geometry',()=>{const s=fs.readFileSync('src/game/specialist-strike-impact-side-finish-rendering.ts','utf8');assert.match(s,/assassin/);assert.match(s,/nullifier/);assert.match(s,/tangent|tx|ty/);});

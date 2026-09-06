@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import * as hazard from '../dist/game/boss-hazard-telegraph-handoff-rendering.js';
+const fn=hazard.bossHazardFootprintLifecycleHandoffPresentation;
+test('boss footprint lifecycle handoff helper exists',()=>assert.equal(typeof fn,'function'));
+test('early materialization keeps footprint owner',()=>{const p=fn?.({footprintVisible:true,footprintProgress:.15,telegraph:.9,ttl:5},false);assert.ok(p);assert.equal(p.owner,'footprint');assert.ok(p.footprintAlphaScale>p.activeAlphaScale);});
+test('late materialization yields to telegraph before activation',()=>{const p=fn?.({footprintVisible:true,footprintProgress:.92,telegraph:.3,ttl:5},false);assert.ok(p);assert.equal(p.owner,'telegraph');assert.ok(p.telegraphAlphaScale>=p.footprintAlphaScale);});
+test('active persistent hazard fully retires footprint owner',()=>{const p=fn?.({footprintVisible:false,footprintProgress:1,telegraph:0,ttl:4},false);assert.ok(p);assert.equal(p.owner,'active');assert.equal(p.footprintAlphaScale,0);assert.equal(p.activeAlphaScale,1);});
+test('lifecycle never gives footprint and active full ownership together',()=>{for(const progress of [0,.25,.6,.9,1]){const p=fn?.({footprintVisible:progress<1,footprintProgress:progress,telegraph:progress<1?.4:0,ttl:4},false);assert.ok(p);assert.ok(!(p.footprintAlphaScale===1&&p.activeAlphaScale===1));}});
+test('reduced flash lowers footprint secondary cue without moving owner',()=>{const a=fn?.({footprintVisible:true,footprintProgress:.2,telegraph:.8,ttl:5},false),b=fn?.({footprintVisible:true,footprintProgress:.2,telegraph:.8,ttl:5},true);assert.ok(a&&b);assert.equal(a.owner,b.owner);assert.ok(b.footprintAlphaScale<a.footprintAlphaScale);});
+test('live boss hazard rendering composes footprint lifecycle handoff',()=>{const s=fs.readFileSync('src/game/game.ts','utf8');assert.match(s,/bossHazardFootprintLifecycleHandoffPresentation/);assert.match(s,/footprintLifecycle/);});

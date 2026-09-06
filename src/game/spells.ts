@@ -22,10 +22,16 @@ import { persistentSpellZoneVfxSprite } from './persistent-spell-zone-vfx-assets
 import { crowdControlPropagationVfxSprite } from './crowd-control-propagation-vfx-assets.js';
 import { ultimatePostImpactResidueVfxSprite, type UltimatePostImpactResidueVfxKind } from './ultimate-post-impact-residue-vfx-assets.js';
 import type { HeroId } from './hero-profiles.js';
-import { heroProjectileLaunchOriginPresentation, visualLaunchPosition } from './hero-projectile-launch-origin-rendering.js';
+import { visualLaunchPosition } from './hero-projectile-launch-origin-rendering.js';
+import { heroActionLaunchOriginCoherencePresentation } from './hero-action-launch-origin-coherence-rendering.js';
+import { heroLaunchOriginHandoffPresentation, type HeroLaunchOriginMemory } from './hero-launch-origin-handoff-rendering.js';
+import { heroLaunchFanAnchorPresentation } from './hero-launch-fan-anchor-rendering.js';
 import { projectileTrailLaunchHandoffPresentation } from './projectile-trail-launch-handoff-rendering.js';
+import { heroProjectileTravelContinuityPresentation } from './hero-projectile-travel-continuity-rendering.js';
+import { heroProjectileTravelHandoffPresentation } from './hero-projectile-travel-handoff-rendering.js';
+import { heroPostImpactHandoffDensityBudgetPresentation, heroTravelBridgeDensityBudgetPresentation } from './hero-travel-bridge-density-budget-rendering.js';
 import { projectileImpactEntryOffset, projectileImpactVisualPosition } from './projectile-impact-arrival-handoff-rendering.js';
-import { projectileMultiHitImpactHandoff } from './projectile-multihit-impact-retirement-rendering.js';
+import { projectileDamageSourceEnemyReactionContinuityPresentation, projectileDamageSourceEnemyReactionDensityBudgetPresentation, projectileDamageSourceEnemyReactionHandoffPresentation, projectileImpactDamageSourceAftermathDensityBudgetPresentation, projectileImpactDamageSourceAftermathHandoffPresentation, projectileImpactDamageSourceAftermathPresentation, projectileImpactDirectionDensityBudgetPresentation, projectileImpactDirectionOwnerHandoffPresentation, projectileImpactResponseDirectionDensityBudgetPresentation, projectileImpactResponsePriorityPresentation, projectileImpactResponseReleaseHandoffPresentation, projectileImpactLineageDensityBudgetPresentation, projectileImpactLineageDirectionPresentation, projectileImpactLineageOwnerHandoffPresentation, projectileImpactLineageTransferPresentation, projectileMultiHitImpactHandoff, projectilePostImpactTrailHandoffPresentation } from './projectile-multihit-impact-retirement-rendering.js';
 import { secondaryImpactCanonicalPresentation, type SecondaryImpactKind } from './secondary-impact-canonical-rendering.js';
 import { secondaryImpactClusterReadabilityBudgetPresentation } from './secondary-impact-cluster-readability-budget-rendering.js';
 import { advanceSecondaryImpactClusterIdentityHold, createSecondaryImpactClusterIdentityHoldState, secondaryImpactClusterIdentityFor, type SecondaryImpactClusterIdentityHoldState } from './secondary-impact-cluster-identity-hold-rendering.js';
@@ -94,6 +100,12 @@ interface PlayerProjectile {
   visualLaunchOffset?: Vec2;
   visualLaunchTtl?: number;
   visualLaunchMaxTtl?: number;
+  visualLaunchWorldOrigin?: Vec2;
+  visualLaunchTravelTtl?: number;
+  visualLaunchTravelMaxTtl?: number;
+  visualImpactHandoffTtl?: number;
+  visualImpactHandoffMaxTtl?: number;
+  visualImpactLineageId?: string;
 }
 
 
@@ -106,6 +118,11 @@ interface ProjectileImpactVisual {
   size: number;
   alphaScale?: number;
   secondaryKind?: SecondaryImpactKind;
+  impactLineageKey?: string;
+  impactDirection?: Vec2;
+  impactResponseOwner?: 'canonical'|'guard'|'weakpoint';
+  impactResponseStrength?: number;
+  enemyReactionOwner?: 'hit'|'death'|'none';
 }
 
 interface FlameField {
@@ -192,8 +209,18 @@ export interface SpellWorld {
   preferredManualTargetId?: number | null;
   weakpointAim?: { activeBossId:number|null; nodes:readonly BossEncounterNode[] } | undefined;
   visualBodyOffset?: Vec2 | undefined;
+  visualActionFacing?: Vec2 | undefined;
+  visualActionPoseStrength?: number | undefined;
+  visualActionOwner?: 'movement'|'cast'|'ultimate'|'recovery' | undefined;
   reducedMotion?: boolean | undefined;
   reducedFlash?: boolean | undefined;
+}
+
+function projectileImpactResponseAt(world:SpellWorld,pos:Vec2,enemy?:Enemy):{owner:'canonical'|'guard'|'weakpoint';strength:number}{
+  const weakpoint=world.weakpointAim?.nodes.filter((node)=>node.alive).reduce<BossEncounterNode|null>((best,node)=>{const d=distance(pos,node.pos);if(d>node.radius+82)return best;if(!best)return node;return d<distance(pos,best.pos)?node:best;},null);
+  if(weakpoint){const reach=Math.max(1,weakpoint.radius+82),d=distance(pos,weakpoint.pos);return{owner:'weakpoint',strength:Math.max(.55,Math.min(1,1-d/reach*.45))};}
+  const guard=Math.max(0,enemy?.guardHp??0);if(guard>0)return{owner:'guard',strength:Math.max(.4,Math.min(1,guard/Math.max(1,(enemy?.maxHp??1)*.24)))};
+  return{owner:'canonical',strength:0};
 }
 
 const ACTION_TO_SPELL: Partial<Record<ActionId, SpellId>> = {
@@ -238,6 +265,8 @@ export class SpellSystem {
   private secondaryImpactLineageLabelCountMemory:SecondaryImpactLineageLabelCountMemoryEntry[]=[];
   private persistentZoneExpireVfx: Array<{heroId:HeroId;kind:'flameField'|'blackHole';pos:Vec2;radius:number;ttl:number;maxTtl:number}> = [];
   private ultimatePostImpactResidues: Array<{heroId:HeroId;kind:UltimatePostImpactResidueVfxKind;pos:Vec2;radius:number;ttl:number;maxTtl:number}> = [];
+  private heroVisualLaunchMemory: HeroLaunchOriginMemory | null = null;
+  private nextVisualImpactLineageId = 1;
 
   reset(): void {
     for (const key of Object.keys(this.levels) as SpellId[]) this.levels[key] = 1;
@@ -256,6 +285,8 @@ export class SpellSystem {
     this.secondaryImpactLineageLabelCountMemory=[];
     this.persistentZoneExpireVfx = [];
     this.ultimatePostImpactResidues = [];
+    this.heroVisualLaunchMemory = null;
+    this.nextVisualImpactLineageId = 1;
   }
 
   update(dt: number, world: SpellWorld): void {
@@ -269,6 +300,7 @@ export class SpellSystem {
     for (const impact of this.projectileImpactVisuals) impact.ttl -= dt;
     for (const cue of this.persistentZoneExpireVfx) cue.ttl -= dt;
     for (const cue of this.ultimatePostImpactResidues) cue.ttl -= dt;
+    if(this.heroVisualLaunchMemory)this.heroVisualLaunchMemory.ttl=Math.max(0,this.heroVisualLaunchMemory.ttl-dt);
     this.arcs = this.arcs.filter((v) => v.ttl > 0);
     this.novas = this.novas.filter((v) => v.ttl > 0);
     this.projectileImpactVisuals = this.projectileImpactVisuals.filter((v) => v.ttl > 0);
@@ -416,11 +448,22 @@ export class SpellSystem {
       }
     }
 
+    const activeHeroTravelBridges=this.projectiles.filter((p)=>Boolean(p.visualLaunchWorldOrigin&&(p.visualLaunchTravelTtl??0)>0));
+    const heroTravelBridgeRank=new Map(activeHeroTravelBridges.map((p,index)=>[p,Math.max(0,activeHeroTravelBridges.length-1-index)]));
+    const activePostImpactHandoffs=this.projectiles.filter((p)=>Boolean((p.visualImpactHandoffTtl??0)>0));
+    const postImpactHandoffRank=new Map(activePostImpactHandoffs.map((p,index)=>[p,Math.max(0,activePostImpactHandoffs.length-1-index)]));
     for (const projectile of this.projectiles) {
       const visualPos = projectile.visualLaunchOffset && projectile.visualLaunchTtl !== undefined && projectile.visualLaunchMaxTtl
         ? visualLaunchPosition(projectile.pos, projectile.visualLaunchOffset, projectile.visualLaunchTtl, projectile.visualLaunchMaxTtl)
         : projectile.pos;
       const trail=projectileTrailLaunchHandoffPresentation({gameplayPos:projectile.pos,velocity:projectile.vel,launchOffset:projectile.visualLaunchOffset,launchTtl:projectile.visualLaunchTtl,launchMaxTtl:projectile.visualLaunchMaxTtl,radius:projectile.radius},reducedMotion);
+      const postImpactHandoff=projectile.visualImpactHandoffTtl!==undefined&&projectile.visualImpactHandoffMaxTtl?projectilePostImpactTrailHandoffPresentation({ttl:projectile.visualImpactHandoffTtl,maxTtl:projectile.visualImpactHandoffMaxTtl,continues:projectile.ttl>0},reducedMotion):null;
+      const postImpactBudget=heroPostImpactHandoffDensityBudgetPresentation({activeCount:activePostImpactHandoffs.length,indexFromNewest:postImpactHandoffRank.get(projectile)??activePostImpactHandoffs.length,life:(projectile.visualImpactHandoffTtl??0)/Math.max(.001,projectile.visualImpactHandoffMaxTtl??.08),evolutionTier:projectile.evolutionTier},reducedMotion);
+      const postImpactSpriteScale=postImpactHandoff&&postImpactBudget.apply?1-(1-postImpactHandoff.spriteAlphaScale)*postImpactBudget.effectStrength:1;
+      const travel=projectile.visualLaunchWorldOrigin&&projectile.visualLaunchTravelTtl!==undefined&&projectile.visualLaunchTravelMaxTtl?heroProjectileTravelContinuityPresentation({origin:projectile.visualLaunchWorldOrigin,projectile:visualPos,velocity:projectile.vel,ttl:projectile.visualLaunchTravelTtl,maxTtl:projectile.visualLaunchTravelMaxTtl,radius:projectile.radius},reducedMotion):null;
+      const travelHandoff=travel?.visible&&projectile.visualLaunchWorldOrigin?heroProjectileTravelHandoffPresentation({origin:projectile.visualLaunchWorldOrigin,projectile:visualPos,ttl:projectile.visualLaunchTravelTtl??0,maxTtl:projectile.visualLaunchTravelMaxTtl??.13},reducedMotion):null;
+      const travelBudget=heroTravelBridgeDensityBudgetPresentation({activeCount:activeHeroTravelBridges.length,indexFromNewest:heroTravelBridgeRank.get(projectile)??activeHeroTravelBridges.length,life:(projectile.visualLaunchTravelTtl??0)/Math.max(.001,projectile.visualLaunchTravelMaxTtl??.13),evolutionTier:projectile.evolutionTier},reducedMotion,reducedFlash);
+      if(travelHandoff&&travelHandoff.visible&&travelBudget.visible){ctx.save();ctx.globalAlpha=Math.min(travel?.alpha??0,travelHandoff.alpha)*travelBudget.alphaScale;ctx.strokeStyle=projectile.secondary;ctx.lineWidth=Math.max(1.1,projectile.radius*.12);ctx.beginPath();ctx.moveTo(travelHandoff.start.x,travelHandoff.start.y);ctx.lineTo(travelHandoff.end.x,travelHandoff.end.y);ctx.stroke();ctx.restore();}
       if(trail.owner==='launch'){ctx.save();ctx.globalAlpha=trail.alpha;ctx.strokeStyle=projectile.secondary;ctx.lineWidth=Math.max(1.4,projectile.radius*.18);ctx.beginPath();ctx.moveTo(trail.tail.x,trail.tail.y);ctx.lineTo(trail.head.x,trail.head.y);ctx.stroke();ctx.restore();}
       ctx.save();
       ctx.shadowColor = projectile.secondary; ctx.shadowBlur = 18;
@@ -429,7 +472,7 @@ export class SpellSystem {
         const sprite = heroProjectileVfxSprite(projectile.heroId);
         const angle = Math.atan2(projectile.vel.y, projectile.vel.x);
         const size = Math.max(34, projectile.radius * 4.6);
-        ctx.save(); ctx.translate(visualPos.x, visualPos.y); ctx.rotate(angle); ctx.globalAlpha = 0.96;
+        ctx.save(); ctx.translate(visualPos.x, visualPos.y); ctx.rotate(angle); ctx.globalAlpha = 0.96*postImpactSpriteScale;
         ctx.drawImage(heroProjectileAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, -size * 0.6, -size / 2, size * 1.2, size);
         ctx.restore();
       }
@@ -442,8 +485,17 @@ export class SpellSystem {
     }
 
     if (heroProjectileAtlasReady && heroProjectileAtlasImage) {
+      const primaryImpactLineageKeys=new Set(this.projectileImpactVisuals.filter((impact)=>impact.secondaryKind===undefined&&impact.impactLineageKey).map((impact)=>impact.impactLineageKey!));
+      const activeImpactDirections=this.projectileImpactVisuals.filter((impact)=>Boolean(impact.impactDirection&&impact.ttl>0));
+      const impactDirectionRank=new Map(activeImpactDirections.map((impact,index)=>[impact,Math.max(0,activeImpactDirections.length-1-index)]));
+      const activeImpactResponses=activeImpactDirections.filter((impact)=>(impact.impactResponseOwner??'canonical')!=='canonical');
+      const impactResponseRank=new Map(activeImpactResponses.map((impact,index)=>[impact,Math.max(0,activeImpactResponses.length-1-index)]));
+      const activeDamageSourceAftermaths=this.projectileImpactVisuals.filter((impact)=>impact.ttl>0);
+      const damageSourceAftermathRank=new Map(activeDamageSourceAftermaths.map((impact,index)=>[impact,Math.max(0,activeDamageSourceAftermaths.length-1-index)]));
+      const activeEnemyReactionImpacts=this.projectileImpactVisuals.filter((impact)=>impact.ttl>0&&(impact.enemyReactionOwner??'none')!=='none');
+      const enemyReactionRank=new Map(activeEnemyReactionImpacts.map((impact,index)=>[impact,Math.max(0,activeEnemyReactionImpacts.length-1-index)]));
       const secondaryImpacts=this.projectileImpactVisuals.filter((impact)=>impact.secondaryKind!==undefined);
-      const secondaryMetadata=secondaryImpacts.map((impact)=>{const identity=secondaryImpactClusterIdentityFor(this.secondaryImpactClusterIdentityHold,impact.pos),lineage=secondaryImpactSplitLineageFor(this.secondaryImpactClusterSplitLineage,impact.pos);return{impact,lineageKey:lineage.key,heldCount:identity.heldCount};});
+      const secondaryMetadata=secondaryImpacts.map((impact)=>{const identity=secondaryImpactClusterIdentityFor(this.secondaryImpactClusterIdentityHold,impact.pos),lineage=secondaryImpactSplitLineageFor(this.secondaryImpactClusterSplitLineage,impact.pos);return{impact,lineageKey:impact.impactLineageKey??lineage.key,heldCount:identity.heldCount};});
       const secondaryBudget=secondaryImpactClusterReadabilityBudgetPresentation(secondaryMetadata.map(({impact,lineageKey,heldCount})=>({pos:impact.pos,ttl:impact.ttl,maxTtl:impact.maxTtl,stableClusterKey:lineageKey,heldCount})),presentationQuality,reducedFlash);
       const secondaryLineageLabels=new Map<string,{heldCount:number;ttl:number;maxTtl:number;budgetVisible:boolean}>();
       let secondaryIndex=0;
@@ -455,12 +507,27 @@ export class SpellSystem {
         const progress = 1 - Math.max(0, impact.ttl / impact.maxTtl);
         const size = impact.size * (0.72 + progress * 0.5) * (budget?.sizeScale??1);
         const impactVisualPos=projectileImpactVisualPosition(impact.pos,impact.entryOffset??{x:0,y:0},impact.ttl,impact.maxTtl);
-        ctx.save(); ctx.globalAlpha = Math.max(0, 1 - progress) * 0.9 * (impact.alphaScale??1) * (budget?.alphaScale??1);
+        const impactDirection=impact.impactDirection?projectileImpactLineageDirectionPresentation({directionX:impact.impactDirection.x,directionY:impact.impactDirection.y,secondaryKind:impact.secondaryKind,ttl:impact.ttl,maxTtl:impact.maxTtl},reducedMotion):null;
+        const impactLineageParentKey=(impact.impactLineageKey??'').endsWith(':splash')?(impact.impactLineageKey??'').slice(0,-7):(impact.impactLineageKey??'');
+        const impactDirectionOwner=projectileImpactDirectionOwnerHandoffPresentation({secondaryKind:impact.secondaryKind,sourceActive:impact.secondaryKind===undefined||primaryImpactLineageKeys.has(impactLineageParentKey),ttl:impact.ttl,maxTtl:impact.maxTtl},reducedMotion);
+        const impactDirectionBudget=projectileImpactDirectionDensityBudgetPresentation({activeCount:activeImpactDirections.length,indexFromNewest:impactDirectionRank.get(impact)??activeImpactDirections.length,owner:impactDirectionOwner.owner,secondaryKind:impact.secondaryKind},reducedMotion);
+        const impactResponsePriority=projectileImpactResponsePriorityPresentation({responseOwner:impact.impactResponseOwner??'canonical',directionOwner:impactDirectionOwner.owner,responseStrength:impact.impactResponseStrength??0},reducedMotion,reducedFlash);
+        const impactResponseRelease=projectileImpactResponseReleaseHandoffPresentation({responseOwner:impact.impactResponseOwner??'canonical',directionOwner:impactDirectionOwner.owner,ttl:impact.ttl,maxTtl:impact.maxTtl},reducedMotion);
+        const impactResponseDensityBudget=projectileImpactResponseDirectionDensityBudgetPresentation({activeResponseCount:activeImpactResponses.length,indexFromNewest:impactResponseRank.get(impact)??activeImpactResponses.length,responseOwner:impact.impactResponseOwner??'canonical',releaseOwner:impactResponseRelease.owner},reducedMotion);
+        const impactDamageSourceAftermath=projectileImpactDamageSourceAftermathPresentation({responseOwner:impact.impactResponseOwner??'canonical',secondaryKind:impact.secondaryKind,ttl:impact.ttl,maxTtl:impact.maxTtl},reducedMotion,reducedFlash);
+        const impactDamageSourceAftermathHandoff=projectileImpactDamageSourceAftermathHandoffPresentation({owner:impactDamageSourceAftermath.owner,ttl:impact.ttl,maxTtl:impact.maxTtl,sourceClass:impactDamageSourceAftermath.sourceClass},reducedMotion);
+        const impactDamageSourceAftermathDensityBudget=projectileImpactDamageSourceAftermathDensityBudgetPresentation({activeCount:activeDamageSourceAftermaths.length,indexFromNewest:damageSourceAftermathRank.get(impact)??activeDamageSourceAftermaths.length,owner:impactDamageSourceAftermathHandoff.owner,sourceClass:impactDamageSourceAftermath.sourceClass},reducedMotion);
+        const impactDamageSourceReaction=projectileDamageSourceEnemyReactionContinuityPresentation({aftermathOwner:impactDamageSourceAftermathHandoff.owner,sourceClass:impactDamageSourceAftermath.sourceClass,reactionOwner:impact.enemyReactionOwner??'none',ttl:impact.ttl,maxTtl:impact.maxTtl},reducedMotion,reducedFlash);
+        const impactDamageSourceReactionHandoff=projectileDamageSourceEnemyReactionHandoffPresentation({owner:impactDamageSourceReaction.owner,reactionOwner:impact.enemyReactionOwner??'none',ttl:impact.ttl,maxTtl:impact.maxTtl},reducedMotion);
+        const impactDamageSourceReactionDensity=(impact.enemyReactionOwner??'none')!=='none'?projectileDamageSourceEnemyReactionDensityBudgetPresentation({activeCount:activeEnemyReactionImpacts.length,indexFromNewest:enemyReactionRank.get(impact)??activeEnemyReactionImpacts.length,reactionOwner:impact.enemyReactionOwner as 'hit'|'death',handoffOwner:impactDamageSourceReactionHandoff.owner},reducedMotion):null;
+        if(impactDirection?.visible&&impactDirectionOwner.owner!=='retired'&&impactDirectionBudget.visible&&impactResponseDensityBudget.visible){const cueLength=impactDirection.cueLength*impactDirectionBudget.lengthScale*impactResponsePriority.directionLengthScale*impactResponseDensityBudget.lengthScale;ctx.save();ctx.globalAlpha=impactDirection.alphaScale*impactDirectionOwner.alphaScale*impactDirectionBudget.alphaScale*impactResponsePriority.directionAlphaScale*impactResponseRelease.directionAlphaScale*impactResponseDensityBudget.alphaScale*(impact.alphaScale??1)*(budget?.alphaScale??1)*(reducedFlash?.62:1);ctx.strokeStyle=impact.secondaryKind==='splash'?'#ffe3b5':'#bcecff';ctx.lineWidth=1.7;ctx.beginPath();ctx.moveTo(impactVisualPos.x-impactDirection.facingX*cueLength,impactVisualPos.y-impactDirection.facingY*cueLength);ctx.lineTo(impactVisualPos.x,impactVisualPos.y);ctx.stroke();ctx.restore();}
+        if(impactDamageSourceAftermath.owner!=='retired'&&impactDamageSourceAftermath.aftermathAlphaScale>0&&impactDamageSourceAftermathDensityBudget.effectVisible){ctx.save();ctx.globalAlpha=impactDamageSourceAftermath.aftermathAlphaScale*impactDamageSourceAftermathHandoff.aftermathAlphaScale*impactDamageSourceAftermathDensityBudget.aftermathAlphaScale*impactDamageSourceReaction.aftermathAlphaScale*impactDamageSourceReactionHandoff.reactionAlphaScale*(impactDamageSourceReactionDensity?.effectStrength??1)*(impact.alphaScale??1)*(budget?.alphaScale??1);ctx.strokeStyle=impactDamageSourceAftermath.sourceClass==='explosion'?'#ffcf8a':'#9edcff';ctx.lineWidth=1.5;if(impactDamageSourceAftermath.sourceClass==='explosion'){ctx.beginPath();ctx.arc(impactVisualPos.x,impactVisualPos.y,Math.max(7,size*.28)*impactDamageSourceAftermath.ringRadiusScale*impactDamageSourceReaction.reactionCarryScale,0,Math.PI*2);ctx.stroke();}else if(impactDirection){const len=Math.max(8,size*.28)*impactDamageSourceAftermath.lineLengthScale*impactDamageSourceReaction.reactionCarryScale;ctx.beginPath();ctx.moveTo(impactVisualPos.x-impactDirection.facingX*len,impactVisualPos.y-impactDirection.facingY*len);ctx.lineTo(impactVisualPos.x,impactVisualPos.y);ctx.stroke();}ctx.restore();}
+        ctx.save(); ctx.globalAlpha = Math.max(0, 1 - progress) * 0.9 * impactDamageSourceAftermathHandoff.impactSpriteAlphaScale * impactDamageSourceReaction.impactSpriteAlphaScale * impactDamageSourceReactionHandoff.impactSpriteAlphaScale * (impactDamageSourceReactionDensity?.impactSpriteAlphaScale??1) * (impact.alphaScale??1) * (budget?.alphaScale??1);
         ctx.drawImage(heroProjectileAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, impactVisualPos.x - size / 2, impactVisualPos.y - size / 2, size, size);
         ctx.restore();
       }
       const secondaryOccupied:Vec2[]=[],secondaryPriority=secondaryImpactLineageLabelPriorityOrder([...secondaryLineageLabels].map(([lineageKey,meta])=>({lineageKey,heldCount:meta.heldCount,ttl:meta.ttl,budgetVisible:meta.budgetVisible}))),secondaryCapacity=secondaryImpactLineageLabelCapacityBudget(secondaryPriority.map(entry=>entry.lineageKey),presentationQuality),secondaryCapacityKeys=new Set(secondaryCapacity.visibleLineageKeys),secondaryConnectorCapacity=secondaryImpactLineageLabelConnectorCapacityBudget(presentationQuality);let secondaryConnectorCount=0;
-      for(const priority of secondaryPriority){if(!secondaryCapacityKeys.has(priority.lineageKey))continue;const lineageKey=priority.lineageKey,labelMeta=secondaryLineageLabels.get(lineageKey)!;const anchor=secondaryImpactActiveLineageAnchorFor(this.secondaryImpactClusterSplitLineage,lineageKey),label=secondaryImpactLineageLabelPresentation({lineageKey,anchor:anchor?.pos,heldCount:labelMeta.heldCount,ttl:labelMeta.ttl,maxTtl:labelMeta.maxTtl,budgetVisible:labelMeta.budgetVisible},reducedFlash);if(!label.visible||!anchor)continue;const fallbackPlacement=secondaryImpactLineageLabelPlacement({anchor:anchor.pos,blockers:primaryProjectileLabelBlockers,occupied:secondaryOccupied,width:LOGICAL_WIDTH,height:LOGICAL_HEIGHT}),held=secondaryImpactLineageHeldPlacement(this.secondaryImpactLineageLabelPlacementHold,lineageKey,fallbackPlacement,primaryProjectileLabelBlockers,secondaryOccupied,LOGICAL_WIDTH,LOGICAL_HEIGHT);this.secondaryImpactLineageLabelPlacementHold=held.memory;const placement=held.placement;if(!placement.visible){const retired=secondaryImpactLineageLabelMotionSettle(this.secondaryImpactLineageLabelMotionMemory,lineageKey,placement.pos,false,reducedMotion);this.secondaryImpactLineageLabelMotionMemory=retired.memory;continue;}const edgeBiased=secondaryImpactLineageLabelEdgeBias({pos:placement.pos,blockers:primaryProjectileLabelBlockers,occupied:secondaryOccupied,width:LOGICAL_WIDTH,height:LOGICAL_HEIGHT});const settled=secondaryImpactLineageLabelMotionSettle(this.secondaryImpactLineageLabelMotionMemory,lineageKey,edgeBiased.pos,true,reducedMotion);this.secondaryImpactLineageLabelMotionMemory=settled.memory;const connector=secondaryImpactLineageLabelConnectorPresentation({anchor:anchor.pos,labelPos:settled.presentation.pos,visible:settled.presentation.visible,biasApplied:edgeBiased.biasApplied,settled:settled.presentation.settled},reducedFlash);if(connector.visible&&secondaryConnectorCount<secondaryConnectorCapacity.maxVisible){secondaryConnectorCount++;ctx.save();ctx.globalAlpha=connector.alpha;ctx.strokeStyle='#bcecff';ctx.lineWidth=connector.lineWidth;ctx.beginPath();ctx.moveTo(connector.from.x,connector.from.y);ctx.lineTo(connector.to.x,connector.to.y);ctx.stroke();ctx.restore();}const emphasis=secondaryImpactLineageLabelCountEmphasis(this.secondaryImpactLineageLabelCountMemory,lineageKey,labelMeta.heldCount,true,reducedFlash);this.secondaryImpactLineageLabelCountMemory=emphasis.memory;const renderPos=settled.presentation.pos;secondaryOccupied.push(renderPos);ctx.save();ctx.globalAlpha=label.alpha;ctx.fillStyle='#f7f4ff';ctx.font='800 10px system-ui';ctx.textAlign='center';ctx.shadowColor='rgba(16,10,28,.82)';ctx.shadowBlur=5;ctx.translate(renderPos.x,renderPos.y);ctx.scale(emphasis.presentation.scale,emphasis.presentation.scale);ctx.fillText(label.text,0,0);ctx.restore();}
+      for(const [lineagePriorityIndex,priority] of secondaryPriority.entries()){if(!secondaryCapacityKeys.has(priority.lineageKey))continue;const lineageKey=priority.lineageKey,labelMeta=secondaryLineageLabels.get(lineageKey)!,lineageParentKey=lineageKey.endsWith(':splash')?lineageKey.slice(0,-7):lineageKey,lineageOwner=projectileImpactLineageOwnerHandoffPresentation({sourceActive:primaryImpactLineageKeys.has(lineageParentKey),secondaryActive:true,ttl:labelMeta.ttl,maxTtl:labelMeta.maxTtl},reducedMotion),lineageDensityBudget=projectileImpactLineageDensityBudgetPresentation({activeLineageCount:secondaryPriority.length,indexFromNewest:lineagePriorityIndex,owner:lineageOwner.owner,heldCount:labelMeta.heldCount},reducedMotion);if(lineageOwner.owner==='retired'||!lineageDensityBudget.visible)continue;const anchor=secondaryImpactActiveLineageAnchorFor(this.secondaryImpactClusterSplitLineage,lineageKey),label=secondaryImpactLineageLabelPresentation({lineageKey,anchor:anchor?.pos,heldCount:labelMeta.heldCount,ttl:labelMeta.ttl,maxTtl:labelMeta.maxTtl,budgetVisible:labelMeta.budgetVisible},reducedFlash);if(!label.visible||!anchor)continue;const fallbackPlacement=secondaryImpactLineageLabelPlacement({anchor:anchor.pos,blockers:primaryProjectileLabelBlockers,occupied:secondaryOccupied,width:LOGICAL_WIDTH,height:LOGICAL_HEIGHT}),held=secondaryImpactLineageHeldPlacement(this.secondaryImpactLineageLabelPlacementHold,lineageKey,fallbackPlacement,primaryProjectileLabelBlockers,secondaryOccupied,LOGICAL_WIDTH,LOGICAL_HEIGHT);this.secondaryImpactLineageLabelPlacementHold=held.memory;const placement=held.placement;if(!placement.visible){const retired=secondaryImpactLineageLabelMotionSettle(this.secondaryImpactLineageLabelMotionMemory,lineageKey,placement.pos,false,reducedMotion);this.secondaryImpactLineageLabelMotionMemory=retired.memory;continue;}const edgeBiased=secondaryImpactLineageLabelEdgeBias({pos:placement.pos,blockers:primaryProjectileLabelBlockers,occupied:secondaryOccupied,width:LOGICAL_WIDTH,height:LOGICAL_HEIGHT});const settled=secondaryImpactLineageLabelMotionSettle(this.secondaryImpactLineageLabelMotionMemory,lineageKey,edgeBiased.pos,true,reducedMotion);this.secondaryImpactLineageLabelMotionMemory=settled.memory;const connector=secondaryImpactLineageLabelConnectorPresentation({anchor:anchor.pos,labelPos:settled.presentation.pos,visible:settled.presentation.visible,biasApplied:edgeBiased.biasApplied,settled:settled.presentation.settled},reducedFlash);if(connector.visible&&secondaryConnectorCount<secondaryConnectorCapacity.maxVisible){secondaryConnectorCount++;ctx.save();ctx.globalAlpha=connector.alpha;ctx.strokeStyle='#bcecff';ctx.lineWidth=connector.lineWidth;ctx.beginPath();ctx.moveTo(connector.from.x,connector.from.y);ctx.lineTo(connector.to.x,connector.to.y);ctx.stroke();ctx.restore();}const emphasis=secondaryImpactLineageLabelCountEmphasis(this.secondaryImpactLineageLabelCountMemory,lineageKey,labelMeta.heldCount,true,reducedFlash);this.secondaryImpactLineageLabelCountMemory=emphasis.memory;const renderPos=settled.presentation.pos;secondaryOccupied.push(renderPos);ctx.save();ctx.globalAlpha=label.alpha*lineageOwner.alphaScale*lineageDensityBudget.alphaScale;ctx.fillStyle='#f7f4ff';ctx.font='800 10px system-ui';ctx.textAlign='center';ctx.shadowColor='rgba(16,10,28,.82)';ctx.shadowBlur=5;ctx.translate(renderPos.x,renderPos.y);ctx.scale(emphasis.presentation.scale,emphasis.presentation.scale);ctx.fillText(label.text,0,0);ctx.restore();}
     }
 
     for (const arc of this.arcs) {
@@ -526,17 +593,23 @@ export class SpellSystem {
     const identity = heroSpellIdentity(world.hero.profileId, 'fireBolt');
     const evolution = spellEvolution(world.hero.profileId, 'fireBolt', this.levels.fireBolt);
     const count = tuning.projectiles + evolution.projectileBonus;
-    const launch = heroProjectileLaunchOriginPresentation({bodyOffsetX:world.visualBodyOffset?.x??0,bodyOffsetY:world.visualBodyOffset?.y??0,facingX:world.hero.facing.x,facingY:world.hero.facing.y,radius:world.hero.radius,kind:'normal'},world.reducedMotion??false);
-    const visualLaunchOrigin={x:world.hero.pos.x+launch.originOffsetX,y:world.hero.pos.y+launch.originOffsetY};
+    const launch = heroActionLaunchOriginCoherencePresentation({owner:world.visualActionOwner??'movement',bodyOffsetX:world.visualBodyOffset?.x??0,bodyOffsetY:world.visualBodyOffset?.y??0,bodyFacingX:world.visualActionFacing?.x??world.hero.facing.x,bodyFacingY:world.visualActionFacing?.y??world.hero.facing.y,movementFacingX:world.hero.facing.x,movementFacingY:world.hero.facing.y,radius:world.hero.radius,poseStrength:world.visualActionPoseStrength??0,kind:'normal'},world.reducedMotion??false);
+    const launchHandoff=heroLaunchOriginHandoffPresentation(this.heroVisualLaunchMemory,{offsetX:launch.originOffsetX,offsetY:launch.originOffsetY,kind:'normal'},world.reducedMotion??false);
+    this.heroVisualLaunchMemory={offsetX:launchHandoff.originOffsetX,offsetY:launchHandoff.originOffsetY,kind:'normal',ttl:launchHandoff.memoryTtl};
+    const visualLaunchOrigin={x:world.hero.pos.x+launchHandoff.originOffsetX,y:world.hero.pos.y+launchHandoff.originOffsetY};
     for (let i = 0; i < count; i++) {
       const spread = (i - (count - 1) / 2) * 0.14;
       const angle = Math.atan2(baseDir.y, baseDir.x) + spread;
       const dir = { x: Math.cos(angle), y: Math.sin(angle) };
       const gameplayOrigin={ x: world.hero.pos.x + dir.x * 28, y: world.hero.pos.y + dir.y * 28 };
+      const fanAnchor=heroLaunchFanAnchorPresentation({baseOffsetX:launchHandoff.originOffsetX,baseOffsetY:launchHandoff.originOffsetY,facingX:launch.facingX,facingY:launch.facingY,radius:world.hero.radius,count,index:i,kind:'normal'},world.reducedMotion??false);
+      const fanVisualOrigin={x:world.hero.pos.x+fanAnchor.offsetX,y:world.hero.pos.y+fanAnchor.offsetY};
+      const visualImpactLineageId=`projectile-${this.nextVisualImpactLineageId++}`;
       this.projectiles.push({
         heroId: world.hero.profileId,
         pos: gameplayOrigin,
-        visualLaunchOffset:{x:visualLaunchOrigin.x-gameplayOrigin.x,y:visualLaunchOrigin.y-gameplayOrigin.y},visualLaunchTtl:launch.convergeSeconds,visualLaunchMaxTtl:launch.convergeSeconds,
+        visualLaunchOffset:{x:fanVisualOrigin.x-gameplayOrigin.x,y:fanVisualOrigin.y-gameplayOrigin.y},visualLaunchTtl:launch.convergeSeconds,visualLaunchMaxTtl:launch.convergeSeconds,
+        visualLaunchWorldOrigin:{...fanVisualOrigin},visualLaunchTravelTtl:world.reducedMotion?.09:.13,visualLaunchTravelMaxTtl:world.reducedMotion?.09:.13,visualImpactLineageId,
         vel: { x: dir.x * 700 * identity.projectileSpeedMultiplier, y: dir.y * 700 * identity.projectileSpeedMultiplier },
         radius: tuning.radius * world.hero.equipmentAreaMultiplier * identity.areaMultiplier * evolution.areaMultiplier * fusion.areaMultiplier,
         damage: tuning.damage * world.hero.spellPower * world.hero.equipmentSpellPower * identity.damageMultiplier * evolution.damageMultiplier * fusion.damageMultiplier,
@@ -557,17 +630,20 @@ export class SpellSystem {
     let current = this.chooseTarget(world);
     if (!current) return;
     const points: Vec2[] = [{ ...world.hero.pos }];
-    const launch=heroProjectileLaunchOriginPresentation({bodyOffsetX:world.visualBodyOffset?.x??0,bodyOffsetY:world.visualBodyOffset?.y??0,facingX:world.hero.facing.x,facingY:world.hero.facing.y,radius:world.hero.radius,kind:'normal'},world.reducedMotion??false);
-    const visualStart={x:world.hero.pos.x+launch.originOffsetX,y:world.hero.pos.y+launch.originOffsetY};
+    const launch= heroActionLaunchOriginCoherencePresentation({owner:world.visualActionOwner??'movement',bodyOffsetX:world.visualBodyOffset?.x??0,bodyOffsetY:world.visualBodyOffset?.y??0,bodyFacingX:world.visualActionFacing?.x??world.hero.facing.x,bodyFacingY:world.visualActionFacing?.y??world.hero.facing.y,movementFacingX:world.hero.facing.x,movementFacingY:world.hero.facing.y,radius:world.hero.radius,poseStrength:world.visualActionPoseStrength??0,kind:'normal'},world.reducedMotion??false);
+    const launchHandoff=heroLaunchOriginHandoffPresentation(this.heroVisualLaunchMemory,{offsetX:launch.originOffsetX,offsetY:launch.originOffsetY,kind:'normal'},world.reducedMotion??false);
+    this.heroVisualLaunchMemory={offsetX:launchHandoff.originOffsetX,offsetY:launchHandoff.originOffsetY,kind:'normal',ttl:launchHandoff.memoryTtl};
+    const visualStart={x:world.hero.pos.x+launchHandoff.originOffsetX,y:world.hero.pos.y+launchHandoff.originOffsetY};
+    const visualImpactLineageId=`chain-${this.nextVisualImpactLineageId++}`;
     const hit = new Set<number>();
     for (let i = 0; i < chainJumpBudget(tuning.jumps + identity.chainJumpBonus + evolution.jumpBonus + fusion.jumpBonus, world.hero.temporaryChainJumpBonus) && current; i++) {
       hit.add(current.id);
       const hitSource={...(points[points.length-1] ?? world.hero.pos)};
       points.push({ ...current.pos });
-      world.enemies.damage(current, tuning.damage * world.hero.spellPower * world.hero.equipmentSpellPower * identity.damageMultiplier * evolution.damageMultiplier * fusion.damageMultiplier * Math.pow(0.86, i), hitSource);
+      const impactPos=this.targetAimPoint(world,current)??current.pos,impactResponse=projectileImpactResponseAt(world,impactPos,current);
+      const chainKilled=world.enemies.damage(current, tuning.damage * world.hero.spellPower * world.hero.equipmentSpellPower * identity.damageMultiplier * evolution.damageMultiplier * fusion.damageMultiplier * Math.pow(0.86, i), hitSource);
       if (identity.chainSlowFactor < 1) world.enemies.applySlow(current, Math.max(0.24, identity.chainSlowFactor * evolution.slowFactorMultiplier), identity.chainSlowDuration * evolution.slowDurationMultiplier * fusion.slowDurationMultiplier);
-      const impactPos=this.targetAimPoint(world,current)??current.pos;
-      if(i>0){const secondary=secondaryImpactCanonicalPresentation('chain',impactPos,world.reducedFlash??false);this.projectileImpactVisuals.push({pos:secondary.pos,entryOffset:secondary.entryOffset,alphaScale:secondary.alphaScale,secondaryKind:'chain',heroId:world.hero.profileId,ttl:.14,maxTtl:.14,size:54*secondary.sizeScale});if(this.projectileImpactVisuals.length>32)this.projectileImpactVisuals.splice(0,this.projectileImpactVisuals.length-32);}
+      if(i>0){const secondary=secondaryImpactCanonicalPresentation('chain',impactPos,world.reducedFlash??false),lineage=projectileImpactLineageTransferPresentation({sourceLineageKey:visualImpactLineageId,impactIndex:i,secondaryKind:'chain',continues:Boolean(current)},world.reducedMotion??false);this.projectileImpactVisuals.push({pos:secondary.pos,entryOffset:secondary.entryOffset,alphaScale:secondary.alphaScale,secondaryKind:'chain',impactLineageKey:lineage.lineageKey,impactDirection:{x:impactPos.x-hitSource.x,y:impactPos.y-hitSource.y},impactResponseOwner:impactResponse.owner,impactResponseStrength:impactResponse.strength,enemyReactionOwner:chainKilled?'death':'hit',heroId:world.hero.profileId,ttl:.14,maxTtl:.14,size:54*secondary.sizeScale});if(this.projectileImpactVisuals.length>32)this.projectileImpactVisuals.splice(0,this.projectileImpactVisuals.length-32);}
       world.terrain?.hitByMagic(current.pos, 1);
       world.magicTargets?.hitMagic(impactPos, tuning.damage * 0.72);
       const from = current.pos;
@@ -671,25 +747,27 @@ export class SpellSystem {
     for (const p of this.projectiles) {
       p.ttl -= dt;
       if(p.visualLaunchTtl!==undefined)p.visualLaunchTtl=Math.max(0,p.visualLaunchTtl-dt);
+      if(p.visualLaunchTravelTtl!==undefined)p.visualLaunchTravelTtl=Math.max(0,p.visualLaunchTravelTtl-dt);
+      if(p.visualImpactHandoffTtl!==undefined)p.visualImpactHandoffTtl=Math.max(0,p.visualImpactHandoffTtl-dt);
       p.pos.x += p.vel.x * dt;
       p.pos.y += p.vel.y * dt;
       world.magicTargets?.hitMagic(p.pos, p.damage * Math.min(0.28, dt * 4));
       for (const enemy of world.enemies.enemies) {
         if (!enemy.alive || p.hitIds.has(enemy.id)) continue;
         if (distance(p.pos, enemy.pos) > p.radius + enemy.radius) continue;
-        const priorImpactCount=p.hitIds.size,continues=p.pierceLeft>0;
+        const priorImpactCount=p.hitIds.size,continues=p.pierceLeft>0,impactResponse=projectileImpactResponseAt(world,p.pos,enemy);
         p.hitIds.add(enemy.id);
-        world.enemies.damage(enemy, p.damage, p.pos);
+        const killedByImpact=world.enemies.damage(enemy, p.damage, p.pos);
         const impactHandoff=projectileMultiHitImpactHandoff({launchOffset:p.visualLaunchOffset,launchTtl:p.visualLaunchTtl,launchMaxTtl:p.visualLaunchMaxTtl,priorImpactCount,continues},world.reducedMotion??false);
-        const entryOffset=impactHandoff.entryOffset;
-        this.projectileImpactVisuals.push({ pos:{...p.pos}, entryOffset, heroId:p.heroId, ttl:0.18, maxTtl:0.18, size:Math.max(48,p.radius*5.2) });
-        if(impactHandoff.retireLaunchOwner){delete p.visualLaunchOffset;delete p.visualLaunchTtl;delete p.visualLaunchMaxTtl;}
+        const entryOffset=impactHandoff.entryOffset,lineage=projectileImpactLineageTransferPresentation({sourceLineageKey:p.visualImpactLineageId??`projectile-unbound`,impactIndex:priorImpactCount,continues},world.reducedMotion??false);
+        this.projectileImpactVisuals.push({ pos:{...p.pos}, entryOffset, impactLineageKey:lineage.lineageKey, impactDirection:{x:p.vel.x,y:p.vel.y}, impactResponseOwner:impactResponse.owner, impactResponseStrength:impactResponse.strength, enemyReactionOwner:killedByImpact?'death':'hit', heroId:p.heroId, ttl:0.18, maxTtl:0.18, size:Math.max(48,p.radius*5.2) });
+        if(impactHandoff.retireLaunchOwner){delete p.visualLaunchOffset;delete p.visualLaunchTtl;delete p.visualLaunchMaxTtl;}if(impactHandoff.retireTravelOwner){delete p.visualLaunchWorldOrigin;delete p.visualLaunchTravelTtl;delete p.visualLaunchTravelMaxTtl;if(continues){const handoffMax=world.reducedMotion?.05:.08;p.visualImpactHandoffTtl=handoffMax;p.visualImpactHandoffMaxTtl=handoffMax;}}
         if (p.evolutionTier === 2) world.feedback?.addImpact(p.pos, 'final');
         if (p.slowFactor < 1) world.enemies.applySlow(enemy, p.slowFactor, p.slowDuration);
         if (p.splashRadius > 0 && p.splashDamage > 0) {
           for (const nearby of world.enemies.enemies) {
             if (!nearby.alive || nearby.id === enemy.id) continue;
-            if (distance(enemy.pos, nearby.pos) <= p.splashRadius + nearby.radius) { world.enemies.damage(nearby, p.splashDamage, enemy.pos, 'explosion'); const secondary=secondaryImpactCanonicalPresentation('splash',nearby.pos,world.reducedFlash??false); this.projectileImpactVisuals.push({pos:secondary.pos,entryOffset:secondary.entryOffset,alphaScale:secondary.alphaScale,secondaryKind:'splash',heroId:p.heroId,ttl:.14,maxTtl:.14,size:Math.max(38,p.radius*4.2)*secondary.sizeScale}); if(this.projectileImpactVisuals.length>32)this.projectileImpactVisuals.splice(0,this.projectileImpactVisuals.length-32); }
+            if (distance(enemy.pos, nearby.pos) <= p.splashRadius + nearby.radius) { const splashResponse=projectileImpactResponseAt(world,nearby.pos,nearby); const splashKilled=world.enemies.damage(nearby, p.splashDamage, enemy.pos, 'explosion'); const secondary=secondaryImpactCanonicalPresentation('splash',nearby.pos,world.reducedFlash??false),secondaryLineage=projectileImpactLineageTransferPresentation({sourceLineageKey:p.visualImpactLineageId??lineage.lineageKey,impactIndex:priorImpactCount,secondaryKind:'splash',continues},world.reducedMotion??false); this.projectileImpactVisuals.push({pos:secondary.pos,entryOffset:secondary.entryOffset,alphaScale:secondary.alphaScale,secondaryKind:'splash',impactLineageKey:secondaryLineage.lineageKey,impactDirection:{x:nearby.pos.x-enemy.pos.x,y:nearby.pos.y-enemy.pos.y},impactResponseOwner:splashResponse.owner,impactResponseStrength:splashResponse.strength,enemyReactionOwner:splashKilled?'death':'hit',heroId:p.heroId,ttl:.14,maxTtl:.14,size:Math.max(38,p.radius*4.2)*secondary.sizeScale}); if(this.projectileImpactVisuals.length>32)this.projectileImpactVisuals.splice(0,this.projectileImpactVisuals.length-32); }
           }
         }
         world.terrain?.hitByMagic(p.pos, 1);

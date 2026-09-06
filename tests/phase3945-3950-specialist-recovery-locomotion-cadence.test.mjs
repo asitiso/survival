@@ -1,0 +1,9 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import * as finish from '../dist/game/specialist-strike-impact-side-finish-rendering.js';
+const fn=finish.specialistRecoveryTrailLocomotionCadencePresentation;
+test('specialist recovery locomotion cadence helper exists',()=>assert.equal(typeof fn,'function'));
+test('early recovery keeps trail ownership and suppresses cadence',()=>{const p=fn?.({trailOwner:'recovery',recoveryBlend:.3,motionBlend:.7,signatureStrength:.6},false);assert.ok(p);assert.equal(p.owner,'recovery');assert.ok(p.recoveryTrailAlphaScale>.6);assert.ok(p.locomotionCadenceScale<.5);});
+test('handoff shares trail and locomotion cadence without overshoot',()=>{const p=fn?.({trailOwner:'handoff',recoveryBlend:.68,motionBlend:.8,signatureStrength:.5},false);assert.ok(p);assert.equal(p.owner,'handoff');assert.ok(p.recoveryTrailAlphaScale>0&&p.locomotionCadenceScale>0);assert.ok(p.recoveryTrailAlphaScale+p.locomotionCadenceScale<=1.35);});
+test('late recovery fully restores locomotion cadence',()=>{const p=fn?.({trailOwner:'locomotion',recoveryBlend:.96,motionBlend:.8,signatureStrength:.7},false);assert.ok(p);assert.equal(p.owner,'locomotion');assert.equal(p.locomotionCadenceScale,1);assert.ok(p.recoveryTrailAlphaScale<.2);});
+test('reduced motion shortens cadence overlap',()=>{const a=fn?.({trailOwner:'handoff',recoveryBlend:.62,motionBlend:.8,signatureStrength:.7},false),b=fn?.({trailOwner:'handoff',recoveryBlend:.62,motionBlend:.8,signatureStrength:.7},true);assert.ok(a&&b);assert.ok(b.recoveryTrailAlphaScale<=a.recoveryTrailAlphaScale);});
+test('live specialist renderer composes recovery trail into locomotion cadence',()=>{const s=fs.readFileSync('src/game/enemies.ts','utf8');assert.match(s,/specialistRecoveryTrailLocomotionCadencePresentation/);assert.match(s,/specialistRecoveryLocomotionCadence/);assert.match(s,/specialistSignatureScale/);});

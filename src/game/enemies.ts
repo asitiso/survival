@@ -71,6 +71,27 @@ import { advanceCoreMixedPressureGuardArbitration, coreMixedPressureGuardArbitra
 import { bossSpecialLaunchOriginPresentation } from './boss-special-launch-origin-rendering.js';
 import { characterGroundContactPresentation, characterHitRecoilPresentation } from './character-contact-recoil-rendering.js';
 import { characterMotionLayerBudgetPresentation } from './character-motion-layer-budget-rendering.js';
+import { characterSilhouetteDirectionOwnerPresentation } from './character-silhouette-direction-owner-rendering.js';
+import { characterSilhouetteDirectionPivotPresentation } from './character-silhouette-direction-pivot-rendering.js';
+import { characterSilhouetteTrailBudgetPresentation } from './character-silhouette-trail-budget-rendering.js';
+import { specialistAttackSilhouetteEmphasisPresentation } from './specialist-attack-silhouette-emphasis-rendering.js';
+import { bossSpecialAnticipationEmphasisPresentation } from './boss-special-anticipation-emphasis-rendering.js';
+import { specialistSilhouettePhaseHandoffPresentation } from './specialist-silhouette-phase-handoff-rendering.js';
+import { bossAnticipationRecoveryHandoffPresentation } from './boss-anticipation-recovery-handoff-rendering.js';
+import { specialistSilhouetteCrowdBudgetPresentation } from './specialist-silhouette-crowd-budget-rendering.js';
+import { bossSpecialCueBudgetPresentation } from './boss-special-cue-budget-rendering.js';
+import { specialistStrikeOriginCoherencePresentation } from './specialist-strike-origin-coherence-rendering.js';
+import { bossAnticipationOriginCoherencePresentation } from './boss-anticipation-origin-coherence-rendering.js';
+import { specialistStrikeOriginArrivalPresentation } from './specialist-strike-origin-arrival-rendering.js';
+import { specialistAttackSilhouetteRecoveryTrailPresentation, specialistRecoveryTrailDensityBudgetPresentation, specialistRecoveryTrailLocomotionCadencePresentation, specialistRecoveryLocomotionCadenceDensityBudgetPresentation, specialistRecoveryLocomotionCadenceHandoffPresentation, specialistImpactFinishLocomotionRecoveryPresentation, specialistRecoveryTrailSilhouetteHandoffPresentation, specialistImpactRecoveryDensityBudgetPresentation, specialistImpactRecoveryFacingHandoffPresentation, specialistAnticipationSilhouetteDensityBudgetPresentation, specialistAnticipationSilhouetteHandoffPresentation, specialistAnticipationSilhouettePoseContinuityPresentation, specialistNextAttackAnticipationDensityBudgetPresentation, specialistNextAttackAnticipationHandoffPresentation, specialistNextAttackAnticipationPresentation, specialistLocomotionTurnStopReattackRhythmPresentation, specialistTurnStopReattackHandoffPresentation, specialistTurnStopReattackDensityBudgetPresentation, specialistStrikeImpactSideFinishPresentation } from './specialist-strike-impact-side-finish-rendering.js';
+import { bossSharedAnchorTravelContinuityPresentation } from './boss-shared-anchor-travel-continuity-rendering.js';
+import { bossAnchorTravelReleasePresentation } from './boss-anchor-travel-release-rendering.js';
+import { specialistImpactFinishResponseArbitrationPresentation } from './specialist-impact-finish-response-arbitration-rendering.js';
+import { bossAnchorBridgeDensityBudgetPresentation } from './boss-anchor-bridge-density-budget-rendering.js';
+import { specialistImpactFinishDensityBudgetPresentation } from './specialist-impact-finish-density-budget-rendering.js';
+import { bossAnticipationOriginLockPresentation } from './boss-anticipation-origin-lock-rendering.js';
+import { specialistStrikeCueBudgetPresentation } from './specialist-strike-cue-budget-rendering.js';
+import { bossSpecialOriginAnchorPresentation } from './boss-special-origin-anchor-rendering.js';
 
 export type EnemyType = 'grunt' | 'hound' | 'brute' | 'archer' | 'bomber' | 'shaman' | 'shieldbearer' | 'assassin' | 'siegeGolem' | 'nullifier' | 'golden' | 'elite' | 'boss';
 export type EnemyTarget = 'hero' | 'core';
@@ -145,6 +166,9 @@ export interface EnemyProjectileView {
   visualLaunchOffset?: Vec2 | undefined;
   visualLaunchTtl?: number | undefined;
   visualLaunchMaxTtl?: number | undefined;
+  visualLaunchWorldOrigin?: Vec2 | undefined;
+  visualLaunchTravelTtl?: number | undefined;
+  visualLaunchTravelMaxTtl?: number | undefined;
   visualPos?: Vec2 | undefined;
 }
 
@@ -258,6 +282,7 @@ export class EnemyManager {
   private regularEnemyActionVfx: Array<{pos:Vec2;kind:RegularEnemyActionVfxKind;ttl:number;maxTtl:number}> = [];
   private eliteAffixResponseVfx: Array<{pos:Vec2;enemyId:number;affixId:EliteAffixId;ttl:number;maxTtl:number}> = [];
   private specialistReactionVfx: Array<{pos:Vec2;targetPos?:Vec2;enemyId:number;type:SpecialistEnemyType;ttl:number;maxTtl:number}> = [];
+  private specialistStrikeOriginVfx: Array<{pos:Vec2;origin:Vec2;target:Vec2;recoveryFacing:Vec2;enemyId:number;type:SpecialistEnemyType;ttl:number;maxTtl:number}> = [];
   private nullifierHeroInside = new Set<number>();
   private nextId = 1;
   private spawnTimer = 0;
@@ -296,6 +321,7 @@ export class EnemyManager {
     this.regularEnemyActionVfx = [];
     this.eliteAffixResponseVfx = [];
     this.specialistReactionVfx = [];
+    this.specialistStrikeOriginVfx = [];
     this.nullifierHeroInside.clear();
     this.nextId = 1;
     this.spawnTimer = 0;
@@ -333,6 +359,7 @@ export class EnemyManager {
     for (const cue of this.eliteAffixResponseVfx) cue.ttl -= Math.max(0, dt);
     this.eliteAffixResponseVfx = this.eliteAffixResponseVfx.filter((cue) => cue.ttl > 0);
     for (const cue of this.specialistReactionVfx) cue.ttl -= Math.max(0, dt);
+    for (const cue of this.specialistStrikeOriginVfx) cue.ttl -= Math.max(0, dt);
     for (const cue of this.projectileGuardImpactVfx) cue.ttl -= Math.max(0, dt);
     this.projectileGuardImpactVfx = this.projectileGuardImpactVfx.filter((cue)=>cue.ttl>0);
     for (const cue of this.projectileCoreGuardImpactVfx) cue.ttl -= Math.max(0, dt);
@@ -343,6 +370,7 @@ export class EnemyManager {
     const contactCoreGuardStrength=this.coreContactGuardImpactVfx.reduce((best,cue)=>Math.max(best,cue.preventionRatio*Math.max(0,Math.min(1,cue.ttl/Math.max(.001,cue.maxTtl)))),0);
     this.coreMixedPressureGuardArbitration=advanceCoreMixedPressureGuardArbitration(this.coreMixedPressureGuardArbitration,{projectileStrength:projectileCoreGuardStrength,contactStrength:contactCoreGuardStrength},dt);
     this.specialistReactionVfx = this.specialistReactionVfx.filter((cue) => cue.ttl > 0);
+    this.specialistStrikeOriginVfx = this.specialistStrikeOriginVfx.filter((cue) => cue.ttl > 0);
 
     if (this.spawnTimer <= 0 && this.enemies.length < director.enemyBudget) {
       const burst = Math.max(1, Math.ceil(director.spawnBurst * (ctx.spawnPressureMultiplier ?? 1)));
@@ -494,6 +522,7 @@ export class EnemyManager {
         enemy.pos.y += dir.y * speed * dt;
       } else if (enemy.attackTimer <= 0) {
         didAttackThisFrame = true;
+        if(isSpecialistEnemyType(enemy.type)&&enemy.type!=='nullifier'){const dir=normalize({x:targetObj.pos.x-enemy.pos.x,y:targetObj.pos.y-enemy.pos.y});const strike=specialistStrikeOriginCoherencePresentation({type:enemy.type,radius:enemy.radius,facingX:dir.x,facingY:dir.y,pullback:0,lunge:1,resolve:0,silhouetteForward:enemy.radius*.42,silhouetteLateral:0},ctx.reducedMotion??false);const maxTtl=.18;this.specialistStrikeOriginVfx.push({pos:{...enemy.pos},origin:{x:enemy.pos.x+strike.originOffsetX,y:enemy.pos.y+strike.originOffsetY},target:{...targetObj.pos},recoveryFacing:{x:enemy.renderMotion?.facingX??dir.x,y:enemy.renderMotion?.facingY??dir.y},enemyId:enemy.id,type:enemy.type,ttl:maxTtl,maxTtl});if(this.specialistStrikeOriginVfx.length>24)this.specialistStrikeOriginVfx.splice(0,this.specialistStrikeOriginVfx.length-24);}
         const frenzyDamage = enemy.hp / Math.max(1, enemy.maxHp) <= 0.42 ? (enemy.lowHpDamageMultiplier ?? 1) : 1;
         // Legacy source continuity: if (enemy.target === 'core') ctx.onCoreDamage(...)
         if (enemy.target === 'core') {
@@ -639,9 +668,15 @@ export class EnemyManager {
   }
 
   renderProjectiles(ctx: CanvasRenderingContext2D, bossSpecialVfxAtlasImage: CanvasImageSource | null = null, bossSpecialVfxAtlasReady = false, battlefieldEnvironmentReactionVfxAtlasImage: CanvasImageSource | null = null, battlefieldEnvironmentReactionVfxAtlasReady = false, bossProjectileLifecycleVfxAtlasImage: CanvasImageSource | null = null, bossProjectileLifecycleVfxAtlasReady = false, presentationQuality: PresentationQuality = 'high', reducedFlash = false, reducedMotion = false): void {
+    const activeBossAnchorBridges=this.projectiles.filter((p)=>Boolean(p.bossArchetype&&p.visualLaunchWorldOrigin&&(p.visualLaunchTravelTtl??0)>0));
+    const bossAnchorBridgeRank=new Map(activeBossAnchorBridges.map((p,index)=>[p,Math.max(0,activeBossAnchorBridges.length-1-index)]));
     for (const projectile of this.projectiles) {
       const visualPos=projectile.visualLaunchOffset&&projectile.visualLaunchTtl!==undefined&&projectile.visualLaunchMaxTtl?rangedEnemyVisualLaunchPosition(projectile.pos,projectile.visualLaunchOffset,projectile.visualLaunchTtl,projectile.visualLaunchMaxTtl):projectile.pos;
       const trail=projectileTrailLaunchHandoffPresentation({gameplayPos:projectile.pos,velocity:projectile.vel,launchOffset:projectile.visualLaunchOffset,launchTtl:projectile.visualLaunchTtl,launchMaxTtl:projectile.visualLaunchMaxTtl,radius:projectile.radius},reducedMotion);
+      const bossTravel=projectile.bossArchetype&&projectile.visualLaunchWorldOrigin&&projectile.visualLaunchTravelTtl!==undefined&&projectile.visualLaunchTravelMaxTtl?bossSharedAnchorTravelContinuityPresentation({anchor:projectile.visualLaunchWorldOrigin,projectile:visualPos,velocity:projectile.vel,ttl:projectile.visualLaunchTravelTtl,maxTtl:projectile.visualLaunchTravelMaxTtl,radius:projectile.radius},reducedMotion):null;
+      const bossTravelRelease=bossTravel?.visible&&projectile.visualLaunchWorldOrigin?bossAnchorTravelReleasePresentation({anchor:projectile.visualLaunchWorldOrigin,projectile:visualPos,ttl:projectile.visualLaunchTravelTtl??0,maxTtl:projectile.visualLaunchTravelMaxTtl??.15},reducedMotion):null;
+      const bossBridgeBudget=bossAnchorBridgeDensityBudgetPresentation({activeCount:activeBossAnchorBridges.length,indexFromNewest:bossAnchorBridgeRank.get(projectile)??activeBossAnchorBridges.length,life:(projectile.visualLaunchTravelTtl??0)/Math.max(.001,projectile.visualLaunchTravelMaxTtl??.15)},reducedMotion,reducedFlash);
+      if(bossTravelRelease&&bossTravelRelease.visible&&bossBridgeBudget.visible){ctx.save();ctx.globalAlpha=Math.min(bossTravel?.alpha??0,bossTravelRelease.alpha)*bossBridgeBudget.alphaScale;ctx.strokeStyle='#ffb26f';ctx.lineWidth=Math.max(1.2,projectile.radius*.15);ctx.beginPath();ctx.moveTo(bossTravelRelease.start.x,bossTravelRelease.start.y);ctx.lineTo(bossTravelRelease.end.x,bossTravelRelease.end.y);ctx.stroke();ctx.restore();}
       if(trail.owner==='launch'){ctx.save();ctx.globalAlpha=trail.alpha;ctx.strokeStyle=projectile.bossArchetype?'#ffb26f':'#ff7c86';ctx.lineWidth=Math.max(1.3,projectile.radius*.2);ctx.beginPath();ctx.moveTo(trail.tail.x,trail.tail.y);ctx.lineTo(trail.head.x,trail.head.y);ctx.stroke();ctx.restore();}
       const hasBossVisual = Boolean(projectile.bossArchetype && bossSpecialVfxAtlasReady && bossSpecialVfxAtlasImage);
       ctx.save();
@@ -736,6 +771,22 @@ export class EnemyManager {
         ctx.restore();
       }
     }
+    const activeStrikeCueCount=this.specialistStrikeOriginVfx.length;
+    const activeImpactFinishCount=this.specialistStrikeOriginVfx.filter((cue)=>cue.ttl/Math.max(.001,cue.maxTtl)<.32).length;
+    for(const [strikeCueIndex,cue] of this.specialistStrikeOriginVfx.entries()){
+      const strikeCueBudget=specialistStrikeCueBudgetPresentation({activeCueCount:activeStrikeCueCount,indexFromNewest:Math.max(0,activeStrikeCueCount-1-strikeCueIndex),type:cue.type,life:cue.ttl/Math.max(.001,cue.maxTtl)},reducedMotion,reducedFlash);
+      if(!strikeCueBudget.visible)continue;
+      const arrival=specialistStrikeOriginArrivalPresentation({body:cue.pos,origin:cue.origin,target:cue.target,ttl:cue.ttl,maxTtl:cue.maxTtl},reducedMotion);
+      const impactFinish=specialistStrikeImpactSideFinishPresentation({origin:cue.origin,target:cue.target,ttl:cue.ttl,maxTtl:cue.maxTtl,type:cue.type},reducedMotion,reducedFlash);
+      const initialRecovery=specialistImpactFinishLocomotionRecoveryPresentation({start:impactFinish.start,end:impactFinish.end,locomotionFacingX:cue.recoveryFacing.x,locomotionFacingY:cue.recoveryFacing.y,ttl:cue.ttl,maxTtl:cue.maxTtl,type:cue.type},reducedMotion),currentRecoveryEnemy=this.enemies.find((candidate)=>candidate.id===cue.enemyId),recoveryFacing=specialistImpactRecoveryFacingHandoffPresentation({storedFacingX:cue.recoveryFacing.x,storedFacingY:cue.recoveryFacing.y,currentFacingX:currentRecoveryEnemy?.renderMotion?.facingX??cue.recoveryFacing.x,currentFacingY:currentRecoveryEnemy?.renderMotion?.facingY??cue.recoveryFacing.y,recoveryBlend:initialRecovery.recoveryBlend,enemyAlive:Boolean(currentRecoveryEnemy?.alive)},reducedMotion);
+      const impactRecovery=specialistImpactFinishLocomotionRecoveryPresentation({start:impactFinish.start,end:impactFinish.end,locomotionFacingX:recoveryFacing.facingX,locomotionFacingY:recoveryFacing.facingY,ttl:cue.ttl,maxTtl:cue.maxTtl,type:cue.type},reducedMotion);
+      const life=Math.max(0,Math.min(1,cue.ttl/Math.max(.001,cue.maxTtl)));
+      ctx.save();ctx.globalAlpha=(.28+.5*life)*strikeCueBudget.alphaScale;ctx.strokeStyle=cue.type==='assassin'?'#e4b5ff':cue.type==='siegeGolem'?'#ffcb7a':'#9fd7ff';ctx.fillStyle=ctx.strokeStyle;ctx.lineWidth=2.4*strikeCueBudget.lineWidthScale;ctx.beginPath();ctx.moveTo(cue.pos.x,cue.pos.y);ctx.lineTo(arrival.marker.x,arrival.marker.y);ctx.stroke();ctx.beginPath();ctx.arc(arrival.marker.x,arrival.marker.y,2.8+1.8*life,0,Math.PI*2);ctx.fill();ctx.restore();
+      if(impactFinish.visible){const responseStrength=this.coreContactGuardImpactVfx.some((g)=>g.ttl>0&&distance(g.pos,cue.target)<=28)?1:0,impactResponse=specialistImpactFinishResponseArbitrationPresentation({finishAlpha:impactFinish.alpha,responseStrength},reducedFlash),impactFinishBudget=specialistImpactFinishDensityBudgetPresentation({activeCount:activeImpactFinishCount,indexFromNewest:Math.max(0,activeStrikeCueCount-1-strikeCueIndex),type:cue.type,life:life},reducedMotion,reducedFlash),recoveryDensityBudget=specialistImpactRecoveryDensityBudgetPresentation({activeCount:activeImpactFinishCount,indexFromNewest:Math.max(0,activeStrikeCueCount-1-strikeCueIndex),owner:impactRecovery.owner,type:cue.type,recoveryBlend:impactRecovery.recoveryBlend},reducedMotion);if(impactFinishBudget.visible&&recoveryDensityBudget.visible){const recoveryEnd={x:impactRecovery.start.x+(impactRecovery.end.x-impactRecovery.start.x)*recoveryDensityBudget.lengthScale,y:impactRecovery.start.y+(impactRecovery.end.y-impactRecovery.start.y)*recoveryDensityBudget.lengthScale};ctx.save();ctx.globalAlpha=impactFinish.alpha*impactRecovery.alphaScale*recoveryDensityBudget.alphaScale*strikeCueBudget.alphaScale*impactResponse.alphaScale*impactFinishBudget.alphaScale;ctx.strokeStyle=cue.type==='assassin'?'#f0cfff':cue.type==='siegeGolem'?'#ffd48f':'#b9e4ff';ctx.lineWidth=2.2*strikeCueBudget.lineWidthScale;ctx.beginPath();ctx.moveTo(impactRecovery.start.x,impactRecovery.start.y);ctx.lineTo(recoveryEnd.x,recoveryEnd.y);ctx.stroke();ctx.restore();}}
+    }
+    const activeSpecialists=this.enemies.filter((enemy)=>isSpecialistEnemyType(enemy.type));
+    const activeSpecialistCount=activeSpecialists.length;
+    const specialistAnticipationRank=new Map(activeSpecialists.map((enemy,index)=>[enemy,Math.max(0,activeSpecialists.length-1-index)]));
     for (const enemy of this.enemies) {
       ctx.save();
       ctx.translate(enemy.pos.x, enemy.pos.y);
@@ -747,8 +798,17 @@ export class EnemyManager {
       const inAttackRange = enemy.preferredRange > 0
         ? targetDistance <= enemy.preferredRange + 14
         : targetDistance <= enemy.radius + 58;
+      const latestStrikeCue=isSpecialistEnemyType(enemy.type)?[...this.specialistStrikeOriginVfx].reverse().find((cue)=>cue.enemyId===enemy.id):undefined;
+      const latestStrikeRecoveryBlend=latestStrikeCue?Math.max(0,Math.min(1,1-latestStrikeCue.ttl/Math.max(.001,latestStrikeCue.maxTtl))):1;
+      const nextAttackAnticipation=isSpecialistEnemyType(enemy.type)?specialistNextAttackAnticipationPresentation({recoveryBlend:latestStrikeRecoveryBlend,attackTimer:enemy.attackTimer,attackInterval:enemy.attackInterval,inAttackRange,facingX:targetDistance<Number.POSITIVE_INFINITY&&targetDistance>0?targetDx/targetDistance:(enemy.renderMotion?.facingX??1),facingY:targetDistance<Number.POSITIVE_INFINITY&&targetDistance>0?targetDy/targetDistance:(enemy.renderMotion?.facingY??0),type:enemy.type},reducedMotion,reducedFlash):null;
       const attackMotion = enemyAttackMotionPresentation(enemy.type, enemy.attackTimer, enemy.attackInterval, targetDx, targetDy, inAttackRange, reducedMotion);
       const attackResolve = enemyAttackResolvePresentation(enemy.type, enemy.attackResolveMotion ?? { resolve:0, settle:0 }, targetDistance < Number.POSITIVE_INFINITY && targetDistance > 0 ? targetDx / targetDistance : 1, targetDistance < Number.POSITIVE_INFINITY && targetDistance > 0 ? targetDy / targetDistance : 0, reducedMotion);
+      const anticipationHandoff=nextAttackAnticipation?specialistNextAttackAnticipationHandoffPresentation({anticipationVisible:nextAttackAnticipation.visible,urgency:nextAttackAnticipation.urgency,pullback:attackMotion.pullback,lunge:attackMotion.lunge,resolve:attackResolve.resolve},reducedMotion):null;
+      const anticipationSilhouetteContinuity=isSpecialistEnemyType(enemy.type)&&nextAttackAnticipation?specialistAnticipationSilhouettePoseContinuityPresentation({type:enemy.type,anticipationVisible:nextAttackAnticipation.visible,urgency:nextAttackAnticipation.urgency,pullback:attackMotion.pullback,lunge:attackMotion.lunge,resolve:attackResolve.resolve},reducedMotion):null;
+      const anticipationSilhouetteHandoff=isSpecialistEnemyType(enemy.type)&&nextAttackAnticipation?specialistAnticipationSilhouetteHandoffPresentation({anticipationVisible:nextAttackAnticipation.visible,pullback:attackMotion.pullback,lunge:attackMotion.lunge,resolve:attackResolve.resolve},reducedMotion):null;
+      const anticipationSilhouetteDensityBudget=isSpecialistEnemyType(enemy.type)&&nextAttackAnticipation&&anticipationSilhouetteContinuity?specialistAnticipationSilhouetteDensityBudgetPresentation({activeCount:activeSpecialistCount,indexFromNewest:specialistAnticipationRank.get(enemy)??activeSpecialistCount,type:enemy.type,owner:anticipationSilhouetteContinuity.owner,urgency:nextAttackAnticipation.urgency},reducedMotion):null;
+      const anticipationDensityBudget=isSpecialistEnemyType(enemy.type)&&nextAttackAnticipation?specialistNextAttackAnticipationDensityBudgetPresentation({activeCount:activeSpecialistCount,indexFromNewest:specialistAnticipationRank.get(enemy)??activeSpecialistCount,type:enemy.type,urgency:nextAttackAnticipation.urgency},reducedMotion):null;
+      if(nextAttackAnticipation?.visible&&(anticipationHandoff?.alphaScale??0)>0&&(anticipationDensityBudget?.visible??true)){const start=Math.max(4,enemy.radius*.72),end=start+nextAttackAnticipation.reach*(anticipationDensityBudget?.reachScale??1);ctx.save();ctx.globalAlpha=nextAttackAnticipation.alpha*(anticipationHandoff?.alphaScale??1)*(anticipationSilhouetteContinuity?.anticipationAlphaScale??1)*(anticipationSilhouetteHandoff?.cueAlphaScale??1)*(anticipationSilhouetteDensityBudget?.cueAlphaScale??1)*(anticipationDensityBudget?.alphaScale??1);ctx.strokeStyle=enemy.type==='assassin'?'#e4b5ff':enemy.type==='siegeGolem'?'#ffcb7a':enemy.type==='nullifier'?'#87b8ff':'#b9e4ff';ctx.lineWidth=1.8;ctx.beginPath();ctx.moveTo(nextAttackAnticipation.facingX*start,nextAttackAnticipation.facingY*start);ctx.lineTo(nextAttackAnticipation.facingX*end,nextAttackAnticipation.facingY*end);ctx.stroke();ctx.restore();}
       const rangedAimRotation = attackMotion.rangedAim ? Math.sin(attackMotion.facingAngle) * 0.07 : 0;
       const attackWeightSettle = attackMotion.maxDisplacement / Math.max(1, attackMotion.weight) * 0.025;
       const recoilIntensity = enemy.hitFlash >= 0.08 ? Math.min(1.25, enemy.hitFlash / 0.10) : 0;
@@ -777,6 +837,9 @@ export class EnemyManager {
       const bossLocomotion = enemy.type === 'boss' ? bossLocomotionWeightPresentation(bossPhaseForRatio(enemy.hp / Math.max(1, enemy.maxHp)), enemy.renderMotion?.motionBlend ?? 0, enemy.renderMotion?.recovery ?? 0, enemy.renderMotion?.turn ?? 0, reducedMotion) : { phase:1 as const, turnWeight:1, settle:0, offsetY:0, rotation:0, showContactPulse:false, contactAlpha:0, contactRadius:0, shadowBoost:0 };
       const specialistLocomotionSignature = isSpecialistEnemyType(enemy.type) ? specialistLocomotionSignaturePresentation(enemy.type, enemy.specialistLocomotionSignature, enemy.renderMotion?.motionBlend ?? 0, enemy.renderMotion?.recovery ?? 0, renderFacingX, renderFacingY, reducedMotion) : null;
       const specialistTurnStop = isSpecialistEnemyType(enemy.type) ? specialistTurnStopPresentation(enemy.type, enemy.renderMotion, enemy.specialistLocomotionSignature, reducedMotion) : null;
+      const specialistTurnStopRhythm=isSpecialistEnemyType(enemy.type)?specialistLocomotionTurnStopReattackRhythmPresentation({type:enemy.type,motionBlend:enemy.renderMotion?.motionBlend??0,turn:enemy.renderMotion?.turn??0,recovery:enemy.renderMotion?.recovery??0,attackReadiness:nextAttackAnticipation?.urgency??0},reducedMotion):null;
+      const specialistTurnStopHandoff=specialistTurnStopRhythm?specialistTurnStopReattackHandoffPresentation({owner:specialistTurnStopRhythm.owner,cadenceScale:specialistTurnStopRhythm.cadenceScale,reattackScale:specialistTurnStopRhythm.reattackScale,motionBlend:enemy.renderMotion?.motionBlend??0},reducedMotion):null;
+      const specialistTurnStopDensity=isSpecialistEnemyType(enemy.type)&&specialistTurnStopHandoff?specialistTurnStopReattackDensityBudgetPresentation({activeCount:activeSpecialistCount,indexFromNewest:specialistAnticipationRank.get(enemy)??activeSpecialistCount,type:enemy.type,owner:specialistTurnStopHandoff.owner},reducedMotion):null;
       const bossSpecialRecovery = enemy.type === 'boss' ? bossSpecialRecoveryPresentation(enemy.bossArchetype ?? bossArchetypeForOrdinal(enemy.bossOrdinal ?? 0), bossPhaseForRatio(enemy.hp / Math.max(1, enemy.maxHp)), enemy.bossSpecialRecovery, renderFacingX, renderFacingY, reducedMotion) : null;
       const specialistGroundOwnership = isSpecialistEnemyType(enemy.type) ? specialistGroundContactOwnershipPresentation(enemy.type,{motion:enemy.renderMotion?.motionBlend??0,attackCommitment:specialistAttackHitArbitration?.attackCommitment??0,hitStagger:enemyHitStagger?.stagger??0,fatal:false,groundAnchor:specialistTurnStop?.groundAnchor??0,attackOffsetX:attackMotion.offsetX*attackScale+attackResolve.offsetX*attackResolveScale,hitOffsetX:hitRecoil.offsetX+(enemyHitStagger?.offsetX??0)*hitStaggerScale},reducedMotion) : null;
       const bossGroundCue = enemy.type === 'boss' ? bossGroundCueArbitrationPresentation(bossPhaseForRatio(enemy.hp / Math.max(1, enemy.maxHp)),{motion:enemy.renderMotion?.motionBlend??0,settle:bossLocomotion.settle,recovery:enemy.bossSpecialRecovery?.recovery??0,stagger:enemy.bossHeavyHitStagger?.stagger??0,specialTimer:enemy.specialTimer??99},reducedMotion) : null;
@@ -797,6 +860,16 @@ export class EnemyManager {
       const shadowMotionScale = (specialistGroundOwnership ? specialistShadowOffsetScale : bossShadowMotionScale)*bossSpecialOriginHandoff.locomotionScale*spawnGroundMaterialize.locomotionScale;
       const bossBodyArchetype = enemy.type === 'boss' ? (enemy.bossArchetype ?? bossArchetypeForOrdinal(enemy.bossOrdinal ?? 0)) : null;
       const bossSpecialBodyLanguage = bossBodyArchetype ? bossSpecialBodyLanguagePresentation(bossBodyArchetype, bossPhaseForRatio(enemy.hp / Math.max(1, enemy.maxHp)), enemy.specialTimer ?? 99, renderFacingX, renderFacingY, reducedMotion) : null;
+      const bossSpecialAnticipation = bossBodyArchetype && bossSpecialBodyLanguage ? bossSpecialAnticipationEmphasisPresentation({archetype:bossBodyArchetype,phase:bossPhaseForRatio(enemy.hp / Math.max(1, enemy.maxHp)),charge:bossSpecialBodyLanguage.charge,recovery:enemy.bossSpecialRecovery?.recovery??0,stagger:enemy.bossHeavyHitStagger?.stagger??0},reducedMotion,reducedFlash) : null;
+      const bossAnticipationHandoff=bossSpecialAnticipation?bossAnticipationRecoveryHandoffPresentation({charge:bossSpecialBodyLanguage?.charge??0,recovery:enemy.bossSpecialRecovery?.recovery??0,stagger:enemy.bossHeavyHitStagger?.stagger??0,ringAlphaScale:bossSpecialAnticipation.ringAlphaScale,bodyStrength:bossSpecialAnticipation.bodyStrength},reducedMotion,reducedFlash):null;
+      const bossAnticipationBodyScale=bossAnticipationHandoff?bossAnticipationHandoff.bodyScale:1;
+      const bossSpecialRingAlphaScale=bossSpecialAnticipation?bossSpecialAnticipation.ringAlphaScale*(bossAnticipationHandoff?.alphaScale??1):1;
+      const bossSpecialBodyScaleX=bossSpecialAnticipation?1+(bossSpecialAnticipation.bodyScaleX-1)*bossAnticipationBodyScale:1;
+      const bossSpecialBodyScaleY=bossSpecialAnticipation?1+(bossSpecialAnticipation.bodyScaleY-1)*bossAnticipationBodyScale:1;
+      const bossSpecialCueBudget=bossBodyArchetype?bossSpecialCueBudgetPresentation({phase:bossPhaseForRatio(enemy.hp/Math.max(1,enemy.maxHp)),charge:bossSpecialBodyLanguage?.charge??0,recovery:enemy.bossSpecialRecovery?.recovery??0,stagger:enemy.bossHeavyHitStagger?.stagger??0,phaseOverlay:bossPhaseForRatio(enemy.hp/Math.max(1,enemy.maxHp))>=2},reducedMotion,reducedFlash):null;
+      const bossSpecialOriginAnchor=enemy.type==='boss'?bossSpecialOriginAnchorPresentation({bodyOffsetX:bossSpecialBodyLanguage?.offsetX??0,bodyOffsetY:bossSpecialBodyLanguage?.offsetY??0,rebaseOffsetX:bossGroundRebase.groundOffsetX+bossSpecialOriginHandoff.groundOffsetX,rebaseOffsetY:bossGroundRebase.groundOffsetY+bossSpecialOriginHandoff.groundOffsetY,handoffStrength:enemy.bossSpecialOriginHandoff?.strength??0,charge:bossSpecialBodyLanguage?.charge??0,recovery:enemy.bossSpecialRecovery?.recovery??0,stagger:enemy.bossHeavyHitStagger?.stagger??0},reducedMotion):null;
+      const bossAnticipationOrigin=enemy.type==='boss'?bossAnticipationOriginCoherencePresentation({bodyOffsetX:bossSpecialBodyLanguage?.offsetX??0,bodyOffsetY:bossSpecialBodyLanguage?.offsetY??0,rebaseOffsetX:bossSpecialOriginAnchor?.anchorOffsetX??(bossGroundRebase.groundOffsetX+bossSpecialOriginHandoff.groundOffsetX),rebaseOffsetY:bossSpecialOriginAnchor?.anchorOffsetY??(bossGroundRebase.groundOffsetY+bossSpecialOriginHandoff.groundOffsetY),displacementStrength:Math.max(enemy.bossGroundOriginRebase?.rebase??0,enemy.bossSpecialOriginHandoff?.strength??0),charge:bossSpecialBodyLanguage?.charge??0,recovery:enemy.bossSpecialRecovery?.recovery??0,stagger:enemy.bossHeavyHitStagger?.stagger??0,radius:enemy.radius},reducedMotion):null;
+      const bossAnticipationOriginLock=bossAnticipationOrigin?bossAnticipationOriginLockPresentation({desiredOwner:bossAnticipationOrigin.owner,desiredOffsetX:bossAnticipationOrigin.ringOffsetX,desiredOffsetY:bossAnticipationOrigin.ringOffsetY,rebaseOffsetX:bossSpecialOriginAnchor?.anchorOffsetX??(bossGroundRebase.groundOffsetX+bossSpecialOriginHandoff.groundOffsetX),rebaseOffsetY:bossSpecialOriginAnchor?.anchorOffsetY??(bossGroundRebase.groundOffsetY+bossSpecialOriginHandoff.groundOffsetY),handoffStrength:enemy.bossSpecialOriginHandoff?.strength??0,charge:bossSpecialBodyLanguage?.charge??0,recovery:enemy.bossSpecialRecovery?.recovery??0,stagger:enemy.bossHeavyHitStagger?.stagger??0},reducedMotion):null;
       if (regularEnemyActionVfxAtlasReady && regularEnemyActionVfxAtlasImage && targetPos) {
         let actionSprite: ReturnType<typeof regularEnemyActionVfxSprite> | null = null;
         let actionSize = 0;
@@ -814,24 +887,30 @@ export class EnemyManager {
         }
       }
       if (enemy.type === 'elite' || enemy.type === 'boss') {
+        ctx.save();
+        if(enemy.type==='boss'&&bossSpecialCueBudget)ctx.globalAlpha=bossSpecialCueBudget.baseOutlineScale*bossSpecialCueBudget.alphaScale;
         ctx.strokeStyle = enemy.type === 'boss' ? 'rgba(255,65,85,.85)' : 'rgba(255,211,95,.8)';
         ctx.lineWidth = enemy.type === 'boss' ? 7 : 4;
         ctx.beginPath(); ctx.arc(0, 0, enemy.radius + 10, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
       }
       if (enemy.type === 'boss' && (enemy.specialTimer ?? 99) <= 1.2) {
+        ctx.save();
+        if(bossAnticipationOriginLock)ctx.translate(bossAnticipationOriginLock.offsetX,bossAnticipationOriginLock.offsetY);else if(bossAnticipationOrigin)ctx.translate(bossAnticipationOrigin.ringOffsetX,bossAnticipationOrigin.ringOffsetY);
         const charge = bossSpecialBodyLanguage?.charge ?? (1 - Math.max(0, enemy.specialTimer ?? 0) / 1.2);
         const phase = bossPhaseForRatio(enemy.hp / enemy.maxHp);
         const archetype = enemy.bossArchetype ?? bossArchetypeForOrdinal(enemy.bossOrdinal ?? 0);
         const telegraph = bossVariantTuning(bossArchetypeTuning(archetype, phase), enemy.bossVariantTier ?? bossVariantTierForOrdinal(enemy.bossOrdinal ?? 0));
-        ctx.globalAlpha = 0.45 + charge * 0.45;
+        ctx.globalAlpha = (0.45 + charge * 0.45)*bossSpecialRingAlphaScale*(bossAnticipationHandoff?bossAnticipationHandoff.ringScale:1)*(bossSpecialCueBudget?bossSpecialCueBudget.primaryRingScale:1);
         ctx.strokeStyle = telegraph.telegraphColor;
-        ctx.lineWidth = 4 + charge * 5;
-        ctx.beginPath(); ctx.arc(0, 0, enemy.radius + 22 + charge * 22 + (bossSpecialBodyLanguage?.auraRadiusBoost ?? 0), 0, Math.PI * 2); ctx.stroke();
+        ctx.lineWidth = (4 + charge * 5)*(bossSpecialAnticipation?.ringWidthScale??1);
+        ctx.beginPath(); ctx.arc(0, 0, (enemy.radius + 22 + charge * 22 + (bossSpecialBodyLanguage?.auraRadiusBoost ?? 0))*(bossSpecialAnticipation?.ringRadiusScale??1), 0, Math.PI * 2); ctx.stroke();
         if (charge > 0.55) {
-          ctx.globalAlpha = 0.35 + charge * 0.35;
-          ctx.beginPath(); ctx.arc(0, 0, enemy.radius + 42 + charge * 34, 0, Math.PI * 2); ctx.stroke();
+          ctx.globalAlpha = (0.35 + charge * 0.35)*(bossSpecialAnticipation?.secondaryRingAlphaScale??1)*(bossAnticipationHandoff?bossAnticipationHandoff.secondaryRingScale:1)*(bossSpecialCueBudget?bossSpecialCueBudget.secondaryRingScale:1);
+          ctx.beginPath(); ctx.arc(0, 0, (enemy.radius + 42 + charge * 34)*(bossSpecialAnticipation?.ringRadiusScale??1), 0, Math.PI * 2); ctx.stroke();
         }
         ctx.globalAlpha = 1;
+        ctx.restore();
       }
       if (enemy.type === 'boss') {
         const tier = enemy.bossVariantTier ?? bossVariantTierForOrdinal(enemy.bossOrdinal ?? 0);
@@ -879,8 +958,27 @@ export class EnemyManager {
         ctx.restore();
       }
       const recoverySilhouetteAlphaScale=(specialistRecoveryHandoff?.silhouetteAlphaScale??1)*(specialistRecoveryHandoff?.silhouetteReentryScale??1)*(bossRecoveryStaggerHandoff?.silhouetteAlphaScale??1)*(bossRecoveryStaggerHandoff?.silhouetteReentryScale??1);
-      const dynamicSilhouette = motionPresentation.silhouetteAlpha*recoverySilhouetteAlphaScale > 0.02 && (enemy.type === 'elite' || enemy.type === 'boss' || isSpecialistEnemyType(enemy.type));
-      const specialistSignatureScale=specialistLocomotionOwnershipScale;
+      const silhouetteDirection=(isSpecialistEnemyType(enemy.type)||enemy.type==='boss')?characterSilhouetteDirectionOwnerPresentation({kind:enemy.type==='boss'?'boss':'specialist',locomotion:{x:renderFacingX,y:renderFacingY},target:{x:targetDx,y:targetDy},hitDirection:{x:enemy.hitDirectionX??-renderFacingX,y:enemy.hitDirectionY??-renderFacingY},attack:isSpecialistEnemyType(enemy.type)?Math.max(attackMotion.pullback,attackMotion.lunge):0,recovery:enemy.type==='boss'?(enemy.bossSpecialRecovery?.recovery??0):attackResolve.resolve,hit:enemy.type==='boss'?(enemy.bossHeavyHitStagger?.stagger??0):(enemyHitStagger?.stagger??0),special:enemy.type==='boss'&&Number.isFinite(enemy.specialTimer)&&((enemy.specialTimer??99)>=0)&&((enemy.specialTimer??99)<=1.2)?Math.max(0,1-(enemy.specialTimer??0)/1.2):0},reducedMotion):{owner:'locomotion' as const,facingX:renderFacingX,facingY:renderFacingY,trailDistanceScale:1,presentationOnly:true as const};
+      const silhouettePivot=characterSilhouetteDirectionPivotPresentation({locomotion:{x:renderFacingX,y:renderFacingY},owned:silhouetteDirection,turn:Math.min(1,Math.abs(motionPresentation.rotation)*4+Math.abs(specialistTurnStop?.rotation??0)*3)},reducedMotion);
+      const silhouetteTrailBudget=characterSilhouetteTrailBudgetPresentation({owner:silhouetteDirection.owner,pivotWeight:silhouettePivot.pivotWeight,baseAlpha:motionPresentation.silhouetteAlpha,trailDistanceScale:silhouettePivot.trailDistanceScale,motionLayerActive:silhouetteDirection.owner!=='locomotion'},reducedMotion);
+      const specialistSilhouetteHandoff=isSpecialistEnemyType(enemy.type)?specialistSilhouettePhaseHandoffPresentation({pullback:attackMotion.pullback,lunge:attackMotion.lunge,resolve:attackResolve.resolve,hit:enemyHitStagger?.stagger??0},reducedMotion):null;
+      const specialistCrowdBudget=isSpecialistEnemyType(enemy.type)?specialistSilhouetteCrowdBudgetPresentation({specialistCount:activeSpecialistCount,owner:specialistSilhouetteHandoff?.owner??'locomotion',hit:enemyHitStagger?.stagger??0,baseAlpha:motionPresentation.silhouetteAlpha},reducedMotion):null;
+      const specialistSilhouetteEmphasis=isSpecialistEnemyType(enemy.type)?specialistAttackSilhouetteEmphasisPresentation({type:enemy.type,pullback:attackMotion.pullback,lunge:attackMotion.lunge,resolve:attackResolve.resolve,hit:enemyHitStagger?.stagger??0,rangedAim:attackMotion.rangedAim,facingX:silhouettePivot.facingX,facingY:silhouettePivot.facingY},reducedMotion):null;
+      const specialistSilhouetteShapeWeight=(specialistSilhouetteHandoff?Math.max(specialistSilhouetteHandoff.strikeScale,specialistSilhouetteHandoff.strikeCarry,specialistSilhouetteHandoff.resolveScale*.55):1)*(anticipationSilhouetteHandoff?.attackShapeScale??1)*(specialistCrowdBudget?.shapeScale??1);
+      const specialistSilhouetteWidthScale=(specialistSilhouetteEmphasis?1+(specialistSilhouetteEmphasis.widthScale-1)*specialistSilhouetteShapeWeight:1)*(1+((anticipationSilhouetteContinuity?.widthScale??1)-1)*(anticipationSilhouetteHandoff?.previewShapeScale??1)*(anticipationSilhouetteDensityBudget?.previewEffectStrength??1));
+      const specialistSilhouetteHeightScale=(specialistSilhouetteEmphasis?1+(specialistSilhouetteEmphasis.heightScale-1)*specialistSilhouetteShapeWeight:1)*(1+((anticipationSilhouetteContinuity?.heightScale??1)-1)*(anticipationSilhouetteHandoff?.previewShapeScale??1)*(anticipationSilhouetteDensityBudget?.previewEffectStrength??1));
+      const specialistSilhouetteLateralOffset=(specialistSilhouetteEmphasis?specialistSilhouetteEmphasis.lateralOffset*specialistSilhouetteShapeWeight:0)+(anticipationSilhouetteContinuity?.lateralOffset??0)*(anticipationSilhouetteHandoff?.previewShapeScale??1)*(anticipationSilhouetteDensityBudget?.previewEffectStrength??1);
+      const specialistSilhouetteRecoveryTrail=isSpecialistEnemyType(enemy.type)?specialistAttackSilhouetteRecoveryTrailPresentation({type:enemy.type,attackFacingX:silhouettePivot.facingX,attackFacingY:silhouettePivot.facingY,recoveryFacingX:renderFacingX,recoveryFacingY:renderFacingY,lunge:attackMotion.lunge,resolve:attackResolve.resolve,recoveryBlend:latestStrikeCue?Math.max(attackResolve.resolve,1-latestStrikeCue.ttl/Math.max(.001,latestStrikeCue.maxTtl)):attackResolve.resolve},reducedMotion):null;
+      const specialistRecoveryTrailHandoff=specialistSilhouetteRecoveryTrail?specialistRecoveryTrailSilhouetteHandoffPresentation({trailOwner:specialistSilhouetteRecoveryTrail.owner,recoveryBlend:specialistSilhouetteRecoveryTrail.recoveryBlend,silhouetteOwner:silhouetteDirection.owner},reducedMotion):null;
+      const specialistRecoveryTrailDensityBudget=isSpecialistEnemyType(enemy.type)&&specialistSilhouetteRecoveryTrail&&specialistRecoveryTrailHandoff?specialistRecoveryTrailDensityBudgetPresentation({activeCount:activeSpecialistCount,indexFromNewest:specialistAnticipationRank.get(enemy)??activeSpecialistCount,type:enemy.type,owner:specialistRecoveryTrailHandoff.owner,recoveryBlend:specialistSilhouetteRecoveryTrail.recoveryBlend},reducedMotion):null;
+      const specialistRecoveryLocomotionCadence=isSpecialistEnemyType(enemy.type)&&specialistSilhouetteRecoveryTrail&&specialistRecoveryTrailHandoff?specialistRecoveryTrailLocomotionCadencePresentation({trailOwner:specialistSilhouetteRecoveryTrail.owner,recoveryBlend:specialistSilhouetteRecoveryTrail.recoveryBlend,motionBlend:enemy.renderMotion?.motionBlend??0,signatureStrength:Math.max(specialistLocomotionSignature?.arrival??0,specialistLocomotionSignature?.brace??0,specialistLocomotionSignature?.plant??0)},reducedMotion):null;
+      const specialistRecoveryCadenceHandoff=specialistRecoveryLocomotionCadence?specialistRecoveryLocomotionCadenceHandoffPresentation({owner:specialistRecoveryLocomotionCadence.owner,recoveryBlend:specialistSilhouetteRecoveryTrail?.recoveryBlend??1,motionBlend:enemy.renderMotion?.motionBlend??0,cadenceScale:specialistRecoveryLocomotionCadence.locomotionCadenceScale},reducedMotion):null;
+      const specialistRecoveryCadenceDensity=isSpecialistEnemyType(enemy.type)&&specialistRecoveryLocomotionCadence?specialistRecoveryLocomotionCadenceDensityBudgetPresentation({activeCount:activeSpecialistCount,indexFromNewest:specialistAnticipationRank.get(enemy)??activeSpecialistCount,type:enemy.type,owner:specialistRecoveryLocomotionCadence.owner},reducedMotion):null;
+      const specialistRecoveryCadenceEffect=specialistRecoveryCadenceDensity?.effectStrength??1, specialistRecoveryCadenceTrailScale=1-(1-(specialistRecoveryCadenceHandoff?.trailAlphaScale??1))*specialistRecoveryCadenceEffect, specialistRecoveryCadenceSignatureScale=1-(1-(specialistRecoveryCadenceHandoff?.signatureAlphaScale??1))*specialistRecoveryCadenceEffect, specialistRecoveryCadenceScale=1-(1-(specialistRecoveryCadenceHandoff?.cadenceScale??1))*specialistRecoveryCadenceEffect;
+      const specialistSilhouetteAlphaScale=(specialistSilhouetteEmphasis?.alphaScale??1)*(anticipationSilhouetteContinuity?.silhouetteAlphaScale??1)*(specialistSilhouetteHandoff?specialistSilhouetteHandoff.attackAlphaScale:1)*(specialistCrowdBudget?specialistCrowdBudget.alphaScale:1)*(specialistSilhouetteRecoveryTrail?.trailAlphaScale??1)*Math.min(1,(specialistRecoveryTrailHandoff?.recoveryTrailAlphaScale??0)+(specialistRecoveryTrailHandoff?.locomotionTrailAlphaScale??1))*(specialistRecoveryTrailDensityBudget?.effectStrength??1)*Math.max(specialistRecoveryLocomotionCadence?.recoveryTrailAlphaScale??1,specialistRecoveryLocomotionCadence?.locomotionCadenceScale??0)*specialistRecoveryCadenceTrailScale;
+      const specialistSilhouetteTrailScale=(specialistSilhouetteEmphasis?.trailDistanceScale??1)*(specialistSilhouetteHandoff?specialistSilhouetteHandoff.trailScale:1)*(specialistCrowdBudget?.trailScale??1)*(specialistSilhouetteRecoveryTrail?.trailDistanceScale??1)*(specialistTurnStopRhythm?.trailDistanceScale??1)*(1-(1-(specialistTurnStopHandoff?.turnStopScale??1))*(specialistTurnStopDensity?.effectStrength??1));
+      const dynamicSilhouette = motionPresentation.silhouetteAlpha*recoverySilhouetteAlphaScale*silhouetteTrailBudget.alphaScale*specialistSilhouetteAlphaScale > 0.02 && (enemy.type === 'elite' || enemy.type === 'boss' || isSpecialistEnemyType(enemy.type));
+      const specialistSignatureScale=specialistLocomotionOwnershipScale*(specialistRecoveryLocomotionCadence?.locomotionCadenceScale??1)*specialistRecoveryCadenceSignatureScale*specialistRecoveryCadenceScale*(specialistTurnStopRhythm?.cadenceScale??1)*(1-(1-(specialistTurnStopHandoff?.cadenceScale??1))*(specialistTurnStopDensity?.effectStrength??1));
       const bossLocomotionScale=bossLocomotionOwnershipScale*bossGroundRebase.locomotionSettleScale;
       ctx.save();
       ctx.translate(motionPresentation.leadX * locomotionOwnershipScale + attackMotion.offsetX * attackScale + attackResolve.offsetX * attackResolveScale + hitRecoil.offsetX + (enemyHitStagger?.offsetX ?? 0) * hitStaggerScale + (bossHeavyHitStagger?.offsetX ?? 0) * bossStaggerScale + (specialistLocomotionSignature?.offsetX ?? 0) * specialistSignatureScale + (specialistTurnStop?.offsetX ?? 0) * specialistTurnOwnershipScale + (bossSpecialBodyLanguage?.offsetX ?? 0) + (bossSpecialRecovery?.offsetX ?? 0) * recoveryScale, (motionPresentation.leadY - motionPresentation.bob) * locomotionOwnershipScale + attackMotion.offsetY * attackScale + attackResolve.offsetY * attackResolveScale + hitRecoil.offsetY + (enemyHitStagger?.offsetY ?? 0) * hitStaggerScale + (bossHeavyHitStagger?.offsetY ?? 0) * bossStaggerScale + bossLocomotion.offsetY * bossLocomotionScale + (specialistLocomotionSignature?.offsetY ?? 0) * specialistSignatureScale + (specialistTurnStop?.offsetY ?? 0) * specialistTurnOwnershipScale + (bossSpecialBodyLanguage?.offsetY ?? 0) + (bossSpecialRecovery?.offsetY ?? 0) * recoveryScale);
@@ -893,14 +991,16 @@ export class EnemyManager {
       const ownedMotionScaleX=1+(motionPresentation.scaleX-1)*locomotionOwnershipScale,ownedMotionScaleY=1+(motionPresentation.scaleY-1)*locomotionOwnershipScale;
       const specialistSignatureScaleX=1+((specialistLocomotionSignature?.scaleX??1)-1)*specialistSignatureScale,specialistSignatureScaleY=1+((specialistLocomotionSignature?.scaleY??1)-1)*specialistSignatureScale;
       const specialistTurnScaleX=1+((specialistTurnStop?.scaleX??1)-1)*specialistTurnOwnershipScale,specialistTurnScaleY=1+((specialistTurnStop?.scaleY??1)-1)*specialistTurnOwnershipScale;
-      ctx.scale(ownedMotionScaleX * attackMotionScaleX * attackResolveScaleX * attackPhaseScale * enemyHitScaleX * bossStaggerScaleX * specialistSignatureScaleX * specialistTurnScaleX * (bossSpecialBodyLanguage?.scaleX ?? 1) * bossRecoveryScaleX, ownedMotionScaleY * attackMotionScaleY * attackResolveScaleY * enemyHitScaleY * bossStaggerScaleY * specialistSignatureScaleY * specialistTurnScaleY * (bossSpecialBodyLanguage?.scaleY ?? 1) * bossRecoveryScaleY / Math.max(0.94, attackPhaseScale));
+      ctx.scale(ownedMotionScaleX * attackMotionScaleX * attackResolveScaleX * attackPhaseScale * enemyHitScaleX * bossStaggerScaleX * specialistSignatureScaleX * specialistTurnScaleX * (bossSpecialBodyLanguage?.scaleX ?? 1) * bossSpecialBodyScaleX * bossRecoveryScaleX, ownedMotionScaleY * attackMotionScaleY * attackResolveScaleY * enemyHitScaleY * bossStaggerScaleY * specialistSignatureScaleY * specialistTurnScaleY * (bossSpecialBodyLanguage?.scaleY ?? 1) * bossSpecialBodyScaleY * bossRecoveryScaleY / Math.max(0.94, attackPhaseScale));
       const recoilDisplacementGuard = hitRecoil.maxDisplacement;
       if (dynamicSilhouette) {
         ctx.save();
-        ctx.globalAlpha = motionPresentation.silhouetteAlpha*recoverySilhouetteAlphaScale;
-        ctx.translate(-(enemy.renderMotion?.facingX ?? 1) * (enemy.radius * 0.28 + 3 + recoilDisplacementGuard * 0.02), -(enemy.renderMotion?.facingY ?? 0) * (enemy.radius * 0.18 + 2));
+        ctx.globalAlpha = motionPresentation.silhouetteAlpha*recoverySilhouetteAlphaScale*silhouetteTrailBudget.alphaScale*specialistSilhouetteAlphaScale;
+        const specialistTrailFacingX=specialistSilhouetteRecoveryTrail?.facingX??silhouettePivot.facingX,specialistTrailFacingY=specialistSilhouetteRecoveryTrail?.facingY??silhouettePivot.facingY;
+        const specialistPerpX=-specialistTrailFacingY,specialistPerpY=specialistTrailFacingX,specialistLateral=specialistSilhouetteLateralOffset;
+        ctx.translate(-specialistTrailFacingX * (enemy.radius * 0.28 + 3 + recoilDisplacementGuard * 0.02)*silhouetteTrailBudget.trailDistanceScale*specialistSilhouetteTrailScale+specialistPerpX*specialistLateral, -specialistTrailFacingY * (enemy.radius * 0.18 + 2)*silhouetteTrailBudget.trailDistanceScale*specialistSilhouetteTrailScale+specialistPerpY*specialistLateral);
         ctx.fillStyle = enemy.type === 'boss' ? 'rgba(255,125,140,.55)' : enemy.type === 'elite' ? 'rgba(255,222,120,.52)' : 'rgba(187,216,255,.45)';
-        ctx.beginPath(); ctx.arc(0, 0, enemy.radius * 0.92, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(0,0,enemy.radius*.92*specialistSilhouetteWidthScale,enemy.radius*.92*specialistSilhouetteHeightScale,0,0,Math.PI*2); ctx.fill();
         ctx.restore();
       }
       ctx.save();
@@ -930,7 +1030,7 @@ export class EnemyManager {
         if (phase >= 2 && bossPhaseOverlayVfxAtlasReady && bossPhaseOverlayVfxAtlasImage) {
           const overlay = bossPhaseOverlayVfxSprite(bossArchetype, phase === 3 ? 3 : 2);
           const overlaySize = size * (phase === 3 ? 1.26 : 1.16);
-          ctx.save(); ctx.globalAlpha = phase === 3 ? 0.76 : 0.56;
+          ctx.save(); ctx.globalAlpha = (phase === 3 ? 0.76 : 0.56)*(bossSpecialCueBudget?bossSpecialCueBudget.phaseOverlayScale:1)*(bossSpecialCueBudget?.alphaScale??1);
           ctx.drawImage(bossPhaseOverlayVfxAtlasImage, overlay.sx, overlay.sy, overlay.sw, overlay.sh, -overlaySize / 2, -overlaySize / 2, overlaySize, overlaySize);
           ctx.restore();
         }
@@ -1283,10 +1383,10 @@ export class EnemyManager {
       const angle = base + t * spread;
       const gameplayOrigin={ x: enemy.pos.x + Math.cos(angle) * (enemy.radius + 8), y: enemy.pos.y + Math.sin(angle) * (enemy.radius + 8) };
       const rebase=bossGroundOriginRebasePresentation(enemy.bossGroundOriginRebase,this.activeReducedMotion);
-      const bossVisualLaunch=enemy.type==='boss'?bossSpecialLaunchOriginPresentation({archetype:enemy.bossArchetype??bossArchetypeForOrdinal(enemy.bossOrdinal??0),phase:bossPhaseForRatio(enemy.hp/Math.max(1,enemy.maxHp)),radius:enemy.radius,facingX:Math.cos(angle),facingY:Math.sin(angle),specialTimer:enemy.specialTimer??0,rebaseOffsetX:rebase.groundOffsetX,rebaseOffsetY:rebase.groundOffsetY,handoffStrength:enemy.bossSpecialOriginHandoff?.strength??0},this.activeReducedMotion):null;
+      const bossVisualLaunch=enemy.type==='boss'?bossSpecialLaunchOriginPresentation({archetype:enemy.bossArchetype??bossArchetypeForOrdinal(enemy.bossOrdinal??0),phase:bossPhaseForRatio(enemy.hp/Math.max(1,enemy.maxHp)),radius:enemy.radius,facingX:Math.cos(angle),facingY:Math.sin(angle),specialTimer:enemy.specialTimer??0,rebaseOffsetX:rebase.groundOffsetX,rebaseOffsetY:rebase.groundOffsetY,handoffStrength:enemy.bossSpecialOriginHandoff?.strength??0,recovery:enemy.bossSpecialRecovery?.recovery??0,stagger:enemy.bossHeavyHitStagger?.stagger??0},this.activeReducedMotion):null;
       this.projectiles.push({
         pos: gameplayOrigin,
-        ...(bossVisualLaunch?{visualLaunchOffset:{x:enemy.pos.x+bossVisualLaunch.projectileOffsetX-gameplayOrigin.x,y:enemy.pos.y+bossVisualLaunch.projectileOffsetY-gameplayOrigin.y},visualLaunchTtl:bossVisualLaunch.convergeSeconds,visualLaunchMaxTtl:bossVisualLaunch.convergeSeconds}:{}),
+        ...(bossVisualLaunch?{visualLaunchOffset:{x:enemy.pos.x+bossVisualLaunch.projectileOffsetX-gameplayOrigin.x,y:enemy.pos.y+bossVisualLaunch.projectileOffsetY-gameplayOrigin.y},visualLaunchTtl:bossVisualLaunch.convergeSeconds,visualLaunchMaxTtl:bossVisualLaunch.convergeSeconds,visualLaunchWorldOrigin:{x:enemy.pos.x+bossVisualLaunch.projectileOffsetX,y:enemy.pos.y+bossVisualLaunch.projectileOffsetY},visualLaunchTravelTtl:this.activeReducedMotion?.1:.15,visualLaunchTravelMaxTtl:this.activeReducedMotion?.1:.15}:{}),
         vel: { x: Math.cos(angle) * 285 * speedMultiplier * this.endlessProjectileSpeedMultiplier, y: Math.sin(angle) * 285 * speedMultiplier * this.endlessProjectileSpeedMultiplier },
         radius: 9, damage: enemy.damage * 0.72, ttl: 2.5, target: 'hero', sourceType: enemy.type,
         ...(enemy.type === 'boss' && enemy.bossArchetype ? { bossArchetype: enemy.bossArchetype } : {}),
@@ -1299,10 +1399,10 @@ export class EnemyManager {
       const angle = (Math.PI * 2 * i) / Math.max(1, count) + (enemy.bossCycle ?? 0) * 0.18;
       const gameplayOrigin={ x: enemy.pos.x + Math.cos(angle) * (enemy.radius + 10), y: enemy.pos.y + Math.sin(angle) * (enemy.radius + 10) };
       const rebase=bossGroundOriginRebasePresentation(enemy.bossGroundOriginRebase,this.activeReducedMotion);
-      const bossVisualLaunch=enemy.type==='boss'?bossSpecialLaunchOriginPresentation({archetype:enemy.bossArchetype??bossArchetypeForOrdinal(enemy.bossOrdinal??0),phase:bossPhaseForRatio(enemy.hp/Math.max(1,enemy.maxHp)),radius:enemy.radius,facingX:Math.cos(angle),facingY:Math.sin(angle),specialTimer:enemy.specialTimer??0,rebaseOffsetX:rebase.groundOffsetX,rebaseOffsetY:rebase.groundOffsetY,handoffStrength:enemy.bossSpecialOriginHandoff?.strength??0},this.activeReducedMotion):null;
+      const bossVisualLaunch=enemy.type==='boss'?bossSpecialLaunchOriginPresentation({archetype:enemy.bossArchetype??bossArchetypeForOrdinal(enemy.bossOrdinal??0),phase:bossPhaseForRatio(enemy.hp/Math.max(1,enemy.maxHp)),radius:enemy.radius,facingX:Math.cos(angle),facingY:Math.sin(angle),specialTimer:enemy.specialTimer??0,rebaseOffsetX:rebase.groundOffsetX,rebaseOffsetY:rebase.groundOffsetY,handoffStrength:enemy.bossSpecialOriginHandoff?.strength??0,recovery:enemy.bossSpecialRecovery?.recovery??0,stagger:enemy.bossHeavyHitStagger?.stagger??0},this.activeReducedMotion):null;
       this.projectiles.push({
         pos: gameplayOrigin,
-        ...(bossVisualLaunch?{visualLaunchOffset:{x:enemy.pos.x+bossVisualLaunch.projectileOffsetX-gameplayOrigin.x,y:enemy.pos.y+bossVisualLaunch.projectileOffsetY-gameplayOrigin.y},visualLaunchTtl:bossVisualLaunch.convergeSeconds,visualLaunchMaxTtl:bossVisualLaunch.convergeSeconds}:{}),
+        ...(bossVisualLaunch?{visualLaunchOffset:{x:enemy.pos.x+bossVisualLaunch.projectileOffsetX-gameplayOrigin.x,y:enemy.pos.y+bossVisualLaunch.projectileOffsetY-gameplayOrigin.y},visualLaunchTtl:bossVisualLaunch.convergeSeconds,visualLaunchMaxTtl:bossVisualLaunch.convergeSeconds,visualLaunchWorldOrigin:{x:enemy.pos.x+bossVisualLaunch.projectileOffsetX,y:enemy.pos.y+bossVisualLaunch.projectileOffsetY},visualLaunchTravelTtl:this.activeReducedMotion?.1:.15,visualLaunchTravelMaxTtl:this.activeReducedMotion?.1:.15}:{}),
         vel: { x: Math.cos(angle) * 245 * speedMultiplier * this.endlessProjectileSpeedMultiplier, y: Math.sin(angle) * 245 * speedMultiplier * this.endlessProjectileSpeedMultiplier },
         radius: 9, damage: enemy.damage * 0.62, ttl: 2.8, target: 'hero', sourceType: enemy.type,
         ...(enemy.type === 'boss' && enemy.bossArchetype ? { bossArchetype: enemy.bossArchetype } : {}),
@@ -1409,6 +1509,7 @@ export class EnemyManager {
     for (const p of this.projectiles) {
       p.ttl -= dt;
       if(p.visualLaunchTtl!==undefined)p.visualLaunchTtl=Math.max(0,p.visualLaunchTtl-dt);
+      if(p.visualLaunchTravelTtl!==undefined)p.visualLaunchTravelTtl=Math.max(0,p.visualLaunchTravelTtl-dt);
       p.pos.x += p.vel.x * dt;
       p.pos.y += p.vel.y * dt;
       const target = p.target === 'core' ? ctx.core : ctx.hero;

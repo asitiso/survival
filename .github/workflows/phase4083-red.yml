@@ -1,0 +1,17 @@
+name: Phase 4083-4088 RED
+on:
+  push:
+    branches: [work/phase4083-4088-fast]
+  workflow_dispatch:
+jobs:
+  red:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - run: node --test tests/phase4083-4088-threat-depth-occlusion-continuity.test.mjs

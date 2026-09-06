@@ -24,4 +24,4 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --ignore-scripts
-      - run: python3 .github/phase4173-4190-fast.py
+      - run: python3 .github/phase4173-4190-fast-v2.py

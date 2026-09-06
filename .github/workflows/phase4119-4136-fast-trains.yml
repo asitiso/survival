@@ -1,0 +1,292 @@
+name: Phase 4119-4136 Fast Trains
+on:
+  push:
+    branches: [work/phase4119-4136-fast]
+    paths: ['.github/workflows/phase4119-4136-fast-trains.yml']
+permissions:
+  contents: write
+jobs:
+  fast-trains:
+    runs-on: ubuntu-24.04
+    env:
+      ALS_TEST_WORKERS: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Baseline
+        run: |
+          npm run build
+          node --test tests/phase4101-4106-spatial-threat-separation.test.mjs tests/phase4107-4112-spatial-threat-recovery.test.mjs tests/phase4113-4118-dense-battlefield-arbitration.test.mjs
+
+      - name: Train 1 RED Phase 4119-4124
+        run: |
+          cat > tests/phase4119-4124-depth-plane-separation.test.mjs <<'EOF'
+          import test from 'node:test';
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          const moduleUrl=new URL('../dist/game/threat-impact-depth-plane-rendering.js',import.meta.url);
+          async function load(){return import(moduleUrl.href+'?v='+Date.now());}
+          test('Phase 4119 projectile depth plane protects body while flattening deep trail',async()=>{const {projectileDepthPlanePresentation}=await load();const p=projectileDepthPlanePresentation({bodyOverlap:1,laneProximity:.8,crowd:1,critical:false},false);assert.equal(p.bodyScale,1);assert.ok(p.trailScale<.9);assert.ok(p.trailLineScale<=1);});
+          test('Phase 4120 impact depth plane keeps edge stronger than fill near hero',async()=>{const {impactDepthPlanePresentation}=await load();const p=impactDepthPlanePresentation({heroProximity:1,crowd:1,critical:false},false);assert.ok(p.edgeScale>=p.fillScale);assert.ok(p.edgeAlphaScale>=p.fillAlphaScale);});
+          test('Phase 4121 hazard foreground boundary remains stable under dense overlap',async()=>{const {hazardDepthPlanePresentation}=await load();const p=hazardDepthPlanePresentation({telegraph:true,laneProximity:.9,crowd:1,critical:true},false);assert.ok(p.edgeAlphaScale>=.94);assert.ok(p.fillScale<1);});
+          test('Phase 4122 safe lane contour keeps foreground floor',async()=>{const {safeLaneContourDepthPresentation}=await load();const p=safeLaneContourDepthPresentation({visible:true,confidence:.9,pressure:1},false);assert.ok(p.contourAlphaScale>=1);assert.ok(p.contourWidthScale>=1);});
+          test('Phase 4123 specialist rim survives background hazard density',async()=>{const {specialistRimDepthPresentation}=await load();const p=specialistRimDepthPresentation({owner:'attack',hazardPressure:1,crowd:1,critical:false},false);assert.equal(p.bodyScale,1);assert.ok(p.rimAlphaScale>=.72);assert.ok(p.secondaryScale<1);});
+          test('Phase 4124 depth plane budget preserves canonical foreground owners',async()=>{const {depthPlaneBudgetPresentation}=await load();const p=depthPlaneBudgetPresentation({criticalCount:2,projectileCount:14,impactCount:8,hazardCount:6,silhouetteCount:5,safeLaneVisible:true},false,false);assert.equal(p.canonicalScale,1);assert.equal(p.criticalAlphaScale,1);assert.ok(p.backgroundScale<1);assert.ok(p.safeLaneScale>=1);});
+          test('Phase 4119-4124 live renderers consume depth plane helpers',()=>{const e=fs.readFileSync(new URL('../src/game/enemies.ts',import.meta.url),'utf8'),s=fs.readFileSync(new URL('../src/game/spells.ts',import.meta.url),'utf8'),g=fs.readFileSync(new URL('../src/game/game.ts',import.meta.url),'utf8');assert.match(e,/projectileDepthPlanePresentation/);assert.match(e,/specialistRimDepthPresentation/);assert.match(s,/impactDepthPlanePresentation/);assert.match(g,/safeLaneContourDepthPresentation/);assert.match(g,/hazardDepthPlanePresentation/);});
+          EOF
+          npm run build
+          set +e
+          node --test tests/phase4119-4124-depth-plane-separation.test.mjs > /tmp/red4119.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/red4119.log
+          test "$status" -ne 0
+          grep -Eq 'threat-impact-depth-plane-rendering|ERR_MODULE_NOT_FOUND|Cannot find module' /tmp/red4119.log
+
+      - name: Train 1 GREEN
+        run: |
+          cat > src/game/threat-impact-depth-plane-rendering.ts <<'EOF'
+          const clamp01=(value:number)=>Math.max(0,Math.min(1,Number.isFinite(value)?value:0));
+          export function projectileDepthPlanePresentation(input:{bodyOverlap:number;laneProximity:number;crowd:number;critical:boolean},reducedMotion=false){const overlap=clamp01(input.bodyOverlap),lane=clamp01(input.laneProximity),crowd=clamp01(input.crowd),pressure=clamp01(overlap*.42+lane*.32+crowd*.34),relief=input.critical?.42:1;return{pressure,bodyScale:1,trailScale:Math.max(input.critical?.84:.62,1-pressure*.28*relief)*(reducedMotion?.96:1),trailLineScale:Math.max(.72,1-pressure*.2),lateralDepthScale:1-pressure*.18,presentationOnly:true as const};}
+          export function impactDepthPlanePresentation(input:{heroProximity:number;crowd:number;critical:boolean},reducedFlash=false){const hero=clamp01(input.heroProximity),crowd=clamp01(input.crowd),pressure=clamp01(hero*.58+crowd*.42),flash=reducedFlash?.9:1,fillScale=Math.max(input.critical?.78:.58,1-pressure*.34),edgeScale=Math.max(fillScale,.82+(1-pressure)*.18),fillAlphaScale=Math.max(input.critical?.64:.38,1-pressure*.48)*flash,edgeAlphaScale=Math.max(fillAlphaScale,.74+(1-pressure)*.2);return{pressure,fillScale,edgeScale,fillAlphaScale,edgeAlphaScale,presentationOnly:true as const};}
+          export function hazardDepthPlanePresentation(input:{telegraph:boolean;laneProximity:number;crowd:number;critical:boolean},reducedFlash=false){const lane=clamp01(input.laneProximity),crowd=clamp01(input.crowd),pressure=clamp01(lane*.48+crowd*.52),flash=reducedFlash?.9:1;return{pressure,edgeAlphaScale:input.telegraph||input.critical?Math.max(.94,.99*(reducedFlash?.98:1)):Math.max(.72,1-pressure*.2),fillScale:Math.max(input.critical?.72:.54,1-pressure*.38),fillAlphaScale:Math.max(input.critical?.58:.28,1-pressure*.5)*flash,presentationOnly:true as const};}
+          export function safeLaneContourDepthPresentation(input:{visible:boolean;confidence:number;pressure:number},reducedFlash=false){const confidence=clamp01(input.confidence),pressure=clamp01(input.pressure);return{contourAlphaScale:input.visible?1+pressure*(.08+.04*confidence)*(reducedFlash?.78:1):1,contourWidthScale:input.visible?1+pressure*.16:1,fillScale:input.visible?Math.max(.78,1-pressure*.12):1,presentationOnly:true as const};}
+          export function specialistRimDepthPresentation(input:{owner:'locomotion'|'attack'|'recovery'|'hit'|'special';hazardPressure:number;crowd:number;critical:boolean},reducedMotion=false){const hazard=clamp01(input.hazardPressure),crowd=clamp01(input.crowd),pressure=clamp01(hazard*.54+crowd*.46),action=input.owner==='special'?1:input.owner==='attack'?.9:input.owner==='hit'?.72:input.owner==='recovery'?.5:.2;return{pressure,bodyScale:1,rimAlphaScale:Math.max(input.critical?.82:.72,.76+action*.18-pressure*.1),rimWidthScale:Math.max(.82,1-pressure*.14),secondaryScale:Math.max(.58,1-pressure*.34)*(reducedMotion?.94:1),presentationOnly:true as const};}
+          export function depthPlaneBudgetPresentation(input:{criticalCount:number;projectileCount:number;impactCount:number;hazardCount:number;silhouetteCount:number;safeLaneVisible:boolean},reducedMotion=false,reducedFlash=false){const critical=clamp01(Math.max(0,input.criticalCount)/3),load=clamp01((input.projectileCount+input.impactCount+input.hazardCount*1.3+input.silhouetteCount)/34),stress=clamp01(load*.86+critical*.18);return{stress,canonicalScale:1,criticalAlphaScale:1,safeLaneScale:input.safeLaneVisible?1+stress*.08*(reducedFlash?.78:1):1,backgroundScale:Math.max(.64,1-stress*.3)*(reducedMotion?.96:1),secondaryAlphaScale:Math.max(.58,1-stress*.34)*(reducedFlash?.94:1),presentationOnly:true as const};}
+          EOF
+          python3 - <<'PY'
+          from pathlib import Path
+          def imp(path,marker,line):
+              p=Path(path);t=p.read_text()
+              if line in t:return
+              if marker not in t:raise SystemExit(f'missing import {path}')
+              p.write_text(t.replace(marker,marker+'\n'+line,1))
+          def after(path,needle,text):
+              p=Path(path);lines=p.read_text().splitlines()
+              if any(text.split('=')[0].strip() in x for x in lines):return
+              hits=[i for i,x in enumerate(lines) if needle in x]
+              if len(hits)!=1:raise SystemExit(f'{path} {needle} hits={len(hits)}')
+              lines.insert(hits[0]+1,text);p.write_text('\n'.join(lines)+'\n')
+          imp('src/game/enemies.ts',"import { denseBattlefieldArbitrationPresentation, denseProjectileArbitrationPresentation, denseSilhouetteArbitrationPresentation } from './threat-impact-dense-arbitration-rendering.js';","import { depthPlaneBudgetPresentation, projectileDepthPlanePresentation, specialistRimDepthPresentation } from './threat-impact-depth-plane-rendering.js';")
+          imp('src/game/spells.ts',"import { denseBattlefieldArbitrationPresentation, denseImpactArbitrationPresentation } from './threat-impact-dense-arbitration-rendering.js';","import { depthPlaneBudgetPresentation, impactDepthPlanePresentation } from './threat-impact-depth-plane-rendering.js';")
+          imp('src/game/game.ts',"import { denseBattlefieldArbitrationPresentation, denseHazardArbitrationPresentation, denseSafeLaneArbitrationPresentation } from './threat-impact-dense-arbitration-rendering.js';","import { depthPlaneBudgetPresentation, hazardDepthPlanePresentation, safeLaneContourDepthPresentation } from './threat-impact-depth-plane-rendering.js';")
+          after('src/game/enemies.ts','const projectileDenseArbitration=',"      const projectileDepthPlane=projectileDepthPlanePresentation({bodyOverlap:projectileBodyOverlap,laneProximity:projectileLaneProximity,crowd:Math.min(1,this.projectiles.length/12),critical:Boolean(projectile.bossArchetype)},reducedMotion),projectileDepthPlaneBudget=depthPlaneBudgetPresentation({criticalCount:projectile.bossArchetype?1:0,projectileCount:this.projectiles.length,impactCount:0,hazardCount:0,silhouetteCount:0,safeLaneVisible:projectileLaneProximity>0},reducedMotion,reducedFlash);")
+          after('src/game/enemies.ts','const specialistDepthRecovery=',"      const specialistDepthPlane=specialistRimDepthPresentation({owner:silhouetteDirection.owner,hazardPressure,crowd:Math.min(1,(this.projectiles.length+activeSpecialistCount)/10),critical:silhouetteDirection.owner==='special'},reducedMotion),specialistDepthPlaneBudget=depthPlaneBudgetPresentation({criticalCount:silhouetteDirection.owner==='special'?1:0,projectileCount:this.projectiles.length,impactCount:0,hazardCount:Math.round(hazardPressure*4),silhouetteCount:activeSpecialistCount,safeLaneVisible:false},reducedMotion,reducedFlash);")
+          p=Path('src/game/enemies.ts');t=p.read_text()
+          t=t.replace('*projectileDenseArbitration.trailAlphaScale*projectileDenseBattlefield.secondaryAlphaScale','*projectileDenseArbitration.trailAlphaScale*projectileDenseBattlefield.secondaryAlphaScale*projectileDepthPlane.trailScale*projectileDepthPlaneBudget.backgroundScale')
+          t=t.replace('*projectileDenseArbitration.bodyAlphaScale*projectileDenseBattlefield.canonicalBodyAlphaScale','*projectileDenseArbitration.bodyAlphaScale*projectileDenseBattlefield.canonicalBodyAlphaScale*projectileDepthPlane.bodyScale*projectileDepthPlaneBudget.canonicalScale')
+          lines=[]
+          for line in t.splitlines():
+              if 'const specialistSilhouetteAlphaScale=' in line and line.rstrip().endswith(';'):line=line.rstrip()[:-1]+'*specialistDepthPlane.rimAlphaScale*specialistDepthPlaneBudget.secondaryAlphaScale;'
+              if 'const specialistSilhouetteTrailScale=' in line and line.rstrip().endswith(';'):line=line.rstrip()[:-1]+'*specialistDepthPlane.secondaryScale*specialistDepthPlaneBudget.backgroundScale;'
+              lines.append(line)
+          p.write_text('\n'.join(lines)+'\n')
+          after('src/game/spells.ts','const impactDenseArbitration=',"        const impactDepthPlane=impactDepthPlanePresentation({heroProximity:heroImpactProximity,crowd:Math.min(1,impactNeighborCount/8),critical:impactCritical},reducedFlash),impactDepthPlaneBudget=depthPlaneBudgetPresentation({criticalCount:impactCritical?1:0,projectileCount:this.projectiles.length,impactCount:this.projectileImpactVisuals.length,hazardCount:this.fields.length+this.holes.length,silhouetteCount:0,safeLaneVisible:false},reducedMotion,reducedFlash);")
+          p=Path('src/game/spells.ts');lines=[]
+          for line in p.read_text().splitlines():
+              if 'ctx.save(); ctx.globalAlpha =' in line and 'impactDenseArbitration.fillAlphaScale' in line:line=line.replace('* impactDenseArbitration.fillAlphaScale;','* impactDenseArbitration.fillAlphaScale * impactDepthPlane.fillAlphaScale * impactDepthPlaneBudget.secondaryAlphaScale;')
+              if 'ctx.save();ctx.globalAlpha=.38' in line and 'impactDenseArbitration.edgeAlphaScale' in line:line=line.replace('*impactDenseArbitration.edgeAlphaScale;','*impactDenseArbitration.edgeAlphaScale*impactDepthPlane.edgeAlphaScale;')
+              lines.append(line)
+          p.write_text('\n'.join(lines)+'\n')
+          after('src/game/game.ts','const safeLaneDenseArbitration=',"      const safeLaneDepthContour=safeLaneContourDepthPresentation({visible:true,confidence:safeLane.confidence,pressure:safeLaneDenseBattlefield.stress},this.presentationSettings.reducedFlash),safeLaneDepthPlaneBudget=depthPlaneBudgetPresentation({criticalCount:(this.dangerState.coreCritical?1:0)+(this.dangerState.heroCritical?1:0),projectileCount:this.enemies.activeProjectileCount,impactCount:0,hazardCount:this.bossArena.hazards.length,silhouetteCount:0,safeLaneVisible:true},this.presentationSettings.reducedMotion,this.presentationSettings.reducedFlash);")
+          after('src/game/game.ts','const hazardDenseArbitration=',"      const hazardDepthPlane=hazardDepthPlanePresentation({telegraph:hazard.telegraph>0,laneProximity:hazardLaneProximity,crowd:Math.min(1,this.bossArena.hazards.length/6),critical:hazard.id===primaryTelegraphHazardId},this.presentationSettings.reducedFlash),hazardDepthPlaneBudget=depthPlaneBudgetPresentation({criticalCount:hazard.id===primaryTelegraphHazardId?1:0,projectileCount:this.enemies.activeProjectileCount,impactCount:0,hazardCount:this.bossArena.hazards.length,silhouetteCount:0,safeLaneVisible:Boolean(safeLane)},this.presentationSettings.reducedMotion,this.presentationSettings.reducedFlash);")
+          p=Path('src/game/game.ts');t=p.read_text()
+          t=t.replace('*safeLaneDenseArbitration.safeLaneAlphaScale*safeLaneDenseBattlefield.safeLaneAlphaScale','*safeLaneDenseArbitration.safeLaneAlphaScale*safeLaneDenseBattlefield.safeLaneAlphaScale*safeLaneDepthContour.contourAlphaScale*safeLaneDepthPlaneBudget.safeLaneScale')
+          t=t.replace('*hazardDenseArbitration.fillAlphaScale*hazardDenseBattlefield.secondaryAlphaScale','*hazardDenseArbitration.fillAlphaScale*hazardDenseBattlefield.secondaryAlphaScale*hazardDepthPlane.fillAlphaScale*hazardDepthPlaneBudget.secondaryAlphaScale')
+          t=t.replace('*hazardDenseArbitration.edgeAlphaScale','*hazardDenseArbitration.edgeAlphaScale*hazardDepthPlane.edgeAlphaScale')
+          p.write_text(t)
+          PY
+          npm run build
+          node --test tests/phase4119-4124-depth-plane-separation.test.mjs tests/phase4101-4106-spatial-threat-separation.test.mjs tests/phase4107-4112-spatial-threat-recovery.test.mjs tests/phase4113-4118-dense-battlefield-arbitration.test.mjs
+          git diff --check
+          git add src/game/enemies.ts src/game/spells.ts src/game/game.ts src/game/threat-impact-depth-plane-rendering.ts tests/phase4119-4124-depth-plane-separation.test.mjs
+          git add -f dist/game/enemies.js dist/game/spells.js dist/game/game.js dist/game/threat-impact-depth-plane-rendering.js
+          git commit -m 'Phase 4119-4124 battlefield depth plane separation'
+
+      - name: Train 2 RED Phase 4125-4130
+        run: |
+          cat > tests/phase4125-4130-depth-plane-reentry.test.mjs <<'EOF'
+          import test from 'node:test';
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          const moduleUrl=new URL('../dist/game/threat-impact-depth-plane-reentry-rendering.js',import.meta.url);
+          async function load(){return import(moduleUrl.href+'?v='+Date.now());}
+          test('Phase 4125 projectile reentry restores depth only as overlap clears',async()=>{const {projectileDepthReentryPresentation}=await load();const blocked=projectileDepthReentryPresentation({release:.2,pressure:1,critical:false},false),clear=projectileDepthReentryPresentation({release:1,pressure:.1,critical:false},false);assert.equal(clear.bodyScale,1);assert.ok(clear.trailScale>blocked.trailScale);});
+          test('Phase 4126 impact reentry restores edge before fill',async()=>{const {impactDepthReentryPresentation}=await load();const p=impactDepthReentryPresentation({release:.7,pressure:.5,critical:false},false);assert.ok(p.edgeScale>=p.fillScale);assert.ok(p.edgeAlphaScale>=p.fillAlphaScale);});
+          test('Phase 4127 hazard reentry avoids fill rebound while edge stays authoritative',async()=>{const {hazardDepthReentryPresentation}=await load();const p=hazardDepthReentryPresentation({release:.65,pressure:.6,telegraph:true},false);assert.ok(p.edgeAlphaScale>=.92);assert.ok(p.fillScale<=p.edgeScale);});
+          test('Phase 4128 safe lane contour releases toward neutral without undershoot',async()=>{const {safeLaneContourReentryPresentation}=await load();const p=safeLaneContourReentryPresentation({release:1,pressure:0,visible:true},false);assert.equal(p.contourAlphaScale,1);assert.equal(p.contourWidthScale,1);});
+          test('Phase 4129 specialist rim reentry keeps body canonical',async()=>{const {specialistRimReentryPresentation}=await load();const p=specialistRimReentryPresentation({release:.8,pressure:.3,owner:'recovery'},false);assert.equal(p.bodyScale,1);assert.ok(p.rimAlphaScale>=.68);});
+          test('Phase 4130 reentry budget prevents all secondary layers peaking together',async()=>{const {depthReentryBudgetPresentation}=await load();const p=depthReentryBudgetPresentation({reenteringCount:9,pressure:.8,criticalCount:1},false,false);assert.equal(p.canonicalScale,1);assert.ok(p.secondaryReentryScale<1);});
+          test('Phase 4125-4130 live renderers consume depth reentry helpers',()=>{const e=fs.readFileSync(new URL('../src/game/enemies.ts',import.meta.url),'utf8'),s=fs.readFileSync(new URL('../src/game/spells.ts',import.meta.url),'utf8'),g=fs.readFileSync(new URL('../src/game/game.ts',import.meta.url),'utf8');assert.match(e,/projectileDepthReentryPresentation/);assert.match(e,/specialistRimReentryPresentation/);assert.match(s,/impactDepthReentryPresentation/);assert.match(g,/hazardDepthReentryPresentation/);assert.match(g,/safeLaneContourReentryPresentation/);});
+          EOF
+          npm run build
+          set +e
+          node --test tests/phase4125-4130-depth-plane-reentry.test.mjs > /tmp/red4125.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/red4125.log
+          test "$status" -ne 0
+          grep -Eq 'threat-impact-depth-plane-reentry-rendering|ERR_MODULE_NOT_FOUND|Cannot find module' /tmp/red4125.log
+
+      - name: Train 2 GREEN
+        run: |
+          cat > src/game/threat-impact-depth-plane-reentry-rendering.ts <<'EOF'
+          const clamp01=(value:number)=>Math.max(0,Math.min(1,Number.isFinite(value)?value:0));
+          export function projectileDepthReentryPresentation(input:{release:number;pressure:number;critical:boolean},reducedMotion=false){const release=clamp01(input.release),pressure=clamp01(input.pressure),reclaim=clamp01(release*(1-pressure*.24)),floor=input.critical?.84:.62;return{reclaim,bodyScale:1,trailScale:(floor+(1-floor)*reclaim)*(reducedMotion?.96:1),trailLineScale:.76+.24*reclaim,presentationOnly:true as const};}
+          export function impactDepthReentryPresentation(input:{release:number;pressure:number;critical:boolean},reducedFlash=false){const release=clamp01(input.release),pressure=clamp01(input.pressure),reclaim=clamp01(release*(1-pressure*.2)),flash=reducedFlash?.9:1,fillScale=(input.critical?.76:.58)+(input.critical?.24:.42)*reclaim,edgeScale=Math.max(fillScale,.8+.2*reclaim),fillAlphaScale=((input.critical?.62:.38)+(input.critical?.38:.62)*reclaim)*flash,edgeAlphaScale=Math.max(fillAlphaScale,.72+.28*reclaim);return{reclaim,fillScale,edgeScale,fillAlphaScale,edgeAlphaScale,presentationOnly:true as const};}
+          export function hazardDepthReentryPresentation(input:{release:number;pressure:number;telegraph:boolean},reducedFlash=false){const release=clamp01(input.release),pressure=clamp01(input.pressure),reclaim=clamp01(release*(1-pressure*.22)),flash=reducedFlash?.9:1,fillScale=.54+.4*reclaim,edgeScale=.82+.18*reclaim;return{reclaim,edgeScale,edgeAlphaScale:input.telegraph?Math.max(.92,.98*(reducedFlash?.98:1)):.72+.24*reclaim,fillScale:Math.min(edgeScale,fillScale),fillAlphaScale:(.3+.58*reclaim)*flash,presentationOnly:true as const};}
+          export function safeLaneContourReentryPresentation(input:{release:number;pressure:number;visible:boolean},reducedFlash=false){const release=clamp01(input.release),pressure=clamp01(input.pressure),hold=clamp01(pressure*(1-release));return{contourAlphaScale:input.visible?1+hold*.1*(reducedFlash?.78:1):1,contourWidthScale:input.visible?1+hold*.16:1,fillScale:input.visible?1-hold*.1:1,presentationOnly:true as const};}
+          export function specialistRimReentryPresentation(input:{release:number;pressure:number;owner:'locomotion'|'attack'|'recovery'|'hit'|'special'},reducedMotion=false){const release=clamp01(input.release),pressure=clamp01(input.pressure),reclaim=clamp01(release*(1-pressure*.18)),action=input.owner==='special'?1:input.owner==='attack'?.9:input.owner==='hit'?.72:input.owner==='recovery'?.5:.2;return{reclaim,bodyScale:1,rimAlphaScale:Math.max(.68,.7+action*.18+reclaim*.08-pressure*.06),secondaryScale:(.62+.38*reclaim)*(reducedMotion?.95:1),presentationOnly:true as const};}
+          export function depthReentryBudgetPresentation(input:{reenteringCount:number;pressure:number;criticalCount:number},reducedMotion=false,reducedFlash=false){const count=clamp01(Math.max(0,input.reenteringCount-1)/10),pressure=clamp01(input.pressure),critical=clamp01(Math.max(0,input.criticalCount)/3),stress=clamp01(count*.56+pressure*.4+critical*.08);return{stress,canonicalScale:1,criticalAlphaScale:1,secondaryReentryScale:Math.max(.62,1-stress*.34)*(reducedMotion?.96:1)*(reducedFlash?.94:1),presentationOnly:true as const};}
+          EOF
+          python3 - <<'PY'
+          from pathlib import Path
+          def imp(path,marker,line):
+              p=Path(path);t=p.read_text()
+              if line in t:return
+              if marker not in t:raise SystemExit(f'missing import {path}')
+              p.write_text(t.replace(marker,marker+'\n'+line,1))
+          def after(path,needle,text):
+              p=Path(path);lines=p.read_text().splitlines()
+              if any(text.split('=')[0].strip() in x for x in lines):return
+              hits=[i for i,x in enumerate(lines) if needle in x]
+              if len(hits)!=1:raise SystemExit(f'{path} {needle} hits={len(hits)}')
+              lines.insert(hits[0]+1,text);p.write_text('\n'.join(lines)+'\n')
+          imp('src/game/enemies.ts',"import { depthPlaneBudgetPresentation, projectileDepthPlanePresentation, specialistRimDepthPresentation } from './threat-impact-depth-plane-rendering.js';","import { depthReentryBudgetPresentation, projectileDepthReentryPresentation, specialistRimReentryPresentation } from './threat-impact-depth-plane-reentry-rendering.js';")
+          imp('src/game/spells.ts',"import { depthPlaneBudgetPresentation, impactDepthPlanePresentation } from './threat-impact-depth-plane-rendering.js';","import { depthReentryBudgetPresentation, impactDepthReentryPresentation } from './threat-impact-depth-plane-reentry-rendering.js';")
+          imp('src/game/game.ts',"import { depthPlaneBudgetPresentation, hazardDepthPlanePresentation, safeLaneContourDepthPresentation } from './threat-impact-depth-plane-rendering.js';","import { depthReentryBudgetPresentation, hazardDepthReentryPresentation, safeLaneContourReentryPresentation } from './threat-impact-depth-plane-reentry-rendering.js';")
+          after('src/game/enemies.ts','const projectileDepthPlane=',"      const projectileDepthReentry=projectileDepthReentryPresentation({release:Math.max(0,1-Math.max(projectileBodyOverlap,projectileLaneProximity)),pressure:projectileDepthPlane.pressure,critical:Boolean(projectile.bossArchetype)},reducedMotion),projectileDepthReentryBudget=depthReentryBudgetPresentation({reenteringCount:this.projectiles.length,pressure:projectileDepthPlane.pressure,criticalCount:projectile.bossArchetype?1:0},reducedMotion,reducedFlash);")
+          after('src/game/enemies.ts','const specialistDepthPlane=',"      const specialistDepthReentry=specialistRimReentryPresentation({release:1-hazardPressure,pressure:specialistDepthPlane.pressure,owner:silhouetteDirection.owner},reducedMotion),specialistDepthReentryBudget=depthReentryBudgetPresentation({reenteringCount:activeSpecialistCount,pressure:specialistDepthPlane.pressure,criticalCount:silhouetteDirection.owner==='special'?1:0},reducedMotion,reducedFlash);")
+          p=Path('src/game/enemies.ts');t=p.read_text()
+          t=t.replace('*projectileDepthPlane.trailScale*projectileDepthPlaneBudget.backgroundScale','*projectileDepthPlane.trailScale*projectileDepthPlaneBudget.backgroundScale*projectileDepthReentry.trailScale*projectileDepthReentryBudget.secondaryReentryScale')
+          t=t.replace('*projectileDepthPlane.bodyScale*projectileDepthPlaneBudget.canonicalScale','*projectileDepthPlane.bodyScale*projectileDepthPlaneBudget.canonicalScale*projectileDepthReentry.bodyScale*projectileDepthReentryBudget.canonicalScale')
+          lines=[]
+          for line in t.splitlines():
+              if 'const specialistSilhouetteAlphaScale=' in line and line.rstrip().endswith(';'):line=line.rstrip()[:-1]+'*specialistDepthReentry.rimAlphaScale*specialistDepthReentryBudget.secondaryReentryScale;'
+              if 'const specialistSilhouetteTrailScale=' in line and line.rstrip().endswith(';'):line=line.rstrip()[:-1]+'*specialistDepthReentry.secondaryScale*specialistDepthReentryBudget.secondaryReentryScale;'
+              lines.append(line)
+          p.write_text('\n'.join(lines)+'\n')
+          after('src/game/spells.ts','const impactDepthPlane=',"        const impactDepthReentry=impactDepthReentryPresentation({release:Math.max(0,1-Math.max(heroImpactProximity,Math.min(1,impactNeighborCount/8))),pressure:impactDepthPlane.pressure,critical:impactCritical},reducedFlash),impactDepthReentryBudget=depthReentryBudgetPresentation({reenteringCount:this.projectileImpactVisuals.length,pressure:impactDepthPlane.pressure,criticalCount:impactCritical?1:0},reducedMotion,reducedFlash);")
+          p=Path('src/game/spells.ts');lines=[]
+          for line in p.read_text().splitlines():
+              if 'ctx.save(); ctx.globalAlpha =' in line and 'impactDepthPlane.fillAlphaScale' in line:line=line.replace('* impactDepthPlane.fillAlphaScale * impactDepthPlaneBudget.secondaryAlphaScale;','* impactDepthPlane.fillAlphaScale * impactDepthPlaneBudget.secondaryAlphaScale * impactDepthReentry.fillAlphaScale * impactDepthReentryBudget.secondaryReentryScale;')
+              if 'ctx.save();ctx.globalAlpha=.38' in line and 'impactDepthPlane.edgeAlphaScale' in line:line=line.replace('*impactDepthPlane.edgeAlphaScale;','*impactDepthPlane.edgeAlphaScale*impactDepthReentry.edgeAlphaScale;')
+              lines.append(line)
+          p.write_text('\n'.join(lines)+'\n')
+          after('src/game/game.ts','const safeLaneDepthContour=',"      const safeLaneDepthReentry=safeLaneContourReentryPresentation({release:Math.max(0,1-safeLaneDepthContour.fillScale),pressure:safeLaneDenseBattlefield.stress,visible:true},this.presentationSettings.reducedFlash),safeLaneDepthReentryBudget=depthReentryBudgetPresentation({reenteringCount:this.bossArena.hazards.length+this.enemies.activeProjectileCount,pressure:safeLaneDenseBattlefield.stress,criticalCount:(this.dangerState.coreCritical?1:0)+(this.dangerState.heroCritical?1:0)},this.presentationSettings.reducedMotion,this.presentationSettings.reducedFlash);")
+          after('src/game/game.ts','const hazardDepthPlane=',"      const hazardDepthReentry=hazardDepthReentryPresentation({release:Math.max(0,1-hazardLaneProximity),pressure:hazardDepthPlane.pressure,telegraph:hazard.telegraph>0},this.presentationSettings.reducedFlash),hazardDepthReentryBudget=depthReentryBudgetPresentation({reenteringCount:this.bossArena.hazards.length,pressure:hazardDepthPlane.pressure,criticalCount:hazard.id===primaryTelegraphHazardId?1:0},this.presentationSettings.reducedMotion,this.presentationSettings.reducedFlash);")
+          p=Path('src/game/game.ts');t=p.read_text()
+          t=t.replace('*safeLaneDepthContour.contourAlphaScale*safeLaneDepthPlaneBudget.safeLaneScale','*safeLaneDepthContour.contourAlphaScale*safeLaneDepthPlaneBudget.safeLaneScale*safeLaneDepthReentry.contourAlphaScale*safeLaneDepthReentryBudget.canonicalScale')
+          t=t.replace('*hazardDepthPlane.fillAlphaScale*hazardDepthPlaneBudget.secondaryAlphaScale','*hazardDepthPlane.fillAlphaScale*hazardDepthPlaneBudget.secondaryAlphaScale*hazardDepthReentry.fillAlphaScale*hazardDepthReentryBudget.secondaryReentryScale')
+          t=t.replace('*hazardDepthPlane.edgeAlphaScale','*hazardDepthPlane.edgeAlphaScale*hazardDepthReentry.edgeAlphaScale')
+          p.write_text(t)
+          PY
+          npm run build
+          node --test tests/phase4125-4130-depth-plane-reentry.test.mjs tests/phase4119-4124-depth-plane-separation.test.mjs tests/phase4101-4106-spatial-threat-separation.test.mjs tests/phase4107-4112-spatial-threat-recovery.test.mjs tests/phase4113-4118-dense-battlefield-arbitration.test.mjs
+          git diff --check
+          git add src/game/enemies.ts src/game/spells.ts src/game/game.ts src/game/threat-impact-depth-plane-reentry-rendering.ts tests/phase4125-4130-depth-plane-reentry.test.mjs
+          git add -f dist/game/enemies.js dist/game/spells.js dist/game/game.js dist/game/threat-impact-depth-plane-reentry-rendering.js
+          git commit -m 'Phase 4125-4130 battlefield depth plane reentry'
+
+      - name: Train 3 RED Phase 4131-4136
+        run: |
+          cat > tests/phase4131-4136-boss-focus-corridor.test.mjs <<'EOF'
+          import test from 'node:test';
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          const moduleUrl=new URL('../dist/game/threat-impact-boss-focus-corridor-rendering.js',import.meta.url);
+          async function load(){return import(moduleUrl.href+'?v='+Date.now());}
+          test('Phase 4131 boss telegraph corridor reserves edge authority',async()=>{const {bossTelegraphFocusCorridorPresentation}=await load();const p=bossTelegraphFocusCorridorPresentation({active:true,critical:true,overlap:1,crowd:1},false);assert.ok(p.edgeAlphaScale>=.96);assert.ok(p.secondaryScale<1);});
+          test('Phase 4132 boss projectile arrival keeps projectile body canonical',async()=>{const {bossProjectileFocusCorridorPresentation}=await load();const p=bossProjectileFocusCorridorPresentation({critical:true,laneProximity:1,crowd:1},false,false);assert.equal(p.bodyScale,1);assert.ok(p.trailScale>=.78);});
+          test('Phase 4133 boss-zone impacts retire fill before edge',async()=>{const {bossImpactFocusCorridorPresentation}=await load();const p=bossImpactFocusCorridorPresentation({bossProximity:1,crowd:1,critical:false},false);assert.ok(p.edgeAlphaScale>=p.fillAlphaScale);});
+          test('Phase 4134 safe lane remains readable during boss focus',async()=>{const {bossSafeLaneFocusCorridorPresentation}=await load();const p=bossSafeLaneFocusCorridorPresentation({visible:true,confidence:.9,bossPressure:1,critical:true},false);assert.ok(p.pathAlphaFloor>=.94);assert.ok(p.safeLaneScale>=1);});
+          test('Phase 4135 specialist secondary layers yield near boss focus',async()=>{const {bossSpecialistFocusCorridorPresentation}=await load();const p=bossSpecialistFocusCorridorPresentation({bossProximity:1,owner:'attack',critical:false},false);assert.equal(p.bodyScale,1);assert.ok(p.secondaryScale<1);});
+          test('Phase 4136 unified boss focus budget preserves canonical and telegraph',async()=>{const {bossFocusCorridorBudgetPresentation}=await load();const p=bossFocusCorridorBudgetPresentation({bossActive:true,criticalCount:2,projectileCount:10,impactCount:7,hazardCount:5,silhouetteCount:4,safeLaneVisible:true},false,false);assert.equal(p.canonicalScale,1);assert.equal(p.telegraphEdgeScale,1);assert.ok(p.secondaryScale<1);});
+          test('Phase 4131-4136 live renderers consume boss focus helpers',()=>{const e=fs.readFileSync(new URL('../src/game/enemies.ts',import.meta.url),'utf8'),s=fs.readFileSync(new URL('../src/game/spells.ts',import.meta.url),'utf8'),g=fs.readFileSync(new URL('../src/game/game.ts',import.meta.url),'utf8');assert.match(e,/bossProjectileFocusCorridorPresentation/);assert.match(e,/bossSpecialistFocusCorridorPresentation/);assert.match(s,/bossImpactFocusCorridorPresentation/);assert.match(g,/bossTelegraphFocusCorridorPresentation/);assert.match(g,/bossSafeLaneFocusCorridorPresentation/);});
+          EOF
+          npm run build
+          set +e
+          node --test tests/phase4131-4136-boss-focus-corridor.test.mjs > /tmp/red4131.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/red4131.log
+          test "$status" -ne 0
+          grep -Eq 'threat-impact-boss-focus-corridor-rendering|ERR_MODULE_NOT_FOUND|Cannot find module' /tmp/red4131.log
+
+      - name: Train 3 GREEN
+        run: |
+          cat > src/game/threat-impact-boss-focus-corridor-rendering.ts <<'EOF'
+          const clamp01=(value:number)=>Math.max(0,Math.min(1,Number.isFinite(value)?value:0));
+          export function bossTelegraphFocusCorridorPresentation(input:{active:boolean;critical:boolean;overlap:number;crowd:number},reducedFlash=false){const overlap=clamp01(input.overlap),crowd=clamp01(input.crowd),focus=input.active?clamp01(overlap*.58+crowd*.32+(input.critical?.22:0)):0;return{focus,edgeAlphaScale:input.active?Math.max(input.critical?.96:.94,.99*(reducedFlash?.98:1)):1,secondaryScale:Math.max(.52,1-focus*.42)*(reducedFlash?.94:1),presentationOnly:true as const};}
+          export function bossProjectileFocusCorridorPresentation(input:{critical:boolean;laneProximity:number;crowd:number},reducedMotion=false,reducedFlash=false){const lane=clamp01(input.laneProximity),crowd=clamp01(input.crowd),focus=clamp01(lane*.5+crowd*.34+(input.critical?.2:0));return{focus,bodyScale:1,trailScale:Math.max(input.critical?.78:.5,1-focus*(input.critical?.18:.42))*(reducedMotion?.96:1),secondaryScale:Math.max(.58,1-focus*.34)*(reducedFlash?.94:1),presentationOnly:true as const};}
+          export function bossImpactFocusCorridorPresentation(input:{bossProximity:number;crowd:number;critical:boolean},reducedFlash=false){const boss=clamp01(input.bossProximity),crowd=clamp01(input.crowd),focus=clamp01(boss*.62+crowd*.38),relief=input.critical?.46:1,flash=reducedFlash?.9:1,fillAlphaScale=Math.max(input.critical?.58:.22,1-focus*.62*relief)*flash,edgeAlphaScale=Math.max(fillAlphaScale,.7+(1-focus)*.22);return{focus,fillAlphaScale,edgeAlphaScale,presentationOnly:true as const};}
+          export function bossSafeLaneFocusCorridorPresentation(input:{visible:boolean;confidence:number;bossPressure:number;critical:boolean},reducedFlash=false){const confidence=clamp01(input.confidence),pressure=clamp01(input.bossPressure),focus=clamp01(pressure+(input.critical?.18:0));return{pathAlphaFloor:input.visible?Math.max(input.critical?.94:.92,.92+confidence*.06):0,safeLaneScale:input.visible?1+focus*(.08+.04*confidence)*(reducedFlash?.78:1):1,secondaryScale:Math.max(.6,1-focus*.32),presentationOnly:true as const};}
+          export function bossSpecialistFocusCorridorPresentation(input:{bossProximity:number;owner:'locomotion'|'attack'|'recovery'|'hit'|'special';critical:boolean},reducedMotion=false){const boss=clamp01(input.bossProximity),action=input.owner==='special'?1:input.owner==='attack'?.9:input.owner==='hit'?.72:input.owner==='recovery'?.5:.2,focus=clamp01(boss*(input.critical?.5:.72));return{focus,bodyScale:1,directionScale:Math.max(.7,.76+action*.18-focus*.08),secondaryScale:Math.max(.54,1-focus*.4)*(reducedMotion?.95:1),presentationOnly:true as const};}
+          export function bossFocusCorridorBudgetPresentation(input:{bossActive:boolean;criticalCount:number;projectileCount:number;impactCount:number;hazardCount:number;silhouetteCount:number;safeLaneVisible:boolean},reducedMotion=false,reducedFlash=false){const critical=clamp01(Math.max(0,input.criticalCount)/3),load=clamp01((input.projectileCount+input.impactCount+input.hazardCount*1.4+input.silhouetteCount)/30),focus=input.bossActive?clamp01(load*.8+critical*.28):0;return{focus,canonicalScale:1,telegraphEdgeScale:1,safeLaneScale:input.safeLaneVisible?1+focus*.08*(reducedFlash?.78:1):1,secondaryScale:Math.max(.5,1-focus*.44)*(reducedMotion?.95:1)*(reducedFlash?.94:1),presentationOnly:true as const};}
+          EOF
+          python3 - <<'PY'
+          from pathlib import Path
+          def imp(path,marker,line):
+              p=Path(path);t=p.read_text()
+              if line in t:return
+              if marker not in t:raise SystemExit(f'missing import {path}')
+              p.write_text(t.replace(marker,marker+'\n'+line,1))
+          def after(path,needle,text):
+              p=Path(path);lines=p.read_text().splitlines()
+              if any(text.split('=')[0].strip() in x for x in lines):return
+              hits=[i for i,x in enumerate(lines) if needle in x]
+              if len(hits)!=1:raise SystemExit(f'{path} {needle} hits={len(hits)}')
+              lines.insert(hits[0]+1,text);p.write_text('\n'.join(lines)+'\n')
+          imp('src/game/enemies.ts',"import { depthReentryBudgetPresentation, projectileDepthReentryPresentation, specialistRimReentryPresentation } from './threat-impact-depth-plane-reentry-rendering.js';","import { bossFocusCorridorBudgetPresentation, bossProjectileFocusCorridorPresentation, bossSpecialistFocusCorridorPresentation } from './threat-impact-boss-focus-corridor-rendering.js';")
+          imp('src/game/spells.ts',"import { depthReentryBudgetPresentation, impactDepthReentryPresentation } from './threat-impact-depth-plane-reentry-rendering.js';","import { bossFocusCorridorBudgetPresentation, bossImpactFocusCorridorPresentation } from './threat-impact-boss-focus-corridor-rendering.js';")
+          imp('src/game/game.ts',"import { depthReentryBudgetPresentation, hazardDepthReentryPresentation, safeLaneContourReentryPresentation } from './threat-impact-depth-plane-reentry-rendering.js';","import { bossFocusCorridorBudgetPresentation, bossSafeLaneFocusCorridorPresentation, bossTelegraphFocusCorridorPresentation } from './threat-impact-boss-focus-corridor-rendering.js';")
+          after('src/game/enemies.ts','const projectileDepthReentry=',"      const projectileBossFocus=bossProjectileFocusCorridorPresentation({critical:Boolean(projectile.bossArchetype),laneProximity:projectileLaneProximity,crowd:Math.min(1,this.projectiles.length/12)},reducedMotion,reducedFlash),projectileBossFocusBudget=bossFocusCorridorBudgetPresentation({bossActive:Boolean(projectile.bossArchetype),criticalCount:projectile.bossArchetype?1:0,projectileCount:this.projectiles.length,impactCount:0,hazardCount:0,silhouetteCount:0,safeLaneVisible:projectileLaneProximity>0},reducedMotion,reducedFlash);")
+          after('src/game/enemies.ts','const specialistDepthReentry=',"      const specialistBossProximity=Math.min(1,this.enemies.filter((boss)=>boss.alive&&boss.type==='boss').reduce((best,boss)=>Math.max(best,1-Math.min(1,distance(enemy.pos,boss.pos)/220)),0)),specialistBossFocus=bossSpecialistFocusCorridorPresentation({bossProximity:specialistBossProximity,owner:silhouetteDirection.owner,critical:silhouetteDirection.owner==='special'},reducedMotion),specialistBossFocusBudget=bossFocusCorridorBudgetPresentation({bossActive:specialistBossProximity>0,criticalCount:silhouetteDirection.owner==='special'?1:0,projectileCount:this.projectiles.length,impactCount:0,hazardCount:Math.round(hazardPressure*4),silhouetteCount:activeSpecialistCount,safeLaneVisible:false},reducedMotion,reducedFlash);")
+          p=Path('src/game/enemies.ts');t=p.read_text()
+          t=t.replace('*projectileDepthReentry.trailScale*projectileDepthReentryBudget.secondaryReentryScale','*projectileDepthReentry.trailScale*projectileDepthReentryBudget.secondaryReentryScale*projectileBossFocus.trailScale*projectileBossFocusBudget.secondaryScale')
+          t=t.replace('*projectileDepthReentry.bodyScale*projectileDepthReentryBudget.canonicalScale','*projectileDepthReentry.bodyScale*projectileDepthReentryBudget.canonicalScale*projectileBossFocus.bodyScale*projectileBossFocusBudget.canonicalScale')
+          lines=[]
+          for line in t.splitlines():
+              if 'const specialistSilhouetteAlphaScale=' in line and line.rstrip().endswith(';'):line=line.rstrip()[:-1]+'*specialistBossFocus.directionScale*specialistBossFocusBudget.secondaryScale;'
+              if 'const specialistSilhouetteTrailScale=' in line and line.rstrip().endswith(';'):line=line.rstrip()[:-1]+'*specialistBossFocus.secondaryScale*specialistBossFocusBudget.secondaryScale;'
+              lines.append(line)
+          p.write_text('\n'.join(lines)+'\n')
+          after('src/game/spells.ts','const impactDepthReentry=',"        const bossImpactFocus=bossImpactFocusCorridorPresentation({bossProximity:bossTelegraphOverlap?1:0,crowd:Math.min(1,impactNeighborCount/8),critical:impactCritical},reducedFlash),bossImpactFocusBudget=bossFocusCorridorBudgetPresentation({bossActive:bossTelegraphOverlap,criticalCount:impactCritical?1:0,projectileCount:this.projectiles.length,impactCount:this.projectileImpactVisuals.length,hazardCount:this.fields.length+this.holes.length,silhouetteCount:0,safeLaneVisible:false},reducedMotion,reducedFlash);")
+          p=Path('src/game/spells.ts');lines=[]
+          for line in p.read_text().splitlines():
+              if 'ctx.save(); ctx.globalAlpha =' in line and 'impactDepthReentry.fillAlphaScale' in line:line=line.replace('* impactDepthReentry.fillAlphaScale * impactDepthReentryBudget.secondaryReentryScale;','* impactDepthReentry.fillAlphaScale * impactDepthReentryBudget.secondaryReentryScale * bossImpactFocus.fillAlphaScale * bossImpactFocusBudget.secondaryScale;')
+              if 'ctx.save();ctx.globalAlpha=.38' in line and 'impactDepthReentry.edgeAlphaScale' in line:line=line.replace('*impactDepthReentry.edgeAlphaScale;','*impactDepthReentry.edgeAlphaScale*bossImpactFocus.edgeAlphaScale;')
+              lines.append(line)
+          p.write_text('\n'.join(lines)+'\n')
+          after('src/game/game.ts','const safeLaneDepthReentry=',"      const safeLaneBossFocus=bossSafeLaneFocusCorridorPresentation({visible:true,confidence:safeLane.confidence,bossPressure:safeLaneDenseBattlefield.stress,critical:this.dangerState.coreCritical||this.dangerState.heroCritical},this.presentationSettings.reducedFlash),safeLaneBossFocusBudget=bossFocusCorridorBudgetPresentation({bossActive:Boolean(boss),criticalCount:(this.dangerState.coreCritical?1:0)+(this.dangerState.heroCritical?1:0),projectileCount:this.enemies.activeProjectileCount,impactCount:0,hazardCount:this.bossArena.hazards.length,silhouetteCount:0,safeLaneVisible:true},this.presentationSettings.reducedMotion,this.presentationSettings.reducedFlash);")
+          after('src/game/game.ts','const hazardDepthReentry=',"      const hazardBossFocus=bossTelegraphFocusCorridorPresentation({active:hazard.telegraph>0,critical:hazard.id===primaryTelegraphHazardId,overlap:hazardLaneProximity,crowd:Math.min(1,this.bossArena.hazards.length/6)},this.presentationSettings.reducedFlash),hazardBossFocusBudget=bossFocusCorridorBudgetPresentation({bossActive:Boolean(boss),criticalCount:hazard.id===primaryTelegraphHazardId?1:0,projectileCount:this.enemies.activeProjectileCount,impactCount:0,hazardCount:this.bossArena.hazards.length,silhouetteCount:0,safeLaneVisible:Boolean(safeLane)},this.presentationSettings.reducedMotion,this.presentationSettings.reducedFlash);")
+          p=Path('src/game/game.ts');t=p.read_text()
+          t=t.replace('*safeLaneDepthReentry.contourAlphaScale*safeLaneDepthReentryBudget.canonicalScale','*safeLaneDepthReentry.contourAlphaScale*safeLaneDepthReentryBudget.canonicalScale*safeLaneBossFocus.safeLaneScale*safeLaneBossFocusBudget.safeLaneScale')
+          t=t.replace('*hazardDepthReentry.fillAlphaScale*hazardDepthReentryBudget.secondaryReentryScale','*hazardDepthReentry.fillAlphaScale*hazardDepthReentryBudget.secondaryReentryScale*hazardBossFocus.secondaryScale*hazardBossFocusBudget.secondaryScale')
+          t=t.replace('*hazardDepthReentry.edgeAlphaScale','*hazardDepthReentry.edgeAlphaScale*hazardBossFocus.edgeAlphaScale*hazardBossFocusBudget.telegraphEdgeScale')
+          p.write_text(t)
+          PY
+          npm run build
+          node --test tests/phase4131-4136-boss-focus-corridor.test.mjs tests/phase4125-4130-depth-plane-reentry.test.mjs tests/phase4119-4124-depth-plane-separation.test.mjs tests/phase4101-4106-spatial-threat-separation.test.mjs tests/phase4107-4112-spatial-threat-recovery.test.mjs tests/phase4113-4118-dense-battlefield-arbitration.test.mjs
+          git diff --check
+          git add src/game/enemies.ts src/game/spells.ts src/game/game.ts src/game/threat-impact-boss-focus-corridor-rendering.ts tests/phase4131-4136-boss-focus-corridor.test.mjs
+          git add -f dist/game/enemies.js dist/game/spells.js dist/game/game.js dist/game/threat-impact-boss-focus-corridor-rendering.js
+          git commit -m 'Phase 4131-4136 boss focus corridor arbitration'
+
+      - name: Final targeted verification and push
+        run: |
+          npm run build
+          node --test tests/phase4119-4124-depth-plane-separation.test.mjs tests/phase4125-4130-depth-plane-reentry.test.mjs tests/phase4131-4136-boss-focus-corridor.test.mjs
+          git diff --check
+          git status --short
+          git push origin HEAD:work/phase4119-4136-fast

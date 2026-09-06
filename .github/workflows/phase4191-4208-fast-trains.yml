@@ -1,0 +1,28 @@
+name: Phase 4191-4208 Fast Trains
+
+on:
+  push:
+    branches:
+      - work/phase4191-4208-fast
+    paths:
+      - '.github/workflows/phase4191-4208-fast-trains.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fast-trains:
+    runs-on: ubuntu-24.04
+    env:
+      ALS_TEST_WORKERS: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Run three incremental TDD trains
+        run: python3 .github/phase4191-4208-fast.py

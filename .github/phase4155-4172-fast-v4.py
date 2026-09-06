@@ -1,0 +1,15 @@
+from pathlib import Path
+
+patcher=Path('.github/phase4155-4172-fast-v2.py').read_text()
+exec_line="exec(compile(runner,'.github/phase4155-4172-fast.py','exec'),{'__name__':'__main__'})"
+if exec_line not in patcher:
+    raise SystemExit('v2 exec seam missing')
+repair=r'''old="insert_after('src/game/enemies.ts','const specialistCriticalReengagement=',\"      const specialistSecondaryCeiling="
+new="insert_after('src/game/enemies.ts','const specialistDenseArbitration=',\"      const specialistSecondaryCeiling="
+count=runner.count(old)
+if count!=1:
+    raise SystemExit(f'expected one specialist secondary ceiling anchor, got {count}')
+runner=runner.replace(old,new,1)
+'''
+patcher=patcher.replace(exec_line,repair+exec_line,1)
+exec(compile(patcher,'.github/phase4155-4172-fast-v2.py','exec'),{'__name__':'__main__'})

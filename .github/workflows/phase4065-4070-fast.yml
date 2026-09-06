@@ -1,4 +1,4 @@
-name: Phase 4065-4076 Fast Train
+name: Phase 4065-4082 Fast Train
 
 on:
   push:
@@ -23,4 +23,5 @@ jobs:
       - run: |
           node --test \
             tests/phase4065-4070-battlefield-threat-priority.test.mjs \
-            tests/phase4071-4076-battlefield-spatial-priority.test.mjs
+            tests/phase4071-4076-battlefield-spatial-priority.test.mjs \
+            tests/phase4077-4082-battlefield-temporal-focus.test.mjs

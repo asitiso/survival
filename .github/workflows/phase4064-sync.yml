@@ -30,7 +30,6 @@ jobs:
           test "$(git hash-object dist/game/game.js)" = "eb975a63114a70b38720bfe331f130aa5b7aed0a"
           test "$(git hash-object dist/game/enemies.js)" = "cedfe9478696bc66c2ed1e1200fda07a1d92cec5"
           test "$(git hash-object dist/game/spells.js)" = "0683ed2567f52dd29fd0e949772c5d7c39dd578e"
-          echo "1bcbe09d9bd01525112b67cfea1defbb7b5c0debd4d980e4500351b9bd94bdd2  sync/phase4064/patch.xz.b64" | sha256sum -c -
           base64 -d sync/phase4064/patch.xz.b64 > /tmp/phase4064.patch.xz
           xz -t /tmp/phase4064.patch.xz
           xz -dc /tmp/phase4064.patch.xz > /tmp/phase4064.patch

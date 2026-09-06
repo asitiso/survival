@@ -1,0 +1,64 @@
+name: Phase 4173-4190 Integration Gate
+
+on:
+  push:
+    branches:
+      - work/phase4173-4190-fast
+    paths:
+      - '.github/workflows/phase4173-4190-integration.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  full-regression:
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    runs-on: ubuntu-24.04
+    env:
+      ALS_TEST_WORKERS: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - name: Run complete regression shard
+        shell: bash
+        run: |
+          mapfile -t all < <(find tests -maxdepth 1 -type f -name '*.test.mjs' | sort -V)
+          echo "TOTAL_TEST_FILES=${#all[@]}"
+          files=()
+          for i in "${!all[@]}"; do
+            if (( i % 8 == ${{ matrix.shard }} )); then files+=("${all[$i]}"); fi
+          done
+          echo "SHARD_TEST_FILES=${#files[@]}"
+          node --test "${files[@]}"
+
+  release-gates:
+    needs: full-regression
+    runs-on: ubuntu-24.04
+    env:
+      ALS_TEST_WORKERS: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - name: Verify Phase 4173-4190 contracts
+        run: |
+          node --test \
+            tests/phase4173-4178-final-readability-settle.test.mjs \
+            tests/phase4179-4184-secondary-recovery-gate.test.mjs \
+            tests/phase4185-4190-focus-transfer-coherence.test.mjs
+          git diff --check
+      - run: npm run verify:raster
+      - run: npm run verify:release
+      - run: npm run verify:candidate

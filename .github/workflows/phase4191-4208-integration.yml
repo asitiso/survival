@@ -1,0 +1,64 @@
+name: Phase 4191-4208 Integration Gate
+
+on:
+  push:
+    branches:
+      - work/phase4191-4208-fast
+    paths:
+      - '.github/workflows/phase4191-4208-integration.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  full-regression:
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    runs-on: ubuntu-24.04
+    env:
+      ALS_TEST_WORKERS: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - name: Run complete regression shard
+        shell: bash
+        run: |
+          mapfile -t all < <(find tests -maxdepth 1 -type f -name '*.test.mjs' | sort -V)
+          echo "TOTAL_TEST_FILES=${#all[@]}"
+          files=()
+          for i in "${!all[@]}"; do
+            if (( i % 8 == ${{ matrix.shard }} )); then files+=("${all[$i]}"); fi
+          done
+          echo "SHARD_TEST_FILES=${#files[@]}"
+          node --test "${files[@]}"
+
+  release-gates:
+    needs: full-regression
+    runs-on: ubuntu-24.04
+    env:
+      ALS_TEST_WORKERS: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - name: Verify Phase 4191-4208 contracts
+        run: |
+          node --test \
+            tests/phase4191-4196-threat-rhythm-stagger.test.mjs \
+            tests/phase4197-4202-threat-rhythm-recovery.test.mjs \
+            tests/phase4203-4208-dense-threat-rhythm.test.mjs
+          git diff --check
+      - run: npm run verify:raster
+      - run: npm run verify:release
+      - run: npm run verify:candidate

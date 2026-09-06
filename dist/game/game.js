@@ -214,6 +214,9 @@ import { safeLaneHazardPathGapPresentation } from './safe-lane-hazard-path-gap-r
 import { safeLaneGapFeatherPresentation } from './safe-lane-gap-feather-rendering.js';
 import { advanceSafeLaneGapFeatherHysteresisState, createSafeLaneGapFeatherHysteresisState } from './safe-lane-gap-feather-hysteresis-rendering.js';
 import { safeLaneGapHazardHandoffPresentation } from './safe-lane-gap-hazard-handoff-rendering.js';
+import { denseBattleSafeLaneContinuityPresentation, hazardExpiryEdgeContinuityPresentation } from './threat-impact-continuity-rendering.js';
+import { hazardResidueReleasePresentation, safeLaneHazardReclaimPresentation } from './threat-impact-recovery-rendering.js';
+import { hazardGroundResolutionPresentation, safeLaneCanonicalResolutionPresentation } from './threat-impact-resolution-rendering.js';
 import { advanceSafeLaneHazardOcclusionRecovery, createSafeLaneHazardOcclusionRecoveryState, safeLaneHazardOcclusionRecoveryPresentation } from './safe-lane-hazard-occlusion-recovery-rendering.js';
 import { ENEMY_FINISHER_VFX_ATLAS, enemyFinisherVfxSprite } from './enemy-finisher-vfx-assets.js';
 import { HERO_CRISIS_VFX_ATLAS, heroCrisisVfxSprite } from './hero-crisis-vfx-assets.js';
@@ -4375,6 +4378,7 @@ export class Game {
             const expirationGroundTransitionScale = 1 - (1 - expirationGroundState.groundAlphaScale * expirationGroundHandoff.groundAlphaScale) * expirationGroundDensity.effectStrength;
             const nextHazard = this.bossArena.hazards.filter((hazard) => hazard.telegraph > 0).reduce((best, hazard) => { const d = Math.hypot(hazard.pos.x - cue.x, hazard.pos.y - cue.y); return !best || d < Math.hypot(best.pos.x - cue.x, best.pos.y - cue.y) ? hazard : best; }, null);
             const memory = bossHazardClearedGroundMemoryPresentation({ memoryTtl: cue.ttl, memoryMaxTtl: cue.maxTtl, aftermathActive, nextHazardDistance: nextHazard ? Math.hypot(nextHazard.pos.x - cue.x, nextHazard.pos.y - cue.y) : 999, nextHazardTelegraph: nextHazard?.telegraph ?? 0 }, this.presentationSettings.reducedFlash);
+            const hazardGroundResolution = hazardGroundResolutionPresentation({ hazardActive: false, hazardLife: 0, memoryLife: Math.max(0, cue.ttl / Math.max(.001, cue.maxTtl)) }, this.presentationSettings.reducedFlash);
             const respawnGroundCoherence = bossHazardRespawnGroundCoherencePresentation({ memoryLife: Math.max(0, cue.ttl / Math.max(.001, cue.maxTtl)), aftermathActive, nextHazardDistance: nextHazard ? Math.hypot(nextHazard.pos.x - cue.x, nextHazard.pos.y - cue.y) : 999, nextHazardRadius: nextHazard?.radius ?? cue.radius, nextHazardTelegraph: nextHazard?.telegraph ?? 0 }, this.presentationSettings.reducedFlash);
             const respawnGroundHandoff = bossHazardRespawnGroundHandoffPresentation({ coherenceOwner: respawnGroundCoherence.owner, memoryLife: Math.max(0, cue.ttl / Math.max(.001, cue.maxTtl)), nextHazardTelegraph: nextHazard?.telegraph ?? 0 }, this.presentationSettings.reducedFlash);
             const respawnGroundDensityBudget = bossHazardRespawnGroundDensityBudgetPresentation({ activeTransitionCount: activeMemoryCount, indexFromNewest: respawnMemoryRank.get(cue) ?? activeMemoryCount, owner: respawnGroundCoherence.owner }, this.presentationSettings.reducedMotion);
@@ -4391,7 +4395,7 @@ export class Game {
             ctx.save();
             ctx.translate(cue.x, cue.y);
             ctx.rotate(geometry.angle);
-            ctx.globalAlpha = geometry.alpha * cueAlpha * clearedAlphaScale * respawnGroundCoherence.memoryAlphaScale * respawnGroundHandoff.memoryAlphaScale * respawnGroundDensityBudget.memoryAlphaScale * expirationGroundTransitionScale * expirationGroundDensity.groundAlphaScale;
+            ctx.globalAlpha = geometry.alpha * cueAlpha * clearedAlphaScale * respawnGroundCoherence.memoryAlphaScale * respawnGroundHandoff.memoryAlphaScale * respawnGroundDensityBudget.memoryAlphaScale * expirationGroundTransitionScale * expirationGroundDensity.groundAlphaScale * hazardGroundResolution.clearedGroundAlphaScale;
             ctx.strokeStyle = '#8fffd3';
             ctx.lineWidth = 1.5;
             ctx.setLineDash([5, 9]);
@@ -6941,6 +6945,7 @@ export class Game {
             this.safeLaneGapFeatherHysteresisState = createSafeLaneGapFeatherHysteresisState();
             this.safeLaneHazardOcclusionRecoveryLastAt = this.elapsed;
         }
+        const denseBattleSafeLane = denseBattleSafeLaneContinuityPresentation({ hazardCount: this.bossArena.hazards.length, projectileCount: this.enemies.activeProjectileCount, bossSpecial: Boolean(boss && Number.isFinite(boss.specialTimer) && (boss.specialTimer ?? 99) <= 1.2) }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash), expiringHazardCount = this.bossArena.hazards.filter((hazard) => hazard.telegraph <= 0 && hazard.ttl <= 1.2).length, battlefieldHazardReclaim = safeLaneHazardReclaimPresentation({ expiringHazardCount, clearedMemoryCount: this.bossHazardClearedGroundMemory.length, occlusion: 0 }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
         if (safeLane) {
             const forecastDistance = forecast ? Math.hypot(forecast.nextTarget.x - forecast.currentTarget.x, forecast.nextTarget.y - forecast.currentTarget.y) : Infinity;
             this.safeLaneForecastPromotionHysteresisState = advanceSafeLaneForecastPromotionHysteresis(this.safeLaneForecastPromotionHysteresisState, { hasForecast: Boolean(forecast), urgency: forecast?.urgency ?? 0, transitionMs: forecast?.transitionMs ?? 0, targetDistance: forecastDistance });
@@ -6954,12 +6959,12 @@ export class Game {
             const safeLaneGapFeatherState = this.safeLaneGapFeatherHysteresisState, safeLaneGapFeather = safeLaneGapFeatherPresentation({ from: this.hero.pos, to: safeLaneVisualTarget, gap: safeLaneGapFeatherState.visible ? { start: safeLaneGapFeatherState.start, end: safeLaneGapFeatherState.end } : null }, this.presentationSettings.reducedFlash), safeLaneHazardRecoveryDt = this.safeLaneHazardOcclusionRecoveryLastAt < 0 ? 0 : Math.max(0, this.elapsed - this.safeLaneHazardOcclusionRecoveryLastAt);
             this.safeLaneHazardOcclusionRecoveryState = advanceSafeLaneHazardOcclusionRecovery(this.safeLaneHazardOcclusionRecoveryState, { pathAlphaScale: safeLaneHazardOcclusion.pathAlphaScale, bridgeAlphaScale: safeLaneHazardOcclusion.bridgeAlphaScale }, safeLaneHazardRecoveryDt, this.presentationSettings.reducedMotion);
             this.safeLaneHazardOcclusionRecoveryLastAt = this.elapsed;
-            const safeLaneHazardRecovery = safeLaneHazardOcclusionRecoveryPresentation(this.safeLaneHazardOcclusionRecoveryState);
+            const safeLaneHazardRecovery = safeLaneHazardOcclusionRecoveryPresentation(this.safeLaneHazardOcclusionRecoveryState), safeLaneReclaim = safeLaneHazardReclaimPresentation({ expiringHazardCount, clearedMemoryCount: this.bossHazardClearedGroundMemory.length, occlusion: 1 - safeLaneHazardOcclusion.pathAlphaScale }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash), safeLaneResolution = safeLaneCanonicalResolutionPresentation({ release: safeLaneReclaim.release, hazardPressure: denseBattleSafeLane.pressure, memoryCount: this.bossHazardClearedGroundMemory.length }, this.presentationSettings.reducedFlash);
             const nearbyClearedSafeLaneMemory = this.bossHazardClearedGroundMemory.filter((cue) => cue.ttl > 0).sort((a, b) => Math.hypot(a.x - safeLaneVisualTarget.x, a.y - safeLaneVisualTarget.y) - Math.hypot(b.x - safeLaneVisualTarget.x, b.y - safeLaneVisualTarget.y))[0];
             const clearedGroundSafeLaneRecovery = bossClearedGroundSafeLaneRecoveryCoherencePresentation({ memoryLife: nearbyClearedSafeLaneMemory ? nearbyClearedSafeLaneMemory.ttl / Math.max(.001, nearbyClearedSafeLaneMemory.maxTtl) : 0, safeLaneConfidence: safeLane.confidence, nearLane: Boolean(nearbyClearedSafeLaneMemory && Math.hypot(nearbyClearedSafeLaneMemory.x - safeLaneVisualTarget.x, nearbyClearedSafeLaneMemory.y - safeLaneVisualTarget.y) <= Math.max(80, nearbyClearedSafeLaneMemory.radius * 1.4)), hazardOccluded: safeLaneHazardOcclusion.pathAlphaScale < .78 }, this.presentationSettings.reducedMotion);
             const clearedGroundSafeLaneHandoff = bossClearedGroundSafeLaneRecoveryHandoffPresentation({ owner: clearedGroundSafeLaneRecovery.owner, memoryLife: nearbyClearedSafeLaneMemory ? nearbyClearedSafeLaneMemory.ttl / Math.max(.001, nearbyClearedSafeLaneMemory.maxTtl) : 0, safeLaneConfidence: safeLane.confidence, hazardOccluded: safeLaneHazardOcclusion.pathAlphaScale < .78 }, this.presentationSettings.reducedMotion);
             const clearedGroundSafeLaneDensity = bossClearedGroundSafeLaneRecoveryDensityBudgetPresentation({ activeCount: this.bossHazardClearedGroundMemory.length, indexFromNewest: nearbyClearedSafeLaneMemory ? Math.max(0, this.bossHazardClearedGroundMemory.length - 1 - this.bossHazardClearedGroundMemory.indexOf(nearbyClearedSafeLaneMemory)) : this.bossHazardClearedGroundMemory.length, owner: clearedGroundSafeLaneHandoff.owner }, this.presentationSettings.reducedMotion);
-            const safeLaneBaseAlpha = (.26 + safeLane.confidence * .18) * safeLaneVisual.primaryAlphaScale * safeLaneAttention.primaryAlphaScale * safeLaneAttentionRecovery.recoveryAlphaScale * (1 - (1 - clearedGroundSafeLaneRecovery.safeLaneAlphaScale * clearedGroundSafeLaneHandoff.safeLaneAlphaScale) * clearedGroundSafeLaneDensity.effectStrength) * clearedGroundSafeLaneDensity.safeLaneAlphaScale;
+            const safeLaneBaseAlpha = (.26 + safeLane.confidence * .18) * safeLaneVisual.primaryAlphaScale * safeLaneAttention.primaryAlphaScale * safeLaneAttentionRecovery.recoveryAlphaScale * (1 - (1 - clearedGroundSafeLaneRecovery.safeLaneAlphaScale * clearedGroundSafeLaneHandoff.safeLaneAlphaScale) * clearedGroundSafeLaneDensity.effectStrength) * clearedGroundSafeLaneDensity.safeLaneAlphaScale * denseBattleSafeLane.safeLaneAlphaScale * safeLaneReclaim.safeLaneAlphaScale * safeLaneResolution.safeLaneAlphaScale;
             ctx.save();
             ctx.globalAlpha = safeLaneBaseAlpha * safeLaneHazardRecovery.pathAlphaScale;
             ctx.strokeStyle = '#8fffd3';
@@ -7084,8 +7089,11 @@ export class Game {
                 ctx.restore();
             }
             const amplitude = hazard.id === primaryTelegraphHazardId ? motion.bossHazardMotionAmplitude : 0;
+            const hazardExpiry = hazardExpiryEdgeContinuityPresentation({ ttl: hazard.ttl, maxTtl: 5.4, telegraph: hazard.telegraph }, this.presentationSettings.reducedFlash), hazardResidueRelease = hazardResidueReleasePresentation({ ttl: hazard.ttl, maxTtl: 5.4, clearedMemoryLife: nearbyClearedMemory ? nearbyClearedMemory.ttl / Math.max(.001, nearbyClearedMemory.maxTtl) : 0 }, this.presentationSettings.reducedFlash), hazardGroundResolution = hazardGroundResolutionPresentation({ hazardActive: hazard.telegraph <= 0 && hazard.ttl > 0, hazardLife: hazard.ttl / 5.4, memoryLife: nearbyClearedMemory ? nearbyClearedMemory.ttl / Math.max(.001, nearbyClearedMemory.maxTtl) : 0 }, this.presentationSettings.reducedFlash);
+            const hazardBaseAlpha = hazard.telegraph > 0 ? (0.34 + amplitude * Math.sin(this.elapsed * 10)) * hazardHandoff.telegraphAlphaScale * footprintTelegraphScale * hazardLifecycle.telegraphAlphaScale * footprintLifecycle.telegraphAlphaScale * telegraphAlphaScale : 0.34 * hazardLifecycle.activeAlphaScale * footprintLifecycle.activeAlphaScale * activationActiveScale * respawnMaterializationOwner.activeAlphaScale * respawnMaterializationSettle.persistentAlphaScale;
+            const hazardFillAlpha = hazardBaseAlpha * hazardExpiry.fillAlphaScale * denseBattleSafeLane.hazardFillScale * battlefieldHazardReclaim.hazardAlphaScale, hazardEdgeAlpha = hazardBaseAlpha * hazardExpiry.edgeAlphaScale * denseBattleSafeLane.hazardEdgeScale * hazardResidueRelease.hazardEdgeScale * hazardGroundResolution.hazardEdgeAlphaScale;
             ctx.save();
-            ctx.globalAlpha = hazard.telegraph > 0 ? (0.34 + amplitude * Math.sin(this.elapsed * 10)) * hazardHandoff.telegraphAlphaScale * footprintTelegraphScale * hazardLifecycle.telegraphAlphaScale * footprintLifecycle.telegraphAlphaScale * telegraphAlphaScale : 0.34 * hazardLifecycle.activeAlphaScale * footprintLifecycle.activeAlphaScale * activationActiveScale * respawnMaterializationOwner.activeAlphaScale * respawnMaterializationSettle.persistentAlphaScale;
+            ctx.globalAlpha = hazard.telegraph > 0 ? hazardBaseAlpha : hazardFillAlpha;
             ctx.fillStyle = color;
             ctx.strokeStyle = color;
             ctx.lineWidth = hazard.telegraph > 0 ? 4 : 2;
@@ -7096,15 +7104,21 @@ export class Game {
                 const length = hazard.length ?? hazard.radius * 3;
                 ctx.beginPath();
                 ctx.rect(-length / 2, -hazard.radius, length, hazard.radius * 2);
-                if (hazard.telegraph <= 0)
+                if (hazard.telegraph <= 0) {
+                    ctx.globalAlpha = hazardFillAlpha;
                     ctx.fill();
+                }
+                ctx.globalAlpha = hazard.telegraph > 0 ? hazardBaseAlpha : hazardEdgeAlpha;
                 ctx.stroke();
                 if (shape === 'cross') {
                     ctx.rotate(Math.PI / 2);
                     ctx.beginPath();
                     ctx.rect(-length / 2, -hazard.radius * .7, length, hazard.radius * 1.4);
-                    if (hazard.telegraph <= 0)
+                    if (hazard.telegraph <= 0) {
+                        ctx.globalAlpha = hazardFillAlpha;
                         ctx.fill();
+                    }
+                    ctx.globalAlpha = hazard.telegraph > 0 ? hazardBaseAlpha : hazardEdgeAlpha;
                     ctx.stroke();
                 }
             }
@@ -7112,8 +7126,11 @@ export class Game {
                 ctx.beginPath();
                 ctx.arc(hazard.pos.x, hazard.pos.y, hazard.radius, 0, Math.PI * 2);
                 ctx.arc(hazard.pos.x, hazard.pos.y, Math.max(10, hazard.radius * .58), 0, Math.PI * 2, true);
-                if (hazard.telegraph <= 0)
+                if (hazard.telegraph <= 0) {
+                    ctx.globalAlpha = hazardFillAlpha;
                     ctx.fill('evenodd');
+                }
+                ctx.globalAlpha = hazard.telegraph > 0 ? hazardBaseAlpha : hazardEdgeAlpha;
                 ctx.stroke();
             }
             else if (shape === 'orbit') {
@@ -7123,8 +7140,11 @@ export class Game {
                 ctx.scale(1.45, .72);
                 ctx.beginPath();
                 ctx.arc(0, 0, hazard.radius, 0, Math.PI * 2);
-                if (hazard.telegraph <= 0)
+                if (hazard.telegraph <= 0) {
+                    ctx.globalAlpha = hazardFillAlpha;
                     ctx.fill();
+                }
+                ctx.globalAlpha = hazard.telegraph > 0 ? hazardBaseAlpha : hazardEdgeAlpha;
                 ctx.stroke();
                 ctx.restore();
             }
@@ -7135,16 +7155,34 @@ export class Game {
                 ctx.moveTo(0, 0);
                 ctx.arc(0, 0, hazard.radius * 1.25, -.2, .2);
                 ctx.closePath();
-                if (hazard.telegraph <= 0)
+                if (hazard.telegraph <= 0) {
+                    ctx.globalAlpha = hazardFillAlpha;
                     ctx.fill();
+                }
+                ctx.globalAlpha = hazard.telegraph > 0 ? hazardBaseAlpha : hazardEdgeAlpha;
                 ctx.stroke();
             }
             else {
                 ctx.beginPath();
                 ctx.arc(hazard.pos.x, hazard.pos.y, hazard.radius, 0, Math.PI * 2);
-                if (hazard.telegraph <= 0)
+                if (hazard.telegraph <= 0) {
+                    ctx.globalAlpha = hazardFillAlpha;
                     ctx.fill();
+                }
+                ctx.globalAlpha = hazard.telegraph > 0 ? hazardBaseAlpha : hazardEdgeAlpha;
                 ctx.stroke();
+            }
+            if (hazardResidueRelease.owner === 'residue' && hazardResidueRelease.clearedGroundAlphaScale > .01) {
+                ctx.save();
+                ctx.globalAlpha = .24 * hazardResidueRelease.clearedGroundAlphaScale * hazardGroundResolution.clearedGroundAlphaScale;
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1.4;
+                ctx.setLineDash([3, 7]);
+                ctx.beginPath();
+                ctx.arc(hazard.pos.x, hazard.pos.y, Math.max(12, hazard.radius * 1.04), 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.restore();
             }
             if (hazard.telegraph > 0 && hazard.id === primaryHazardIdentityId)
                 this.drawBossArenaHazardIdentity(ctx, hazard.kind, hazard.pos.x, hazard.pos.y - hazard.radius - 30, 24);

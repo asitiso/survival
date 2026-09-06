@@ -5,4 +5,7 @@ const from='"*.38*arrivalContinuity.edgeAlphaScale*reactionCarry.aftermathAlphaS
 const to='".38*arrivalContinuity.edgeAlphaScale*reactionCarry.aftermathAlphaScale*arrivalSettleRecovery.footprintAlphaScale*impactRetirement.footprintAlphaScale*impactResolutionBudget.effectStrength"';
 if(!text.includes(from))throw new Error('mutator correction target missing');
 text=text.replace(from,to);
+const duplicate=`replaceOnce('src/game/enemies.ts',\n  "*projectileLayerBudget.projectileDecorationScale;ctx.strokeStyle='#ffb26f'",\n  "*projectileLayerBudget.projectileDecorationScale*bossSpatialFocus.secondaryAlphaScale;ctx.strokeStyle='#ffb26f'");\n`;
+if(!text.includes(duplicate))throw new Error('duplicate boss-travel mutation target missing');
+text=text.replace(duplicate,'');
 fs.writeFileSync(path,text);

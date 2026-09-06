@@ -1,0 +1,49 @@
+import fs from 'node:fs';
+
+function edit(path, transform) {
+  const before=fs.readFileSync(path,'utf8');
+  const after=transform(before);
+  if(after===before) console.log(`${path}: already integrated`);
+  else { fs.writeFileSync(path,after); console.log(`${path}: integrated`); }
+}
+function insertAfter(text, needle, addition) {
+  if(text.includes(addition.trim())) return text;
+  const i=text.indexOf(needle); if(i<0) throw new Error(`missing anchor: ${needle}`);
+  return text.slice(0,i+needle.length)+addition+text.slice(i+needle.length);
+}
+function insertAfterLine(text, token, addition) {
+  if(text.includes(addition.trim())) return text;
+  const i=text.indexOf(token); if(i<0) throw new Error(`missing line token: ${token}`);
+  const e=text.indexOf('\n',i); if(e<0) throw new Error(`unterminated line: ${token}`);
+  return text.slice(0,e+1)+addition+text.slice(e+1);
+}
+function appendScale(text, anchor, suffix) {
+  if(text.includes(anchor+suffix)) return text;
+  if(!text.includes(anchor)) throw new Error(`missing scale anchor: ${anchor}`);
+  return text.split(anchor).join(anchor+suffix);
+}
+
+edit('src/game/enemies.ts',(source)=>{
+  source=insertAfter(source,"import { focusTransferCoherenceBudgetPresentation, projectileFocusTransferCoherencePresentation, specialistFocusTransferCoherencePresentation } from './threat-impact-focus-transfer-coherence-rendering.js';\n","import { crossFamilyPeakBudgetPresentation, projectileImpactPeakSeparationPresentation, specialistRecoveryTrailPeakPresentation } from './threat-rhythm-peak-separation-rendering.js';\n");
+  source=insertAfterLine(source,'const projectileFocusTransfer=projectileFocusTransferCoherencePresentation',"      const projectileRecentImpactProximity=Math.max(0,...[...this.archerProjectileImpactVfx,...this.bossProjectileImpactVfx].map((cue)=>Math.max(0,1-distance(cue.pos,visualPos)/Math.max(48,projectile.radius*6))));\n      const projectilePeakSeparation=projectileImpactPeakSeparationPresentation({trailPeak:Math.max(launchLife,travelLife),impactPeak:projectileRecentImpactProximity,proximity:projectileRecentImpactProximity,critical:Boolean(projectile.bossArchetype)},reducedMotion,reducedFlash),projectilePeakBudget=crossFamilyPeakBudgetPresentation({activePeakFamilies:1+(projectileRecentImpactProximity>0?1:0)+(projectileLaneProximity>0?1:0)+(projectile.bossArchetype?1:0),crowd:Math.min(1,this.projectiles.length/12),criticalCount:projectile.bossArchetype?1:0,safeLaneVisible:projectileLaneProximity>0,bossActive:Boolean(projectile.bossArchetype)},reducedMotion,reducedFlash);\n");
+  source=appendScale(source,'*projectileFocusTransferBudget.secondaryScale','*projectilePeakSeparation.trailScale*projectilePeakBudget.secondaryScale');
+  source=insertAfterLine(source,'const specialistFocusTransfer=specialistFocusTransferCoherencePresentation',"      const specialistPeakSeparation=specialistRecoveryTrailPeakPresentation({facingPeak:specialistFocusTransfer.incomingScale,recoveryPeak:specialistSecondaryRecoveryGate.release,stress:specialistSecondaryRecoveryGateBudget.hold,critical:specialistFinalSettleBudget.stress>.72},reducedMotion,reducedFlash),specialistPeakBudget=crossFamilyPeakBudgetPresentation({activePeakFamilies:2,crowd:specialistFinalSettleBudget.stress,criticalCount:specialistFinalSettleBudget.stress>.72?1:0,safeLaneVisible:false,bossActive:specialistFinalSettleBudget.stress>.78},reducedMotion,reducedFlash);\n");
+  source=appendScale(source,'*specialistFocusTransferBudget.secondaryScale','*specialistPeakSeparation.recoveryTrailScale*specialistPeakBudget.secondaryScale');
+  return source;
+});
+
+edit('src/game/spells.ts',(source)=>{
+  source=insertAfter(source,"import { focusTransferCoherenceBudgetPresentation, impactFocusTransferCoherencePresentation } from './threat-impact-focus-transfer-coherence-rendering.js';\n","import { crossFamilyPeakBudgetPresentation, projectileImpactPeakSeparationPresentation } from './threat-rhythm-peak-separation-rendering.js';\n");
+  source=insertAfterLine(source,'const impactFocusTransfer=impactFocusTransferCoherencePresentation',"        const impactPeakSeparation=projectileImpactPeakSeparationPresentation({trailPeak:impactFocusTransfer.incomingScale,impactPeak:impactFinalSettle.settle,proximity:Math.max(impactFocusTransfer.transfer,heroImpactProximity),critical:impactCritical},reducedMotion,reducedFlash),impactPeakBudget=crossFamilyPeakBudgetPresentation({activePeakFamilies:1+(bossTelegraphOverlap?1:0)+(persistentHazardOverlap?1:0),crowd:Math.min(1,impactNeighborCount/8),criticalCount:impactCritical?1:0,safeLaneVisible:false,bossActive:bossTelegraphOverlap},reducedMotion,reducedFlash);\n");
+  source=appendScale(source,'*impactFocusTransferBudget.secondaryScale','*impactPeakSeparation.impactInteriorScale*impactPeakBudget.secondaryScale');
+  return source;
+});
+
+edit('src/game/game.ts',(source)=>{
+  source=insertAfter(source,"import { focusTransferCoherenceBudgetPresentation, hazardFocusTransferCoherencePresentation, safeLaneFocusTransferCoherencePresentation } from './threat-impact-focus-transfer-coherence-rendering.js';\n","import { bossHazardPeakSeparationPresentation, criticalCorridorTemporalReservePresentation, crossFamilyPeakBudgetPresentation, safeLaneBossPeakPriorityPresentation } from './threat-rhythm-peak-separation-rendering.js';\n");
+  source=insertAfterLine(source,'const hazardFocusTransfer=hazardFocusTransferCoherencePresentation',"        const hazardBossPeakSeparation=bossHazardPeakSeparationPresentation({bossPeak:hazardFocusTransfer.outgoingScale,hazardPeak:hazardFinalSettle.settle,overlap:hazardFocusTransfer.transfer,critical:hazardFinalSettleBudget.stress>.72},this.presentationSettings.reducedMotion,this.presentationSettings.reducedFlash),hazardPeakBudget=crossFamilyPeakBudgetPresentation({activePeakFamilies:2,crowd:hazardFinalSettleBudget.stress,criticalCount:hazardFinalSettleBudget.stress>.72?1:0,safeLaneVisible:false,bossActive:hazardFocusTransfer.outgoingScale>.55},this.presentationSettings.reducedMotion,this.presentationSettings.reducedFlash);\n");
+  source=appendScale(source,'*hazardFocusTransferBudget.secondaryScale','*hazardBossPeakSeparation.hazardInteriorScale*hazardPeakBudget.secondaryScale');
+  source=insertAfterLine(source,'const safeLaneFocusTransfer=safeLaneFocusTransferCoherencePresentation',"            const safeLaneBossPeak=safeLaneBossPeakPriorityPresentation({laneConfidence:safeLane.confidence,bossPeak:safeLaneFocusTransfer.outgoingScale,crossing:safeLaneFocusTransfer.transfer,critical:safeLaneFinalSettleBudget.stress>.72},this.presentationSettings.reducedMotion,this.presentationSettings.reducedFlash),safeLaneCriticalCorridor=criticalCorridorTemporalReservePresentation({corridorPressure:safeLaneFinalSettleBudget.stress,secondaryPeak:safeLaneSecondaryRecoveryGate.release,criticalCount:safeLaneFinalSettleBudget.stress>.72?2:0,heroProximity:this.dangerState.heroCritical?1:0},this.presentationSettings.reducedMotion,this.presentationSettings.reducedFlash),safeLanePeakBudget=crossFamilyPeakBudgetPresentation({activePeakFamilies:1+(safeLaneFocusTransfer.transfer>.2?1:0)+(safeLaneFinalSettleBudget.stress>.5?1:0),crowd:safeLaneFinalSettleBudget.stress,criticalCount:safeLaneFinalSettleBudget.stress>.72?2:0,safeLaneVisible:true,bossActive:safeLaneFocusTransfer.outgoingScale>.55},this.presentationSettings.reducedMotion,this.presentationSettings.reducedFlash);\n");
+  source=appendScale(source,'*safeLaneFocusTransferBudget.secondaryScale','*safeLaneBossPeak.bossInteriorScale*safeLaneCriticalCorridor.secondaryScale*safeLanePeakBudget.secondaryScale');
+  return source;
+});

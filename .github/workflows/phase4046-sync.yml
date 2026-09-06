@@ -1,0 +1,45 @@
+name: Phase 4046 Verified Sync
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/phase4046-sync.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct and verify Phase 4046 patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat sync/phase4046/part-* > /tmp/phase4046.patch.xz.b64
+          base64 -d /tmp/phase4046.patch.xz.b64 > /tmp/phase4046.patch.xz
+          xz -t /tmp/phase4046.patch.xz
+          xz -dc /tmp/phase4046.patch.xz > /tmp/phase4046.patch
+          echo "5a098a136012eebc4e49a71ce98618a27878193197b922ce81409335a62c4f7b  /tmp/phase4046.patch" | sha256sum -c -
+          git apply --check /tmp/phase4046.patch
+          git apply /tmp/phase4046.patch
+          git diff --check
+
+      - name: Commit verified Phase 4046 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf sync/phase4046
+          rm -f .github/workflows/phase4046-sync.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Sync verified local Phase 4046 source"
+          git push origin HEAD:main

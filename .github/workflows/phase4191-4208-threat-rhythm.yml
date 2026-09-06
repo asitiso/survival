@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   targeted:
@@ -19,21 +19,44 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Apply approved presentation integration
+        run: node scripts/phase4191-4208-mutator.mjs
       - name: Build
         run: npm run build
-      - name: Targeted phase contracts
+      - name: Targeted phase contracts and affected regression
         shell: bash
         run: |
           set -euo pipefail
-          files=()
+          files=(
+            tests/phase4173-4178-final-readability-settle.test.mjs
+            tests/phase4179-4184-secondary-recovery-gate.test.mjs
+            tests/phase4185-4190-focus-transfer-coherence.test.mjs
+          )
           for f in \
             tests/phase4191-4196-threat-rhythm-peak-separation.test.mjs \
             tests/phase4197-4202-threat-rhythm-recovery.test.mjs \
             tests/phase4203-4208-threat-rhythm-temporal-arbitration.test.mjs; do
             [[ -f "$f" ]] && files+=("$f")
           done
-          if [[ ${#files[@]} -eq 0 ]]; then
-            echo "No threat-rhythm phase tests committed yet; bootstrap only."
+          node --test "${files[@]}"
+          git diff --check
+      - name: Commit verified generated/runtime integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "asitiso"
+          git config user.email "asitiso.woo@gmail.com"
+          git add src/game/enemies.ts src/game/spells.ts src/game/game.ts dist/game
+          if git diff --cached --quiet; then
+            echo "Verified tree already committed."
             exit 0
           fi
-          node --test "${files[@]}"
+          if [[ -f tests/phase4203-4208-threat-rhythm-temporal-arbitration.test.mjs ]]; then
+            message="feat: integrate Phase 4203-4208 temporal arbitration"
+          elif [[ -f tests/phase4197-4202-threat-rhythm-recovery.test.mjs ]]; then
+            message="feat: integrate Phase 4197-4202 rhythm recovery"
+          else
+            message="feat: integrate Phase 4191-4196 peak separation"
+          fi
+          git commit -m "$message"
+          git push origin HEAD:work/phase4191-4208-threat-rhythm

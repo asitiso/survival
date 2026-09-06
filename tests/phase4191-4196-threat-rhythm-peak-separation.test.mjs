@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 
 import {
   projectileImpactPeakSeparationPresentation,
@@ -63,4 +64,17 @@ test('Phase 4191-4196 reduced motion/flash never increases secondary rhythmic in
   assert.ok(reduced.secondaryScale <= normal.secondaryScale);
   assert.ok(reduced.safeLaneScale <= normal.safeLaneScale);
   assert.ok(reduced.bossEdgeScale <= normal.bossEdgeScale);
+});
+
+test('Phase 4191-4196 live battlefield renderers consume peak arbitration', () => {
+  const e=fs.readFileSync(new URL('../src/game/enemies.ts',import.meta.url),'utf8');
+  const s=fs.readFileSync(new URL('../src/game/spells.ts',import.meta.url),'utf8');
+  const g=fs.readFileSync(new URL('../src/game/game.ts',import.meta.url),'utf8');
+  assert.match(e,/projectileImpactPeakSeparationPresentation/);
+  assert.match(e,/specialistRecoveryTrailPeakPresentation/);
+  assert.match(s,/projectileImpactPeakSeparationPresentation/);
+  assert.match(g,/bossHazardPeakSeparationPresentation/);
+  assert.match(g,/safeLaneBossPeakPriorityPresentation/);
+  assert.match(g,/criticalCorridorTemporalReservePresentation/);
+  assert.match(g,/crossFamilyPeakBudgetPresentation/);
 });

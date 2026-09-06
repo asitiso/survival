@@ -25,6 +25,7 @@ import { projectileImpactVisualPosition } from './projectile-impact-arrival-hand
 import { impactArrivalFootprintContinuityPresentation, impactReactionCarryPresentation, projectileTravelThreatCarryPresentation, threatLaunchOwnershipPresentation } from './threat-impact-continuity-rendering.js';
 import { projectileArrivalSettleRecoveryPresentation } from './threat-impact-recovery-rendering.js';
 import { continuityResolutionBudgetPresentation, impactFootprintRetirementPresentation } from './threat-impact-resolution-rendering.js';
+import { battlefieldThreatLayerBudgetPresentation, hazardImpactEdgeArbitrationPresentation } from './threat-impact-priority-rendering.js';
 import { projectileDamageSourceEnemyReactionContinuityPresentation, projectileDamageSourceEnemyReactionDensityBudgetPresentation, projectileDamageSourceEnemyReactionHandoffPresentation, projectileImpactDamageSourceAftermathDensityBudgetPresentation, projectileImpactDamageSourceAftermathHandoffPresentation, projectileImpactDamageSourceAftermathPresentation, projectileImpactDirectionDensityBudgetPresentation, projectileImpactDirectionOwnerHandoffPresentation, projectileImpactResponseDirectionDensityBudgetPresentation, projectileImpactResponsePriorityPresentation, projectileImpactResponseReleaseHandoffPresentation, projectileImpactLineageDensityBudgetPresentation, projectileImpactLineageDirectionPresentation, projectileImpactLineageOwnerHandoffPresentation, projectileImpactLineageTransferPresentation, projectileMultiHitImpactHandoff, projectilePostImpactTrailHandoffPresentation } from './projectile-multihit-impact-retirement-rendering.js';
 import { secondaryImpactCanonicalPresentation } from './secondary-impact-canonical-rendering.js';
 import { secondaryImpactClusterReadabilityBudgetPresentation } from './secondary-impact-cluster-readability-budget-rendering.js';
@@ -464,6 +465,8 @@ export class SpellSystem {
                     continue;
                 const sprite = heroProjectileImpactVfxSprite(impact.heroId);
                 const progress = 1 - Math.max(0, impact.ttl / impact.maxTtl), impactLife = Math.max(0, Math.min(1, impact.ttl / Math.max(.001, impact.maxTtl)));
+                const persistentHazardOverlap = this.fields.some((field) => distance(field.pos, impact.pos) <= field.radius + impact.size * .5) || this.holes.some((hole) => distance(hole.pos, impact.pos) <= hole.radius + impact.size * .5);
+                const impactPriority = hazardImpactEdgeArbitrationPresentation({ hazardActive: persistentHazardOverlap, hazardLife: persistentHazardOverlap ? 1 : 0, impactLife, overlap: persistentHazardOverlap ? 1 : 0 }, reducedFlash), impactThreatBudget = battlefieldThreatLayerBudgetPresentation({ projectileCount: this.projectiles.length, impactCount: this.projectileImpactVisuals.length, hazardCount: this.fields.length + this.holes.length, silhouetteCount: 0, criticalCount: (impact.impactResponseOwner === 'weakpoint' || impact.enemyReactionOwner === 'death') ? 1 : 0 }, reducedMotion, reducedFlash);
                 const arrivalContinuity = impactArrivalFootprintContinuityPresentation({ life: impactLife, response: impact.enemyReactionOwner ?? 'none', secondary: impact.secondaryKind !== undefined }, reducedFlash), reactionCarry = impactReactionCarryPresentation({ life: impactLife, reaction: impact.enemyReactionOwner ?? 'none', response: impact.impactResponseOwner ?? 'canonical' }, reducedMotion), arrivalSettleRecovery = projectileArrivalSettleRecoveryPresentation({ impactLife, reaction: impact.enemyReactionOwner ?? 'none' }, reducedFlash), impactRetirement = impactFootprintRetirementPresentation({ life: impactLife, reaction: impact.enemyReactionOwner ?? 'none' }, reducedFlash), impactResolutionBudget = continuityResolutionBudgetPresentation({ activeCount: this.projectileImpactVisuals.length, indexFromNewest: impactResolutionRank.get(impact) ?? this.projectileImpactVisuals.length, kind: 'impact' }, reducedMotion);
                 const size = impact.size * (0.72 + progress * 0.5) * (budget?.sizeScale ?? 1) * arrivalContinuity.radiusScale;
                 const impactVisualPos = projectileImpactVisualPosition(impact.pos, impact.entryOffset ?? { x: 0, y: 0 }, impact.ttl, impact.maxTtl);
@@ -483,7 +486,7 @@ export class SpellSystem {
                 if (impactDirection?.visible && impactDirectionOwner.owner !== 'retired' && impactDirectionBudget.visible && impactResponseDensityBudget.visible) {
                     const cueLength = impactDirection.cueLength * impactDirectionBudget.lengthScale * impactResponsePriority.directionLengthScale * impactResponseDensityBudget.lengthScale;
                     ctx.save();
-                    ctx.globalAlpha = impactDirection.alphaScale * impactDirectionOwner.alphaScale * impactDirectionBudget.alphaScale * impactResponsePriority.directionAlphaScale * impactResponseRelease.directionAlphaScale * impactResponseDensityBudget.alphaScale * arrivalSettleRecovery.directionAlphaScale * impactRetirement.responseAlphaScale * impactResolutionBudget.effectStrength * (impact.alphaScale ?? 1) * (budget?.alphaScale ?? 1) * (reducedFlash ? .62 : 1);
+                    ctx.globalAlpha = impactDirection.alphaScale * impactDirectionOwner.alphaScale * impactDirectionBudget.alphaScale * impactResponsePriority.directionAlphaScale * impactResponseRelease.directionAlphaScale * impactResponseDensityBudget.alphaScale * arrivalSettleRecovery.directionAlphaScale * impactRetirement.responseAlphaScale * impactResolutionBudget.effectStrength * impactPriority.impactAlphaScale * impactThreatBudget.impactDecorationScale * (impact.alphaScale ?? 1) * (budget?.alphaScale ?? 1) * (reducedFlash ? .62 : 1);
                     ctx.strokeStyle = impact.secondaryKind === 'splash' ? '#ffe3b5' : '#bcecff';
                     ctx.lineWidth = 1.7;
                     ctx.beginPath();
@@ -516,7 +519,7 @@ export class SpellSystem {
                 ctx.drawImage(heroProjectileAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, impactVisualPos.x - size / 2, impactVisualPos.y - size / 2, size, size);
                 ctx.restore();
                 ctx.save();
-                ctx.globalAlpha = .38 * arrivalContinuity.edgeAlphaScale * reactionCarry.aftermathAlphaScale * arrivalSettleRecovery.footprintAlphaScale * impactRetirement.footprintAlphaScale * impactResolutionBudget.effectStrength * (impact.alphaScale ?? 1) * (budget?.alphaScale ?? 1);
+                ctx.globalAlpha = .38 * arrivalContinuity.edgeAlphaScale * reactionCarry.aftermathAlphaScale * arrivalSettleRecovery.footprintAlphaScale * impactRetirement.footprintAlphaScale * impactResolutionBudget.effectStrength * impactPriority.impactAlphaScale * impactThreatBudget.impactDecorationScale * (impact.alphaScale ?? 1) * (budget?.alphaScale ?? 1);
                 ctx.strokeStyle = impact.secondaryKind === 'splash' ? '#ffd6a3' : '#bcecff';
                 ctx.lineWidth = 1.4;
                 ctx.beginPath();

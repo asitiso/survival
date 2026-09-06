@@ -1,0 +1,64 @@
+name: Phase 4101-4118 Fast Continuation
+on:
+  push:
+    branches: [work/phase4101-4118-fast]
+    paths: ['.github/workflows/phase4101-4118-fast-continuation.yml']
+permissions:
+  contents: write
+jobs:
+  continue-trains:
+    runs-on: ubuntu-24.04
+    env:
+      ALS_TEST_WORKERS: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Extract and run original TDD train steps with corrected dist staging
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path('.github/workflows/phase4101-4118-fast-trains.yml').read_text().splitlines()
+          names=[
+            'Train 1 RED Phase 4101-4106','Train 1 GREEN implementation',
+            'Train 2 RED Phase 4107-4112','Train 2 GREEN implementation',
+            'Train 3 RED Phase 4113-4118','Train 3 GREEN implementation',
+          ]
+          def extract(name):
+              marker='      - name: '+name
+              try:i=source.index(marker)
+              except ValueError:raise SystemExit('missing step '+name)
+              if i+1>=len(source) or source[i+1].strip()!='run: |':raise SystemExit('missing run block '+name)
+              out=[]
+              for line in source[i+2:]:
+                  if line.startswith('      - name: ') or line.startswith('      - uses: '):break
+                  if line.startswith('          '):out.append(line[10:])
+                  elif line.strip()=='':out.append('')
+                  else:raise SystemExit(f'unexpected indentation in {name}: {line!r}')
+              script='\n'.join(out)+'\n'
+              fixes={
+                'git add src/game dist/game tests/phase4101-4106-spatial-threat-separation.test.mjs':'git add src/game tests/phase4101-4106-spatial-threat-separation.test.mjs\ngit add -f dist/game',
+                'git add src/game dist/game tests/phase4107-4112-spatial-threat-recovery.test.mjs':'git add src/game tests/phase4107-4112-spatial-threat-recovery.test.mjs\ngit add -f dist/game',
+                'git add src/game dist/game tests/phase4113-4118-dense-battlefield-arbitration.test.mjs':'git add src/game tests/phase4113-4118-dense-battlefield-arbitration.test.mjs\ngit add -f dist/game',
+              }
+              for old,new in fixes.items():script=script.replace(old,new)
+              return script
+          outdir=Path('/tmp/phase-trains');outdir.mkdir(exist_ok=True)
+          for idx,name in enumerate(names,1):
+              p=outdir/f'{idx:02d}.sh';p.write_text('set -euo pipefail\n'+extract(name));p.chmod(0o755)
+              print(p,name)
+          PY
+          for f in /tmp/phase-trains/*.sh; do
+            echo "=== RUN $f ==="
+            bash "$f"
+          done

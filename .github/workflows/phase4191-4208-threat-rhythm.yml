@@ -46,7 +46,8 @@ jobs:
           set -euo pipefail
           git config user.name "asitiso"
           git config user.email "asitiso.woo@gmail.com"
-          git add src/game/enemies.ts src/game/spells.ts src/game/game.ts dist/game
+          git add src/game/enemies.ts src/game/spells.ts src/game/game.ts
+          git add -f dist/game
           if git diff --cached --quiet; then
             echo "Verified tree already committed."
             exit 0

@@ -52,3 +52,4 @@ jobs:
         if: success()
         shell: bash
         run: git push origin --delete sync/phase4046-upload || true
+# all chunks staged; verification rerun

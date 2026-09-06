@@ -222,6 +222,7 @@ import { bossCriticalFocusReservationPresentation, hazardSafeLaneCarvePresentati
 import { hazardCorridorStabilityPresentation, safeLaneAttentionHoldPresentation, temporalThreatBudgetPresentation } from './threat-impact-temporal-focus-rendering.js';
 import { battlefieldDepthBudgetPresentation, bossTelegraphImpactDepthPresentation, safeLaneProjectileCrossingPresentation } from './threat-impact-depth-priority-rendering.js';
 import { bossTelegraphDepthReleasePresentation, depthRecoveryBudgetPresentation, safeLaneDepthRecoveryPresentation } from './threat-impact-depth-recovery-rendering.js';
+import { bossTelegraphStackOrderPresentation, safeLaneEdgeClutterProtectionPresentation, unifiedDepthStackBudgetPresentation } from './threat-impact-depth-stack-rendering.js';
 import { advanceSafeLaneHazardOcclusionRecovery, createSafeLaneHazardOcclusionRecoveryState, safeLaneHazardOcclusionRecoveryPresentation } from './safe-lane-hazard-occlusion-recovery-rendering.js';
 import { ENEMY_FINISHER_VFX_ATLAS, enemyFinisherVfxSprite } from './enemy-finisher-vfx-assets.js';
 import { HERO_CRISIS_VFX_ATLAS, heroCrisisVfxSprite } from './hero-crisis-vfx-assets.js';
@@ -6969,13 +6970,14 @@ export class Game {
             const safeLaneTemporal = safeLaneAttentionHoldPresentation({ confidence: safeLane.confidence, critical: this.dangerState.coreCritical || this.dangerState.heroCritical, pressure: denseBattleSafeLane.pressure, release: safeLaneAttentionRecovery.recoveryAlphaScale }, this.presentationSettings.reducedFlash), safeLaneTemporalBudget = temporalThreatBudgetPresentation({ churn: Math.min(1, (this.bossArena.hazards.length + this.enemies.activeProjectileCount) / 14), pressure: denseBattleSafeLane.pressure, criticalCount: (this.dangerState.coreCritical ? 1 : 0) + (this.dangerState.heroCritical ? 1 : 0) }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
             const safeLaneProjectileDepth = safeLaneProjectileCrossingPresentation({ laneProximity: Math.min(1, this.enemies.activeProjectileCount / 8), threatLevel: denseBattleSafeLane.pressure, critical: this.dangerState.coreCritical || this.dangerState.heroCritical }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash), safeLaneDepthBudget = battlefieldDepthBudgetPresentation({ criticalCount: (this.dangerState.coreCritical ? 1 : 0) + (this.dangerState.heroCritical ? 1 : 0), bossTelegraph: Boolean(boss && Number.isFinite(boss.specialTimer) && (boss.specialTimer ?? 99) <= 1.2), safeLaneVisible: true, projectilePressure: Math.min(1, this.enemies.activeProjectileCount / 12), impactPressure: 0, hazardPressure: denseBattleSafeLane.pressure }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
             const safeLaneDepthRecovery = safeLaneDepthRecoveryPresentation({ laneProximity: Math.min(1, this.enemies.activeProjectileCount / 8), confidence: safeLane.confidence, release: safeLaneReclaim.release, critical: this.dangerState.coreCritical || this.dangerState.heroCritical }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash), safeLaneRecoveryBudget = depthRecoveryBudgetPresentation({ recoveringCount: this.bossArena.hazards.length + this.enemies.activeProjectileCount, pressure: denseBattleSafeLane.pressure, criticalCount: (this.dangerState.coreCritical ? 1 : 0) + (this.dangerState.heroCritical ? 1 : 0) }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
+            const safeLaneEdgeDistance = Math.min(safeLaneVisualTarget.x, LOGICAL_WIDTH - safeLaneVisualTarget.x, safeLaneVisualTarget.y, LOGICAL_HEIGHT - safeLaneVisualTarget.y), safeLaneStackProtection = safeLaneEdgeClutterProtectionPresentation({ edgeProximity: 1 - Math.min(1, safeLaneEdgeDistance / 180), clutter: Math.min(1, (this.bossArena.hazards.length + this.enemies.activeProjectileCount) / 14), confidence: safeLane.confidence, critical: this.dangerState.coreCritical || this.dangerState.heroCritical }, this.presentationSettings.reducedFlash), safeLaneUnifiedStack = unifiedDepthStackBudgetPresentation({ criticalCount: (this.dangerState.coreCritical ? 1 : 0) + (this.dangerState.heroCritical ? 1 : 0), bossTelegraphCount: this.bossArena.hazards.filter((entry) => entry.telegraph > 0).length, safeLaneVisible: true, secondaryCount: this.bossArena.hazards.length + this.enemies.activeProjectileCount, pressure: denseBattleSafeLane.pressure }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
             const nearbyClearedSafeLaneMemory = this.bossHazardClearedGroundMemory.filter((cue) => cue.ttl > 0).sort((a, b) => Math.hypot(a.x - safeLaneVisualTarget.x, a.y - safeLaneVisualTarget.y) - Math.hypot(b.x - safeLaneVisualTarget.x, b.y - safeLaneVisualTarget.y))[0];
             const clearedGroundSafeLaneRecovery = bossClearedGroundSafeLaneRecoveryCoherencePresentation({ memoryLife: nearbyClearedSafeLaneMemory ? nearbyClearedSafeLaneMemory.ttl / Math.max(.001, nearbyClearedSafeLaneMemory.maxTtl) : 0, safeLaneConfidence: safeLane.confidence, nearLane: Boolean(nearbyClearedSafeLaneMemory && Math.hypot(nearbyClearedSafeLaneMemory.x - safeLaneVisualTarget.x, nearbyClearedSafeLaneMemory.y - safeLaneVisualTarget.y) <= Math.max(80, nearbyClearedSafeLaneMemory.radius * 1.4)), hazardOccluded: safeLaneHazardOcclusion.pathAlphaScale < .78 }, this.presentationSettings.reducedMotion);
             const clearedGroundSafeLaneHandoff = bossClearedGroundSafeLaneRecoveryHandoffPresentation({ owner: clearedGroundSafeLaneRecovery.owner, memoryLife: nearbyClearedSafeLaneMemory ? nearbyClearedSafeLaneMemory.ttl / Math.max(.001, nearbyClearedSafeLaneMemory.maxTtl) : 0, safeLaneConfidence: safeLane.confidence, hazardOccluded: safeLaneHazardOcclusion.pathAlphaScale < .78 }, this.presentationSettings.reducedMotion);
             const clearedGroundSafeLaneDensity = bossClearedGroundSafeLaneRecoveryDensityBudgetPresentation({ activeCount: this.bossHazardClearedGroundMemory.length, indexFromNewest: nearbyClearedSafeLaneMemory ? Math.max(0, this.bossHazardClearedGroundMemory.length - 1 - this.bossHazardClearedGroundMemory.indexOf(nearbyClearedSafeLaneMemory)) : this.bossHazardClearedGroundMemory.length, owner: clearedGroundSafeLaneHandoff.owner }, this.presentationSettings.reducedMotion);
-            const safeLaneBaseAlpha = (.26 + safeLane.confidence * .18) * safeLaneVisual.primaryAlphaScale * safeLaneAttention.primaryAlphaScale * safeLaneAttentionRecovery.recoveryAlphaScale * (1 - (1 - clearedGroundSafeLaneRecovery.safeLaneAlphaScale * clearedGroundSafeLaneHandoff.safeLaneAlphaScale) * clearedGroundSafeLaneDensity.effectStrength) * clearedGroundSafeLaneDensity.safeLaneAlphaScale * denseBattleSafeLane.safeLaneAlphaScale * safeLaneReclaim.safeLaneAlphaScale * safeLaneResolution.safeLaneAlphaScale * safeLanePriority.safeLaneAlphaScale * battlefieldThreatBudget.safeLaneAlphaScale * safeLaneSpatial.safeLaneAlphaScale * bossSpatialFocus.safeLaneAlphaScale * safeLaneTemporal.safeLaneAlphaScale * safeLaneTemporalBudget.safeLaneAlphaScale * safeLaneProjectileDepth.safeLaneAlphaScale * safeLaneDepthBudget.safeLaneAlphaScale * safeLaneDepthRecovery.safeLaneAlphaScale;
+            const safeLaneBaseAlpha = (.26 + safeLane.confidence * .18) * safeLaneVisual.primaryAlphaScale * safeLaneAttention.primaryAlphaScale * safeLaneAttentionRecovery.recoveryAlphaScale * (1 - (1 - clearedGroundSafeLaneRecovery.safeLaneAlphaScale * clearedGroundSafeLaneHandoff.safeLaneAlphaScale) * clearedGroundSafeLaneDensity.effectStrength) * clearedGroundSafeLaneDensity.safeLaneAlphaScale * denseBattleSafeLane.safeLaneAlphaScale * safeLaneReclaim.safeLaneAlphaScale * safeLaneResolution.safeLaneAlphaScale * safeLanePriority.safeLaneAlphaScale * battlefieldThreatBudget.safeLaneAlphaScale * safeLaneSpatial.safeLaneAlphaScale * bossSpatialFocus.safeLaneAlphaScale * safeLaneTemporal.safeLaneAlphaScale * safeLaneTemporalBudget.safeLaneAlphaScale * safeLaneProjectileDepth.safeLaneAlphaScale * safeLaneDepthBudget.safeLaneAlphaScale * safeLaneDepthRecovery.safeLaneAlphaScale * safeLaneStackProtection.safeLaneAlphaScale * safeLaneUnifiedStack.safeLaneAlphaScale;
             ctx.save();
-            ctx.globalAlpha = safeLaneBaseAlpha * safeLaneHazardRecovery.pathAlphaScale;
+            ctx.globalAlpha = safeLaneBaseAlpha * Math.max(safeLaneHazardRecovery.pathAlphaScale, safeLaneStackProtection.pathAlphaFloor);
             ctx.strokeStyle = '#8fffd3';
             ctx.fillStyle = '#8fffd3';
             ctx.lineWidth = 2;
@@ -7103,9 +7105,10 @@ export class Game {
             const hazardLaneProximity = safeLane ? 1 - Math.min(1, Math.hypot(hazard.pos.x - safeLane.target.x, hazard.pos.y - safeLane.target.y) / Math.max(1, hazard.radius * 2.4)) : 0, hazardSpatial = hazardSafeLaneCarvePresentation({ hazardActive: hazard.telegraph <= 0 && hazard.ttl > 0, laneProximity: hazardLaneProximity, pressure: denseBattleSafeLane.pressure }, this.presentationSettings.reducedFlash), hazardTemporal = hazardCorridorStabilityPresentation({ active: hazard.telegraph <= 0 && hazard.ttl > 0, life: hazard.ttl / 5.4, laneProximity: hazardLaneProximity, pressure: denseBattleSafeLane.pressure }, this.presentationSettings.reducedFlash);
             const hazardTelegraphDepth = bossTelegraphImpactDepthPresentation({ telegraphActive: hazard.telegraph > 0, overlap: Math.min(1, this.enemies.activeProjectileCount / 8), impactLife: Math.max(0, Math.min(1, hazard.ttl / 5.4)) }, this.presentationSettings.reducedFlash), hazardDepthBudget = battlefieldDepthBudgetPresentation({ criticalCount: hazard.id === primaryTelegraphHazardId ? 1 : 0, bossTelegraph: hazard.telegraph > 0, safeLaneVisible: Boolean(safeLane), projectilePressure: Math.min(1, this.enemies.activeProjectileCount / 12), impactPressure: 0, hazardPressure: denseBattleSafeLane.pressure }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
             const hazardDepthRelease = bossTelegraphDepthReleasePresentation({ telegraphLife: hazard.telegraph > 0 ? Math.min(1, hazard.telegraph / 1.2) : 0, impactLife: Math.max(0, Math.min(1, hazard.ttl / 5.4)), overlap: Math.min(1, this.enemies.activeProjectileCount / 8) }, this.presentationSettings.reducedFlash), hazardRecoveryBudget = depthRecoveryBudgetPresentation({ recoveringCount: this.bossArena.hazards.length, pressure: denseBattleSafeLane.pressure, criticalCount: hazard.id === primaryTelegraphHazardId ? 1 : 0 }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
-            const hazardFillAlpha = hazardBaseAlpha * hazardExpiry.fillAlphaScale * denseBattleSafeLane.hazardFillScale * battlefieldHazardReclaim.hazardAlphaScale * hazardSpatial.fillAlphaScale * hazardTemporal.fillAlphaScale * hazardDepthBudget.secondaryAlphaScale * hazardRecoveryBudget.secondaryRecoveryScale * hazardDepthRelease.impactFillAlphaScale, hazardEdgeAlpha = hazardBaseAlpha * hazardExpiry.edgeAlphaScale * denseBattleSafeLane.hazardEdgeScale * hazardResidueRelease.hazardEdgeScale * hazardGroundResolution.hazardEdgeAlphaScale * hazardSpatial.hazardEdgeAlphaScale * hazardTemporal.edgeAlphaScale * hazardTelegraphDepth.telegraphEdgeAlphaScale * hazardDepthRelease.telegraphEdgeAlphaScale;
+            const hazardStackOrder = bossTelegraphStackOrderPresentation({ activeCount: this.bossArena.hazards.length, indexFromNewest: Math.max(0, this.bossArena.hazards.length - 1 - this.bossArena.hazards.indexOf(hazard)), life: hazard.telegraph > 0 ? Math.min(1, hazard.telegraph / 1.2) : Math.min(1, hazard.ttl / 5.4), critical: hazard.id === primaryTelegraphHazardId }, this.presentationSettings.reducedFlash), hazardUnifiedStack = unifiedDepthStackBudgetPresentation({ criticalCount: hazard.id === primaryTelegraphHazardId ? 1 : 0, bossTelegraphCount: this.bossArena.hazards.filter((entry) => entry.telegraph > 0).length, safeLaneVisible: Boolean(safeLane), secondaryCount: this.bossArena.hazards.length + this.enemies.activeProjectileCount, pressure: denseBattleSafeLane.pressure }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
+            const hazardFillAlpha = hazardBaseAlpha * hazardExpiry.fillAlphaScale * denseBattleSafeLane.hazardFillScale * battlefieldHazardReclaim.hazardAlphaScale * hazardSpatial.fillAlphaScale * hazardTemporal.fillAlphaScale * hazardDepthBudget.secondaryAlphaScale * hazardRecoveryBudget.secondaryRecoveryScale * hazardDepthRelease.impactFillAlphaScale * hazardStackOrder.decorationAlphaScale * hazardUnifiedStack.secondaryAlphaScale, hazardEdgeAlpha = hazardBaseAlpha * hazardExpiry.edgeAlphaScale * denseBattleSafeLane.hazardEdgeScale * hazardResidueRelease.hazardEdgeScale * hazardGroundResolution.hazardEdgeAlphaScale * hazardSpatial.hazardEdgeAlphaScale * hazardTemporal.edgeAlphaScale * hazardTelegraphDepth.telegraphEdgeAlphaScale * hazardDepthRelease.telegraphEdgeAlphaScale;
             ctx.save();
-            ctx.globalAlpha = hazard.telegraph > 0 ? hazardBaseAlpha * hazardTelegraphDepth.telegraphEdgeAlphaScale * hazardDepthRelease.telegraphEdgeAlphaScale : hazardFillAlpha;
+            ctx.globalAlpha = hazard.telegraph > 0 ? hazardBaseAlpha * hazardTelegraphDepth.telegraphEdgeAlphaScale * hazardDepthRelease.telegraphEdgeAlphaScale * hazardStackOrder.edgeAlphaScale * hazardUnifiedStack.bossTelegraphEdgeAlphaScale : hazardFillAlpha;
             ctx.fillStyle = color;
             ctx.strokeStyle = color;
             ctx.lineWidth = hazard.telegraph > 0 ? 4 : 2;
@@ -7120,7 +7123,7 @@ export class Game {
                     ctx.globalAlpha = hazardFillAlpha;
                     ctx.fill();
                 }
-                ctx.globalAlpha = hazard.telegraph > 0 ? hazardBaseAlpha * hazardTelegraphDepth.telegraphEdgeAlphaScale * hazardDepthRelease.telegraphEdgeAlphaScale : hazardEdgeAlpha;
+                ctx.globalAlpha = hazard.telegraph > 0 ? hazardBaseAlpha * hazardTelegraphDepth.telegraphEdgeAlphaScale * hazardDepthRelease.telegraphEdgeAlphaScale * hazardStackOrder.edgeAlphaScale * hazardUnifiedStack.bossTelegraphEdgeAlphaScale : hazardEdgeAlpha;
                 ctx.stroke();
                 if (shape === 'cross') {
                     ctx.rotate(Math.PI / 2);
@@ -7130,7 +7133,7 @@ export class Game {
                         ctx.globalAlpha = hazardFillAlpha;
                         ctx.fill();
                     }
-                    ctx.globalAlpha = hazard.telegraph > 0 ? hazardBaseAlpha * hazardTelegraphDepth.telegraphEdgeAlphaScale * hazardDepthRelease.telegraphEdgeAlphaScale : hazardEdgeAlpha;
+                    ctx.globalAlpha = hazard.telegraph > 0 ? hazardBaseAlpha * hazardTelegraphDepth.telegraphEdgeAlphaScale * hazardDepthRelease.telegraphEdgeAlphaScale * hazardStackOrder.edgeAlphaScale * hazardUnifiedStack.bossTelegraphEdgeAlphaScale : hazardEdgeAlpha;
                     ctx.stroke();
                 }
             }
@@ -7142,7 +7145,7 @@ export class Game {
                     ctx.globalAlpha = hazardFillAlpha;
                     ctx.fill('evenodd');
                 }
-                ctx.globalAlpha = hazard.telegraph > 0 ? hazardBaseAlpha * hazardTelegraphDepth.telegraphEdgeAlphaScale * hazardDepthRelease.telegraphEdgeAlphaScale : hazardEdgeAlpha;
+                ctx.globalAlpha = hazard.telegraph > 0 ? hazardBaseAlpha * hazardTelegraphDepth.telegraphEdgeAlphaScale * hazardDepthRelease.telegraphEdgeAlphaScale * hazardStackOrder.edgeAlphaScale * hazardUnifiedStack.bossTelegraphEdgeAlphaScale : hazardEdgeAlpha;
                 ctx.stroke();
             }
             else if (shape === 'orbit') {
@@ -7156,7 +7159,7 @@ export class Game {
                     ctx.globalAlpha = hazardFillAlpha;
                     ctx.fill();
                 }
-                ctx.globalAlpha = hazard.telegraph > 0 ? hazardBaseAlpha * hazardTelegraphDepth.telegraphEdgeAlphaScale * hazardDepthRelease.telegraphEdgeAlphaScale : hazardEdgeAlpha;
+                ctx.globalAlpha = hazard.telegraph > 0 ? hazardBaseAlpha * hazardTelegraphDepth.telegraphEdgeAlphaScale * hazardDepthRelease.telegraphEdgeAlphaScale * hazardStackOrder.edgeAlphaScale * hazardUnifiedStack.bossTelegraphEdgeAlphaScale : hazardEdgeAlpha;
                 ctx.stroke();
                 ctx.restore();
             }
@@ -7171,7 +7174,7 @@ export class Game {
                     ctx.globalAlpha = hazardFillAlpha;
                     ctx.fill();
                 }
-                ctx.globalAlpha = hazard.telegraph > 0 ? hazardBaseAlpha * hazardTelegraphDepth.telegraphEdgeAlphaScale * hazardDepthRelease.telegraphEdgeAlphaScale : hazardEdgeAlpha;
+                ctx.globalAlpha = hazard.telegraph > 0 ? hazardBaseAlpha * hazardTelegraphDepth.telegraphEdgeAlphaScale * hazardDepthRelease.telegraphEdgeAlphaScale * hazardStackOrder.edgeAlphaScale * hazardUnifiedStack.bossTelegraphEdgeAlphaScale : hazardEdgeAlpha;
                 ctx.stroke();
             }
             else {
@@ -7181,7 +7184,7 @@ export class Game {
                     ctx.globalAlpha = hazardFillAlpha;
                     ctx.fill();
                 }
-                ctx.globalAlpha = hazard.telegraph > 0 ? hazardBaseAlpha * hazardTelegraphDepth.telegraphEdgeAlphaScale * hazardDepthRelease.telegraphEdgeAlphaScale : hazardEdgeAlpha;
+                ctx.globalAlpha = hazard.telegraph > 0 ? hazardBaseAlpha * hazardTelegraphDepth.telegraphEdgeAlphaScale * hazardDepthRelease.telegraphEdgeAlphaScale * hazardStackOrder.edgeAlphaScale * hazardUnifiedStack.bossTelegraphEdgeAlphaScale : hazardEdgeAlpha;
                 ctx.stroke();
             }
             if (hazardResidueRelease.owner === 'residue' && hazardResidueRelease.clearedGroundAlphaScale > .01) {

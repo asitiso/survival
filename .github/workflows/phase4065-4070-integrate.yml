@@ -1,0 +1,46 @@
+name: Phase 4065-4070 Integrate
+
+on:
+  push:
+    branches:
+      - work/phase4065-4070-fast
+    paths:
+      - 'scripts/phase4065-4070-integrate.mjs'
+      - '.github/workflows/phase4065-4070-integrate.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: node scripts/phase4065-4070-integrate.mjs
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - name: Fast Train verification
+        run: |
+          node --test \
+            tests/phase4047-4052-threat-impact-continuity.test.mjs \
+            tests/phase4053-4058-threat-impact-recovery.test.mjs \
+            tests/phase4059-4064-threat-impact-resolution.test.mjs \
+            tests/phase4065-4070-battlefield-threat-priority.test.mjs
+          git diff --check
+      - name: Commit Fast Train 1
+        run: |
+          rm -f scripts/phase4065-4070-integrate.mjs .github/workflows/phase4065-4070-integrate.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git add -f dist/game/threat-impact-priority-rendering.js dist/game/enemies.js dist/game/spells.js dist/game/game.js
+          git diff --cached --check
+          git commit -m "Phase 4065-4070 fast train battlefield threat priority"
+          git push origin HEAD:work/phase4065-4070-fast

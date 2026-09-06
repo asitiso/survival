@@ -72,9 +72,11 @@ import { HERO_MOTION_RENDER_ATLAS, heroMotionRenderPresentation, heroMotionRende
 import { HERO_CAST_RENDER_ATLAS, heroCastRenderPresentation, heroCastRenderSprite } from './hero-cast-render-assets.js';
 import { advanceHeroKinematicRenderState, createHeroKinematicRenderState, heroKinematicRenderPresentation } from './hero-kinematic-rendering.js';
 import { heroCastOrientationPresentation } from './hero-cast-orientation-rendering.js';
+import { advanceHeroCastAimHoldState, createHeroCastAimHoldState, heroCastAimHoldPresentation } from './hero-cast-aim-hold-rendering.js';
 import { advanceHeroCastCadenceState, heroCastCadencePresentation } from './hero-cast-cadence-rendering.js';
 import { advanceHeroActionTransitionState, heroActionTransitionPresentation } from './hero-action-transition-rendering.js';
 import { advanceHeroUltimateBodyState, heroUltimateBodyPresentation } from './hero-ultimate-body-continuity-rendering.js';
+import { advanceHeroUltimateAimContinuityState, createHeroUltimateAimContinuityState, heroUltimateAimContinuityPresentation } from './hero-ultimate-aim-continuity-rendering.js';
 import { advanceHeroUltimateActionHandoffState, heroUltimateActionHandoffPresentation } from './hero-ultimate-action-handoff-rendering.js';
 import { heroMotionBudgetPresentation } from './hero-motion-budget-rendering.js';
 import { heroGroundContactOwnershipPresentation } from './hero-ground-contact-ownership-rendering.js';
@@ -167,6 +169,16 @@ import { PICKUP_FLOW_VFX_ATLAS } from './pickup-flow-vfx-assets.js';
 import { SPAWN_PRESSURE_VFX_ATLAS } from './spawn-pressure-vfx-assets.js';
 import { SURVIVAL_RESPONSE_VFX_ATLAS, survivalResponseVfxSprite } from './survival-response-vfx-assets.js';
 import { coreGuardSurvivalResponseArbitrationPresentation } from './core-guard-survival-response-arbitration-rendering.js';
+import { coreHitWorldGuardArbitrationPresentation } from './core-hit-world-guard-arbitration-rendering.js';
+import { coreGuardDamageSourceBodyLanguagePresentation } from './core-guard-damage-source-body-language-rendering.js';
+import { coreGuardMixedSourceCompositionPresentation } from './core-guard-mixed-source-composition-rendering.js';
+import { coreGuardVisualLoadBudgetPresentation } from './core-guard-visual-load-budget-rendering.js';
+import { coreGuardMixedAccentPhasePresentation } from './core-guard-mixed-accent-phase-rendering.js';
+import { coreGuardMultiCueStackBudget } from './core-guard-multi-cue-stack-budget-rendering.js';
+import { coreGuardDirectionalStackOwnership } from './core-guard-directional-stack-ownership-rendering.js';
+import { coreGuardPressureVectorOrientationPresentation } from './core-guard-pressure-vector-orientation-rendering.js';
+import { advanceCoreGuardPressureVectorHysteresis, createCoreGuardPressureVectorHysteresisState } from './core-guard-pressure-vector-hysteresis-rendering.js';
+import { advanceCoreGuardDamageSourceHysteresis, createCoreGuardDamageSourceHysteresisState } from './core-guard-damage-source-hysteresis-rendering.js';
 import { FREEZE_CONTROL_VFX_ATLAS, freezeControlVfxClassForEnemyType, freezeControlVfxSprite } from './freeze-control-vfx-assets.js';
 import { REGULAR_ENEMY_ACTION_VFX_ATLAS } from './regular-enemy-action-vfx-assets.js';
 import { ELITE_AFFIX_LIFECYCLE_VFX_ATLAS } from './elite-affix-lifecycle-vfx-assets.js';
@@ -186,6 +198,14 @@ import { bossHazardClearedGroundMemoryPresentation } from './boss-hazard-cleared
 import { bossClearedGroundGeometryPresentation } from './boss-cleared-ground-geometry-rendering.js';
 import { bossClearedSafeLaneArbitrationPresentation } from './boss-cleared-safe-lane-arbitration-rendering.js';
 import { bossClearedSafeLaneForecastTarget } from './boss-cleared-safe-lane-forecast-arbitration-rendering.js';
+import { safeLaneForecastVisualCoherencePresentation } from './safe-lane-forecast-visual-coherence-rendering.js';
+import { advanceSafeLaneForecastPromotionHysteresis, createSafeLaneForecastPromotionHysteresisState } from './safe-lane-forecast-promotion-hysteresis-rendering.js';
+import { safeLaneCombatAttentionBudgetPresentation } from './safe-lane-combat-attention-budget-rendering.js';
+import { advanceSafeLaneAttentionRecoveryHysteresis, createSafeLaneAttentionRecoveryHysteresisState, safeLaneAttentionRecoveryPresentation } from './safe-lane-attention-recovery-hysteresis-rendering.js';
+import { safeLaneIdentityOwnerArbitrationPresentation } from './safe-lane-identity-owner-arbitration-rendering.js';
+import { safeLaneHazardPathOcclusionPresentation } from './safe-lane-hazard-path-occlusion-rendering.js';
+import { safeLaneHazardPathGapPresentation } from './safe-lane-hazard-path-gap-rendering.js';
+import { advanceSafeLaneHazardOcclusionRecovery, createSafeLaneHazardOcclusionRecoveryState, safeLaneHazardOcclusionRecoveryPresentation } from './safe-lane-hazard-occlusion-recovery-rendering.js';
 import { ENEMY_FINISHER_VFX_ATLAS, enemyFinisherVfxSprite } from './enemy-finisher-vfx-assets.js';
 import { HERO_CRISIS_VFX_ATLAS, heroCrisisVfxSprite } from './hero-crisis-vfx-assets.js';
 import { PERFECT_EVADE_TRAIL_VFX_ATLAS, perfectEvadeTrailVfxSprite } from './perfect-evade-trail-vfx-assets.js';
@@ -563,8 +583,10 @@ export class Game {
     heroCastRenderCast = 0;
     heroCastRenderRecover = 0;
     heroCastCadenceState = { chain: 0, bridge: 0, pulse: 0 };
+    heroCastAimHoldState = createHeroCastAimHoldState();
     heroActionTransitionState = { hit: 0, cast: 0, evade: 0, bridge: 0, last: 'neutral' };
     heroUltimateBodyState = { kind: null, elapsed: 0 };
+    heroUltimateAimContinuityState = createHeroUltimateAimContinuityState();
     heroUltimateActionHandoffState = { normalCast: 0 };
     heroRenderKinematicState = createHeroKinematicRenderState();
     heroRenderHitRecoil = 0;
@@ -726,6 +748,10 @@ export class Game {
     survivalResponseVfxAtlasReady = false;
     survivalResponseVfx = [];
     survivalResponseLastAt = {};
+    coreGuardDamageSourceHysteresisState = createCoreGuardDamageSourceHysteresisState();
+    coreGuardDamageSourceLastAt = -99;
+    coreGuardPressureVectorHysteresisState = createCoreGuardPressureVectorHysteresisState();
+    coreGuardPressureVectorLastAt = -99;
     observedCoreHpForVfx = this.core.hp;
     freezeControlVfxAtlasImage = null;
     freezeControlVfxAtlasReady = false;
@@ -765,6 +791,11 @@ export class Game {
     bossHazardAftermathVfx = [];
     bossHazardClearedGroundMemory = [];
     currentMythicSafeLanePresentation = null;
+    safeLaneForecastPromotionHysteresisState = createSafeLaneForecastPromotionHysteresisState();
+    safeLaneAttentionRecoveryHysteresisState = createSafeLaneAttentionRecoveryHysteresisState();
+    safeLaneAttentionRecoveryLastAt = -99;
+    safeLaneHazardOcclusionRecoveryState = createSafeLaneHazardOcclusionRecoveryState();
+    safeLaneHazardOcclusionRecoveryLastAt = -99;
     enemyFinisherVfxAtlasImage = null;
     enemyFinisherVfxAtlasReady = false;
     enemyFinisherVfx = [];
@@ -2311,8 +2342,10 @@ export class Game {
         this.heroCastRenderCast = 0;
         this.heroCastRenderRecover = 0;
         this.heroCastCadenceState = { chain: 0, bridge: 0, pulse: 0 };
+        this.heroCastAimHoldState = createHeroCastAimHoldState();
         this.heroActionTransitionState = { hit: 0, cast: 0, evade: 0, bridge: 0, last: 'neutral' };
         this.heroUltimateBodyState = { kind: null, elapsed: 0 };
+        this.heroUltimateAimContinuityState = createHeroUltimateAimContinuityState();
         this.heroUltimateActionHandoffState = { normalCast: 0 };
         this.heroRenderKinematicState = createHeroKinematicRenderState(this.hero.facing);
         this.heroRenderHitRecoil = 0;
@@ -2320,6 +2353,10 @@ export class Game {
         this.heroLastRenderedBodyOffset = { x: 0, y: 0 };
         this.survivalResponseVfx = [];
         this.survivalResponseLastAt = {};
+        this.coreGuardDamageSourceHysteresisState = createCoreGuardDamageSourceHysteresisState();
+        this.coreGuardDamageSourceLastAt = -99;
+        this.coreGuardPressureVectorHysteresisState = createCoreGuardPressureVectorHysteresisState();
+        this.coreGuardPressureVectorLastAt = -99;
         this.observedCoreHpForVfx = this.core.hp;
         this.freezeShatterVfx = [];
         this.finalFormWorldVfx = [];
@@ -2331,6 +2368,11 @@ export class Game {
         this.bossHazardAftermathVfx = [];
         this.bossHazardClearedGroundMemory = [];
         this.currentMythicSafeLanePresentation = null;
+        this.safeLaneForecastPromotionHysteresisState = createSafeLaneForecastPromotionHysteresisState();
+        this.safeLaneAttentionRecoveryHysteresisState = createSafeLaneAttentionRecoveryHysteresisState();
+        this.safeLaneAttentionRecoveryLastAt = -99;
+        this.safeLaneHazardOcclusionRecoveryState = createSafeLaneHazardOcclusionRecoveryState();
+        this.safeLaneHazardOcclusionRecoveryLastAt = -99;
         this.enemyFinisherVfx = [];
         this.heroCrisisVfx = [];
         this.lastHeroCrisisHpRatio = 1;
@@ -2502,8 +2544,10 @@ export class Game {
         this.heroRenderHitRecoil = Math.max(0, this.heroRenderHitRecoil - dt / (this.presentationSettings.reducedMotion ? 0.09 : 0.14));
         this.heroCrisisGroundSettleState = advanceHeroCrisisGroundSettleState(this.heroCrisisGroundSettleState, null, dt, this.presentationSettings.reducedMotion);
         this.heroCastCadenceState = advanceHeroCastCadenceState(this.heroCastCadenceState, false, dt, this.presentationSettings.reducedMotion);
+        this.heroCastAimHoldState = advanceHeroCastAimHoldState(this.heroCastAimHoldState, null, dt, this.presentationSettings.reducedMotion);
         this.heroActionTransitionState = advanceHeroActionTransitionState(this.heroActionTransitionState, null, dt, this.presentationSettings.reducedMotion);
         this.heroUltimateBodyState = advanceHeroUltimateBodyState(this.heroUltimateBodyState, null, dt, this.presentationSettings.reducedMotion);
+        this.heroUltimateAimContinuityState = advanceHeroUltimateAimContinuityState(this.heroUltimateAimContinuityState, null, dt, this.presentationSettings.reducedMotion);
         this.heroUltimateActionHandoffState = advanceHeroUltimateActionHandoffState(this.heroUltimateActionHandoffState, false, dt, this.presentationSettings.reducedMotion);
         if (this.heroCastRenderCast > 0) {
             this.heroCastRenderCast = Math.max(0, this.heroCastRenderCast - dt / (this.presentationSettings.reducedMotion ? 0.2 : 0.24));
@@ -2728,14 +2772,14 @@ export class Game {
                 this.advanceHeroMeter(0, { preventedDamageRatio: Math.max(0, amount - applied) / Math.max(1, this.hero.maxHp) });
                 return applied;
             },
-            onCoreDamage: (amount, source = 'contact') => {
+            onCoreDamage: (amount, source = 'contact', origin) => {
                 const applied = amount * this.hero.equipmentCoreDamageTakenMultiplier * this.runCoreDamageTakenMultiplier * fateRewardMultipliers(this.fateRuntime.modifiers).coreDamageTakenMultiplier * catastropheMods.coreDamageMultiplier * contractMods.coreDamageTakenMultiplier * (edricAura ? combatBuild.edricCoreAuraMultiplier : 1);
                 this.core.hp = Math.max(0, this.core.hp - applied);
+                const prevented = Math.max(0, amount - applied), mitigationRatio = amount > 0 ? Math.max(0, Math.min(1, prevented / amount)) : 0;
                 if (applied > 0) {
                     this.frameEndlessEvents.push({ type: 'core_damaged', amount: applied });
-                    this.queueSurvivalResponseVfx('coreHit');
+                    this.queueSurvivalResponseVfx('coreHit', { mitigationRatio, damageSource: source, ...(origin ? { pressureVector: { x: this.core.pos.x - origin.x, y: this.core.pos.y - origin.y } } : {}) });
                 }
-                const prevented = Math.max(0, amount - applied);
                 if (prevented >= this.core.maxHp * .002)
                     this.queueSurvivalResponseVfx('coreGuard');
                 if (applied > 0 && this.onboarding.signal('core'))
@@ -3565,7 +3609,7 @@ export class Game {
         this.drawBossSpecialIntentCue(ctx);
         this.drawBossSafeResponseWindowConfirmation(ctx);
         // Preserve the residual-motion render contract: this.spells.render(ctx, residualMotion)
-        this.spells.render(ctx, residualMotion, this.battlefieldPropVfxAtlasImage, this.battlefieldPropVfxAtlasReady, this.heroProjectileVfxAtlasImage, this.heroProjectileVfxAtlasReady, this.heroSpellSignatureVfxAtlasImage, this.heroSpellSignatureVfxAtlasReady, this.heroUltimateSignatureVfxAtlasImage, this.heroUltimateSignatureVfxAtlasReady, this.persistentSpellZoneVfxAtlasImage, this.persistentSpellZoneVfxAtlasReady, this.crowdControlPropagationVfxAtlasImage, this.crowdControlPropagationVfxAtlasReady, this.presentationSettings.reducedFlash, this.ultimatePostImpactResidueVfxAtlasImage, this.ultimatePostImpactResidueVfxAtlasReady, this.presentationSettings.reducedMotion, this.presentation.quality);
+        this.spells.render(ctx, residualMotion, this.battlefieldPropVfxAtlasImage, this.battlefieldPropVfxAtlasReady, this.heroProjectileVfxAtlasImage, this.heroProjectileVfxAtlasReady, this.heroSpellSignatureVfxAtlasImage, this.heroSpellSignatureVfxAtlasReady, this.heroUltimateSignatureVfxAtlasImage, this.heroUltimateSignatureVfxAtlasReady, this.persistentSpellZoneVfxAtlasImage, this.persistentSpellZoneVfxAtlasReady, this.crowdControlPropagationVfxAtlasImage, this.crowdControlPropagationVfxAtlasReady, this.presentationSettings.reducedFlash, this.ultimatePostImpactResidueVfxAtlasImage, this.ultimatePostImpactResidueVfxAtlasReady, this.presentationSettings.reducedMotion, this.presentation.quality, this.enemies.projectileImpactLabelBlockers(this.presentation.quality, this.presentationSettings.reducedFlash));
         this.drawFinalFormWorldVfx(ctx);
         this.drawFusionWorldVfx(ctx);
         this.drawEnemyStatusCues(ctx, secondaryMotion);
@@ -3691,9 +3735,12 @@ export class Game {
             this.saveStoredOnboardingState();
         this.emitSpellCastVfx(action);
         this.heroCastCadenceState = advanceHeroCastCadenceState(this.heroCastCadenceState, true, 0, this.presentationSettings.reducedMotion);
+        this.heroCastAimHoldState = advanceHeroCastAimHoldState(this.heroCastAimHoldState, this.hero.facing, 0, this.presentationSettings.reducedMotion);
         this.heroActionTransitionState = advanceHeroActionTransitionState(this.heroActionTransitionState, 'cast', 0, this.presentationSettings.reducedMotion);
-        if (action === 'ultimate1' || action === 'ultimate2')
+        if (action === 'ultimate1' || action === 'ultimate2') {
             this.heroUltimateBodyState = advanceHeroUltimateBodyState(this.heroUltimateBodyState, action === 'ultimate1' ? 'meteorStorm' : 'blackHole', 0, this.presentationSettings.reducedMotion);
+            this.heroUltimateAimContinuityState = advanceHeroUltimateAimContinuityState(this.heroUltimateAimContinuityState, this.hero.facing, 0, this.presentationSettings.reducedMotion);
+        }
         const normalSpellHandoff = action === 'spell1' || action === 'spell2' || action === 'spell3' || action === 'spell4';
         const ultimateHandoffReset = action === 'ultimate1' || action === 'ultimate2';
         this.heroUltimateActionHandoffState = advanceHeroUltimateActionHandoffState(this.heroUltimateActionHandoffState, normalSpellHandoff, 0, this.presentationSettings.reducedMotion, ultimateHandoffReset);
@@ -4780,13 +4827,27 @@ export class Game {
             ctx.restore();
         }
     }
-    queueSurvivalResponseVfx(kind) {
+    queueSurvivalResponseVfx(kind, metadata) {
         const cooldown = kind === 'coreHit' || kind === 'coreGuard' || kind === 'heroGuard' ? .10 : .04, last = this.survivalResponseLastAt[kind] ?? -99;
         if (this.elapsed - last < cooldown)
             return;
         this.survivalResponseLastAt[kind] = this.elapsed;
         const target = kind.startsWith('core') ? this.core.pos : this.hero.pos, maxTtl = kind === 'coreHit' ? .34 : kind.includes('Guard') ? .42 : .52;
-        this.survivalResponseVfx.push({ kind, x: target.x, y: target.y, ttl: maxTtl, maxTtl });
+        let damageSource = metadata?.damageSource, mixedPressure = false, pressureVector = metadata?.pressureVector;
+        if (kind === 'coreHit' && damageSource) {
+            const delta = Math.max(0, this.elapsed - this.coreGuardDamageSourceLastAt);
+            this.coreGuardDamageSourceHysteresisState = advanceCoreGuardDamageSourceHysteresis(this.coreGuardDamageSourceHysteresisState, damageSource, delta);
+            this.coreGuardDamageSourceLastAt = this.elapsed;
+            damageSource = this.coreGuardDamageSourceHysteresisState.sourceClass;
+            mixedPressure = this.coreGuardDamageSourceHysteresisState.mixedPressure;
+        }
+        if (kind === 'coreHit' && pressureVector) {
+            const delta = Math.max(0, this.elapsed - this.coreGuardPressureVectorLastAt);
+            this.coreGuardPressureVectorHysteresisState = advanceCoreGuardPressureVectorHysteresis(this.coreGuardPressureVectorHysteresisState, pressureVector, delta, this.presentationSettings.reducedMotion);
+            this.coreGuardPressureVectorLastAt = this.elapsed;
+            pressureVector = this.coreGuardPressureVectorHysteresisState.vector ?? pressureVector;
+        }
+        this.survivalResponseVfx.push({ kind, x: target.x, y: target.y, ttl: maxTtl, maxTtl, ...(metadata?.mitigationRatio !== undefined ? { mitigationRatio: metadata.mitigationRatio } : {}), ...(damageSource ? { damageSource } : {}), ...(mixedPressure ? { mixedPressure: true } : {}), ...(pressureVector ? { pressureVector: { ...pressureVector } } : {}) });
         if (this.survivalResponseVfx.length > 12)
             this.survivalResponseVfx.splice(0, this.survivalResponseVfx.length - 12);
     }
@@ -4860,8 +4921,9 @@ export class Game {
         if (!this.survivalResponseVfxAtlasReady || !this.survivalResponseVfxAtlasImage)
             return;
         const worldCoreGuard = this.enemies.coreWorldGuardPresentationState();
-        for (const cue of this.survivalResponseVfx) {
-            let arbitrationAlphaScale = 1;
+        const coreHitCues = this.survivalResponseVfx.flatMap((cue, index) => cue.kind === 'coreHit' ? [{ id: index, ttl: cue.ttl, maxTtl: cue.maxTtl, pressureVector: cue.pressureVector }] : []), coreHitStack = coreGuardMultiCueStackBudget(coreHitCues, this.presentationSettings.reducedFlash), coreHitStackAlphaByIndex = new Map(coreHitStack.entries.map(entry => [entry.id, entry.alphaScale])), coreHitDirectional = coreGuardDirectionalStackOwnership(coreHitCues, this.presentationSettings.reducedFlash), coreHitDirectionalAlphaByIndex = new Map(coreHitDirectional.entries.map(entry => [entry.id, entry.accentAlphaScale]));
+        for (const [cueIndex, cue] of this.survivalResponseVfx.entries()) {
+            let arbitrationAlphaScale = 1, arbitrationSizeScale = 1;
             if (cue.kind === 'coreGuard') {
                 const arbitration = coreGuardSurvivalResponseArbitrationPresentation({ worldGuardStrength: worldCoreGuard.strength, worldGuardOwned: cue.worldGuardOwned ?? false, survivalTtl: cue.ttl, survivalMaxTtl: cue.maxTtl }, this.presentationSettings.reducedFlash);
                 cue.worldGuardOwned = arbitration.worldGuardOwned;
@@ -4869,11 +4931,48 @@ export class Game {
                 if (arbitrationAlphaScale <= 0)
                     continue;
             }
+            let sourceBody = null, sourceComposition = null;
+            if (cue.kind === 'coreHit') {
+                const arbitration = coreHitWorldGuardArbitrationPresentation({ worldGuardStrength: worldCoreGuard.strength, mitigationRatio: cue.mitigationRatio ?? 0, worldDamageOwned: cue.worldDamageOwned ?? false, hitTtl: cue.ttl, hitMaxTtl: cue.maxTtl }, this.presentationSettings.reducedFlash);
+                cue.worldDamageOwned = arbitration.worldDamageOwned;
+                arbitrationAlphaScale = arbitration.coreHitAlphaScale;
+                arbitrationSizeScale = arbitration.coreHitSizeScale;
+                sourceBody = coreGuardDamageSourceBodyLanguagePresentation({ source: cue.damageSource ?? 'contact', owner: arbitration.owner, mitigationRatio: cue.mitigationRatio ?? 0, ttl: cue.ttl, maxTtl: cue.maxTtl }, this.presentationSettings.reducedFlash);
+                sourceComposition = coreGuardMixedSourceCompositionPresentation({ sourceClass: sourceBody.sourceClass, mixedPressure: cue.mixedPressure ?? false, owner: arbitration.owner, ttl: cue.ttl, maxTtl: cue.maxTtl }, this.presentationSettings.reducedFlash);
+                const pressureOrientation = coreGuardPressureVectorOrientationPresentation({ pressureVector: cue.pressureVector });
+                const visualLoad = coreGuardVisualLoadBudgetPresentation({ coreHitAlphaScale: arbitrationAlphaScale, projectileAccentAlpha: sourceComposition.projectileAccentAlpha, contactAccentAlpha: sourceComposition.contactAccentAlpha, mitigationRatio: cue.mitigationRatio ?? 0, mixedPressure: cue.mixedPressure ?? false }, this.presentationSettings.reducedFlash), accentPhase = coreGuardMixedAccentPhasePresentation({ ttl: cue.ttl, maxTtl: cue.maxTtl, mixedPressure: cue.mixedPressure ?? false }, this.presentationSettings.reducedFlash);
+                arbitrationAlphaScale *= visualLoad.coreHitAlphaScale * (coreHitStackAlphaByIndex.get(cueIndex) ?? 1);
+                if (sourceBody.visible) {
+                    ctx.save();
+                    ctx.strokeStyle = '#8fffd3';
+                    ctx.lineWidth = 2.4;
+                    if (sourceComposition.projectileAccentAlpha > 0) {
+                        ctx.globalAlpha = sourceComposition.projectileAccentAlpha * visualLoad.accentAlphaScale * accentPhase.projectileAlphaScale * (coreHitDirectionalAlphaByIndex.get(cueIndex) ?? 1);
+                        ctx.save();
+                        ctx.translate(cue.x, cue.y);
+                        ctx.rotate(pressureOrientation.projectileLineAngle);
+                        ctx.beginPath();
+                        ctx.moveTo(-34 * accentPhase.projectileLengthScale, 0);
+                        ctx.lineTo(34 * accentPhase.projectileLengthScale, 0);
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+                    if (sourceComposition.contactAccentAlpha > 0) {
+                        ctx.globalAlpha = sourceComposition.contactAccentAlpha * visualLoad.accentAlphaScale * accentPhase.contactAlphaScale * (coreHitDirectionalAlphaByIndex.get(cueIndex) ?? 1);
+                        ctx.beginPath();
+                        ctx.arc(cue.x, cue.y, 31 * accentPhase.contactRadiusScale, pressureOrientation.contactArcStart, pressureOrientation.contactArcEnd);
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+                }
+                if (arbitrationAlphaScale <= 0)
+                    continue;
+            }
             const sprite = survivalResponseVfxSprite(cue.kind), t = Math.max(0, Math.min(1, cue.ttl / cue.maxTtl)), progress = 1 - t;
-            const base = cue.kind === 'coreRecover' ? 126 : cue.kind === 'coreHit' ? 118 : cue.kind === 'heroPotionBoost' ? 114 : cue.kind.includes('Guard') ? 104 : 98, size = base * (1 + progress * .18);
+            const base = cue.kind === 'coreRecover' ? 126 : cue.kind === 'coreHit' ? 118 : cue.kind === 'heroPotionBoost' ? 114 : cue.kind.includes('Guard') ? 104 : 98, size = base * (1 + progress * .18) * arbitrationSizeScale, drawW = size * (sourceComposition?.bodyScaleX ?? sourceBody?.bodyScaleX ?? 1), drawH = size * (sourceComposition?.bodyScaleY ?? sourceBody?.bodyScaleY ?? 1);
             ctx.save();
             ctx.globalAlpha = Math.min(this.presentationSettings.reducedFlash ? .48 : .82, t * (cue.kind === 'coreHit' ? .78 : .92)) * arbitrationAlphaScale;
-            ctx.drawImage(this.survivalResponseVfxAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, cue.x - size / 2, cue.y - size / 2, size, size);
+            ctx.drawImage(this.survivalResponseVfxAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, cue.x - drawW / 2, cue.y - drawH / 2, drawW, drawH);
             ctx.restore();
         }
     }
@@ -4929,7 +5028,8 @@ export class Game {
         const movementBlend = this.presentationSettings.reducedMotion ? 0 : this.heroRenderMotionBlend;
         const castCadence = heroCastCadencePresentation(this.heroCastCadenceState, this.heroCastRenderCast, this.heroCastRenderRecover, this.heroRenderKinematicState.speed, this.presentationSettings.reducedMotion);
         const actionTransition = heroActionTransitionPresentation(this.heroActionTransitionState, this.hero.facing.x, this.hero.facing.y, this.heroRenderKinematicState.speed, this.presentationSettings.reducedMotion);
-        const ultimateBody = heroUltimateBodyPresentation(this.heroUltimateBodyState, this.hero.facing.x, this.hero.facing.y, this.presentationSettings.reducedMotion);
+        const ultimateAim = heroUltimateAimContinuityPresentation(this.heroUltimateAimContinuityState, this.hero.facing.x, this.hero.facing.y, this.heroUltimateBodyState.kind !== null, this.heroUltimateBodyState.elapsed, this.presentationSettings.reducedMotion);
+        const ultimateBody = heroUltimateBodyPresentation(this.heroUltimateBodyState, ultimateAim.facingX, ultimateAim.facingY, this.presentationSettings.reducedMotion);
         const ultimateHandoff = heroUltimateActionHandoffPresentation(this.heroUltimateBodyState, this.heroUltimateActionHandoffState, this.heroRenderKinematicState.speed, this.presentationSettings.reducedMotion);
         const baseUltimatePoseScale = ultimateHandoff.ultimatePoseScale;
         const rawCastBlend = Math.max(castCadence.castBlend, actionTransition.castContinuity * 0.22, ultimateBody.windup * 0.28 * baseUltimatePoseScale, ultimateBody.release * 0.38 * baseUltimatePoseScale);
@@ -4943,7 +5043,8 @@ export class Game {
         const ultimateScaleY = 1 + (ultimateBody.scaleY - 1) * ultimatePoseScale;
         const recoveryBlend = castCadence.recoverBlend * (1 - actionTransition.recoverSuppression * transitionScale) * (1 - ultimateBody.castRecoverySuppression * ultimateHandoff.castRecoverySuppressionScale * motionBudget.ultimateScale);
         const kinematicPresentation = heroKinematicRenderPresentation(this.heroRenderKinematicState, this.presentationSettings.reducedMotion, castBlend);
-        const castOrientation = heroCastOrientationPresentation({ facingX: this.hero.facing.x, facingY: this.hero.facing.y, speed: this.heroRenderKinematicState.speed, turn: this.heroRenderKinematicState.turn, cast: castBlend, recover: recoveryBlend }, this.presentationSettings.reducedMotion);
+        const castAimHold = heroCastAimHoldPresentation(this.heroCastAimHoldState, this.hero.facing.x, this.hero.facing.y, castBlend, recoveryBlend, this.presentationSettings.reducedMotion);
+        const castOrientation = heroCastOrientationPresentation({ facingX: castAimHold.facingX, facingY: castAimHold.facingY, speed: this.heroRenderKinematicState.speed, turn: this.heroRenderKinematicState.turn, cast: castBlend, recover: recoveryBlend }, this.presentationSettings.reducedMotion);
         const { accelerationLean, turnAnticipation, decelerationSettle, castFocus } = kinematicPresentation;
         const hitRecoilScale = actionTransition.hitRecoilScale * motionBudget.hitScale;
         const hitRecoil = { ...baseHitRecoil, intensity: baseHitRecoil.intensity * motionBudget.hitScale, offsetX: baseHitRecoil.offsetX * hitRecoilScale, offsetY: baseHitRecoil.offsetY * hitRecoilScale, rotation: baseHitRecoil.rotation * hitRecoilScale, flashAlpha: baseHitRecoil.flashAlpha * (0.72 + hitRecoilScale * 0.28) };
@@ -6768,24 +6869,46 @@ export class Game {
             const pressureProjection = projectMythicSafeZonePressureEffects(boss.bossArchetype ?? 'inferno', safeZone, destroyedRatio);
             this.drawMythicSafeZonePressureHelpers(ctx, boss, pressureProjection, safeZoneLabelAnchor.x, safeZoneLabelAnchor.y + 4, lawActive);
         }
+        if (!safeLane) {
+            this.safeLaneForecastPromotionHysteresisState = createSafeLaneForecastPromotionHysteresisState();
+            this.safeLaneAttentionRecoveryHysteresisState = createSafeLaneAttentionRecoveryHysteresisState();
+            this.safeLaneAttentionRecoveryLastAt = this.elapsed;
+            this.safeLaneHazardOcclusionRecoveryState = createSafeLaneHazardOcclusionRecoveryState();
+            this.safeLaneHazardOcclusionRecoveryLastAt = this.elapsed;
+        }
         if (safeLane) {
+            const forecastDistance = forecast ? Math.hypot(forecast.nextTarget.x - forecast.currentTarget.x, forecast.nextTarget.y - forecast.currentTarget.y) : Infinity;
+            this.safeLaneForecastPromotionHysteresisState = advanceSafeLaneForecastPromotionHysteresis(this.safeLaneForecastPromotionHysteresisState, { hasForecast: Boolean(forecast), urgency: forecast?.urgency ?? 0, transitionMs: forecast?.transitionMs ?? 0, targetDistance: forecastDistance });
+            const safeLaneVisual = safeLaneForecastVisualCoherencePresentation({ currentTarget: safeLane.target, currentConfidence: safeLane.confidence, ...(forecast ? { nextTarget: forecast.nextTarget, forecastUrgency: forecast.urgency, transitionMs: forecast.transitionMs } : {}), promotionOwner: this.safeLaneForecastPromotionHysteresisState.owner }, this.presentationSettings.reducedFlash), safeLaneAttention = safeLaneCombatAttentionBudgetPresentation({ heroCritical: this.dangerState.heroCritical, coreCritical: this.dangerState.coreCritical, lawActive: Boolean(lawIdentity?.active) }, this.presentationSettings.reducedFlash), safeLaneAttentionTarget = this.dangerState.coreCritical ? 1 : this.dangerState.heroCritical ? .86 : lawIdentity?.active ? .72 : 0, safeLaneAttentionDt = this.safeLaneAttentionRecoveryLastAt < 0 ? 0 : Math.max(0, this.elapsed - this.safeLaneAttentionRecoveryLastAt);
+            this.safeLaneAttentionRecoveryHysteresisState = advanceSafeLaneAttentionRecoveryHysteresis(this.safeLaneAttentionRecoveryHysteresisState, safeLaneAttentionTarget, safeLaneAttentionDt, this.presentationSettings.reducedMotion);
+            this.safeLaneAttentionRecoveryLastAt = this.elapsed;
+            const safeLaneAttentionRecovery = safeLaneAttentionRecoveryPresentation(this.safeLaneAttentionRecoveryHysteresisState), safeLaneIdentity = safeLaneIdentityOwnerArbitrationPresentation({ lawActive: Boolean(lawIdentity?.active), lawIdAvailable: Boolean(lawIdentity && lawIdentity.lawId !== 'none'), mythic: Boolean(boss?.isMythic), directionVisible: Boolean(safeLaneVisual.directionVisible && safeLaneAttention.directionVisible && safeLaneAttentionRecovery.secondaryRecovered), attentionOwner: safeLaneAttention.identityOwner }), safeLaneVisualTarget = safeLaneVisual.target, safeLaneHazardOcclusion = safeLaneHazardPathOcclusionPresentation({ from: this.hero.pos, to: safeLaneVisualTarget, hazards: this.bossArena.hazards }, this.presentationSettings.reducedFlash), safeLanePathGap = safeLaneHazardPathGapPresentation({ from: this.hero.pos, to: safeLaneVisualTarget, hazards: this.bossArena.hazards }), safeLaneHazardRecoveryDt = this.safeLaneHazardOcclusionRecoveryLastAt < 0 ? 0 : Math.max(0, this.elapsed - this.safeLaneHazardOcclusionRecoveryLastAt);
+            this.safeLaneHazardOcclusionRecoveryState = advanceSafeLaneHazardOcclusionRecovery(this.safeLaneHazardOcclusionRecoveryState, { pathAlphaScale: safeLaneHazardOcclusion.pathAlphaScale, bridgeAlphaScale: safeLaneHazardOcclusion.bridgeAlphaScale }, safeLaneHazardRecoveryDt, this.presentationSettings.reducedMotion);
+            this.safeLaneHazardOcclusionRecoveryLastAt = this.elapsed;
+            const safeLaneHazardRecovery = safeLaneHazardOcclusionRecoveryPresentation(this.safeLaneHazardOcclusionRecoveryState);
+            const safeLaneBaseAlpha = (.26 + safeLane.confidence * .18) * safeLaneVisual.primaryAlphaScale * safeLaneAttention.primaryAlphaScale * safeLaneAttentionRecovery.recoveryAlphaScale;
             ctx.save();
-            ctx.globalAlpha = .26 + safeLane.confidence * .18;
+            ctx.globalAlpha = safeLaneBaseAlpha * safeLaneHazardRecovery.pathAlphaScale;
             ctx.strokeStyle = '#8fffd3';
             ctx.fillStyle = '#8fffd3';
             ctx.lineWidth = 2;
             ctx.setLineDash([7, 7]);
             ctx.beginPath();
-            ctx.moveTo(this.hero.pos.x, this.hero.pos.y);
-            ctx.lineTo(safeLane.target.x, safeLane.target.y);
+            for (const segment of safeLanePathGap.segments) {
+                ctx.moveTo(segment.from.x, segment.from.y);
+                ctx.lineTo(segment.to.x, segment.to.y);
+            }
             ctx.stroke();
             ctx.setLineDash([]);
-            ctx.beginPath();
-            ctx.arc(safeLane.target.x, safeLane.target.y, 14, 0, Math.PI * 2);
-            ctx.stroke();
-            this.drawMapSafeLaneTransitionVfx(ctx, safeLane);
-            if (forecast && forecast.urgency >= .65) {
-                ctx.globalAlpha = .18 + .22 * forecast.urgency;
+            if (safeLanePathGap.locatorVisible) {
+                ctx.globalAlpha = safeLaneBaseAlpha * safeLaneHazardOcclusion.locatorAlphaScale * safeLaneHazardRecovery.locatorAlphaScale;
+                ctx.beginPath();
+                ctx.arc(safeLaneVisualTarget.x, safeLaneVisualTarget.y, 14, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            this.drawMapSafeLaneTransitionVfx(ctx, safeLane, safeLaneVisualTarget, safeLaneVisual.arrivalAlphaScale * safeLaneAttention.arrivalAlphaScale * safeLaneHazardOcclusion.arrivalAlphaScale);
+            if (forecast && forecast.urgency >= .65 && safeLaneVisual.bridgeVisible) {
+                ctx.globalAlpha = (.18 + .22 * forecast.urgency) * safeLaneVisual.bridgeAlphaScale * safeLaneAttention.bridgeAlphaScale * safeLaneAttentionRecovery.bridgeRecoveryScale * safeLaneHazardRecovery.bridgeAlphaScale;
                 ctx.strokeStyle = '#7fd9ff';
                 ctx.setLineDash([4, 8]);
                 ctx.beginPath();
@@ -6796,26 +6919,26 @@ export class Game {
                 ctx.beginPath();
                 ctx.arc(forecast.nextTarget.x, forecast.nextTarget.y, 10, 0, Math.PI * 2);
                 ctx.stroke();
-                if (!this.dangerState.heroCritical && !this.dangerState.coreCritical && !lawIdentity?.active) {
+                if (!safeLaneVisual.handoffSettled && safeLaneIdentity.showDirectionIcon) {
                     const direction = safeZoneTransitionDirectionFromVector(forecast.nextTarget.x - forecast.currentTarget.x, forecast.nextTarget.y - forecast.currentTarget.y);
-                    this.drawSafeZoneTransitionDirectionIcon(ctx, direction, forecast.nextTarget.x + 16, forecast.nextTarget.y - 34, 20);
+                    this.drawSafeZoneTransitionDirectionIcon(ctx, direction, safeLaneVisualTarget.x + 16, safeLaneVisualTarget.y - 34, 20);
                 }
             }
-            ctx.globalAlpha = .78;
+            ctx.globalAlpha = .78 * safeLaneVisual.primaryAlphaScale * safeLaneAttention.primaryAlphaScale * safeLaneAttentionRecovery.recoveryAlphaScale;
             ctx.fillStyle = '#8fffd3';
             ctx.font = '800 10px system-ui';
             ctx.textAlign = 'center';
-            const forecastText = forecast ? ` · ${forecast.phase.toUpperCase()} ${(forecast.transitionMs / 1000).toFixed(1)}s` : '';
+            const forecastText = forecast && safeLaneVisual.forecastDetailVisible && safeLaneAttention.detailVisible && safeLaneAttentionRecovery.secondaryRecovered ? ` · ${forecast.phase.toUpperCase()} ${(forecast.transitionMs / 1000).toFixed(1)}s` : '';
             const timelineText = lawTimeline ? ` · ${lawTimeline.stage.toUpperCase()} ${(lawTimeline.decisionWindowMs / 1000).toFixed(1)}s${lawTimeline.hazardActivationMs !== null ? ` / H${(lawTimeline.hazardActivationMs / 1000).toFixed(1)}` : ''}${lawTimeline.lawStage !== 'none' ? ` / ${lawTimeline.label}` : ''}` : '';
             if (lawTimeline)
                 ctx.fillStyle = lawTimeline.accent;
-            if (lawTimeline?.lawStage === 'active' && lawIdentity && lawIdentity.lawId !== 'none')
-                this.drawMythicLastLawSafeLaneIcon(ctx, safeLane.target.x - 12, safeLane.target.y - 54, 24, lawIdentity.lawId);
-            if (boss?.isMythic)
-                this.drawMythicArenaGeometrySafeLaneIcon(ctx, boss, destroyedRatio, safeLane.target.x + 18, safeLane.target.y - 54, 24, Boolean(lawIdentity?.active));
-            ctx.fillText(`${safeLane.label}${forecastText}${timelineText}`, safeLane.target.x, safeLane.target.y - 20);
+            if (safeLaneIdentity.showLawIcon && lawTimeline?.lawStage === 'active' && lawIdentity && lawIdentity.lawId !== 'none')
+                this.drawMythicLastLawSafeLaneIcon(ctx, safeLaneVisualTarget.x - 12, safeLaneVisualTarget.y - 54, 24, lawIdentity.lawId);
+            if (safeLaneIdentity.showGeometryIcon && boss?.isMythic)
+                this.drawMythicArenaGeometrySafeLaneIcon(ctx, boss, destroyedRatio, safeLaneVisualTarget.x + 18, safeLaneVisualTarget.y - 54, 24, Boolean(lawIdentity?.active));
+            ctx.fillText(`${safeLane.label}${forecastText}${timelineText}`, safeLaneVisualTarget.x, safeLaneVisualTarget.y - 20);
             if (lawTimeline) {
-                const barW = 72, barX = safeLane.target.x - barW / 2, barY = safeLane.target.y - 14;
+                const barW = 72, barX = safeLaneVisualTarget.x - barW / 2, barY = safeLaneVisualTarget.y - 14;
                 ctx.globalAlpha = .34;
                 ctx.fillStyle = '#172b34';
                 ctx.fillRect(barX, barY, barW, 4);
@@ -7074,9 +7197,13 @@ export class Game {
         ctx.drawImage(this.safeZoneTransitionDirectionAtlasImage, icon.sx, icon.sy, icon.sw, icon.sh, x, y, size, size);
         ctx.restore();
     }
-    drawMapSafeLaneTransitionVfx(ctx, safeLane) {
+    /* Phase 2584~2586 source-contract continuity. Runtime rendering may promote an imminent forecast target, while the canonical gameplay safe-lane target remains unchanged:
+       const dx=safeLane.target.x-this.hero.pos.x,dy=safeLane.target.y-this.hero.pos.y; Math.atan2(dy,dx);
+       safeLane.target.x-arrivalSize/2; safeLane.target.y-arrivalSize/2; ctx.lineTo(safeLane.target.x, safeLane.target.y);
+    */
+    drawMapSafeLaneTransitionVfx(ctx, safeLane, safeLaneVisualTarget = safeLane.target, arrivalAlphaScale = 1) {
         if (this.mapSafeLaneTransitionVfxAtlasReady && this.mapSafeLaneTransitionVfxAtlasImage) {
-            const dx = safeLane.target.x - this.hero.pos.x, dy = safeLane.target.y - this.hero.pos.y;
+            const dx = safeLaneVisualTarget.x - this.hero.pos.x, dy = safeLaneVisualTarget.y - this.hero.pos.y;
             const angle = Math.atan2(dy, dx), distanceToTarget = Math.hypot(dx, dy);
             const transitionAlpha = this.presentationSettings.reducedFlash ? 0.24 : 0.44;
             const pathSprite = mapSafeLaneTransitionVfxSprite(this.terrain.currentLayout.id, 'path'), arrivalSprite = mapSafeLaneTransitionVfxSprite(this.terrain.currentLayout.id, 'arrival');
@@ -7091,8 +7218,8 @@ export class Game {
             }
             const arrivalSize = 86;
             ctx.save();
-            ctx.globalAlpha = transitionAlpha + .08;
-            ctx.drawImage(this.mapSafeLaneTransitionVfxAtlasImage, arrivalSprite.sx, arrivalSprite.sy, arrivalSprite.sw, arrivalSprite.sh, safeLane.target.x - arrivalSize / 2, safeLane.target.y - arrivalSize / 2, arrivalSize, arrivalSize);
+            ctx.globalAlpha = (transitionAlpha + .08) * Math.max(0, Math.min(1, arrivalAlphaScale));
+            ctx.drawImage(this.mapSafeLaneTransitionVfxAtlasImage, arrivalSprite.sx, arrivalSprite.sy, arrivalSprite.sw, arrivalSprite.sh, safeLaneVisualTarget.x - arrivalSize / 2, safeLaneVisualTarget.y - arrivalSize / 2, arrivalSize, arrivalSize);
             ctx.restore();
         }
     }

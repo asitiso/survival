@@ -61,3 +61,4 @@ export function secondaryImpactSplitLineageFor(state, pos) { let best, bestD = I
         bestD = d;
     }
 } return { key: best?.key ?? `unbound:${Math.floor(pos.x / 64)}:${Math.floor(pos.y / 64)}`, ttl: best?.ttl ?? 0, presentationOnly: true }; }
+export function secondaryImpactActiveLineageAnchorFor(state, key) { const entry = state.entries.find(candidate => !candidate.retired && candidate.key === key); return entry ? { key: entry.key, pos: { x: entry.x, y: entry.y }, ttl: entry.ttl, presentationOnly: true } : null; }

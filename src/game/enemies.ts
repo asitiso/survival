@@ -51,7 +51,9 @@ import { advanceBossSpecialRecoveryState, bossSpecialRecoveryPresentation, type 
 import { enemyHitStaggerPresentation, type EnemyDeathPose } from './enemy-hit-death-transition-rendering.js';
 import { advanceBossHeavyHitStaggerState, bossHeavyHitStaggerPresentation, type BossHeavyHitStaggerState } from './boss-heavy-hit-stagger-rendering.js';
 import { specialistAttackHitArbitrationPresentation } from './specialist-attack-hit-arbitration-rendering.js';
+import { specialistRecoveryHitHandoffPresentation } from './specialist-recovery-hit-handoff-rendering.js';
 import { bossStaggerSpecialRecoveryArbitrationPresentation } from './boss-stagger-special-recovery-arbitration-rendering.js';
+import { bossRecoveryStaggerHandoffPresentation } from './boss-recovery-stagger-handoff-rendering.js';
 import { specialistGroundContactOwnershipPresentation } from './specialist-ground-contact-ownership-rendering.js';
 import { bossGroundCueArbitrationPresentation } from './boss-ground-cue-arbitration-rendering.js';
 import { advanceBossGroundOriginRebaseState, bossGroundOriginRebasePresentation, type BossGroundOriginRebaseState } from './boss-ground-origin-rebase-rendering.js';
@@ -68,6 +70,7 @@ import { coreContactGuardMemoryPresentation } from './core-contact-guard-memory-
 import { advanceCoreMixedPressureGuardArbitration, coreMixedPressureGuardArbitrationPresentation, createCoreMixedPressureGuardArbitrationState, type CoreMixedPressureGuardArbitrationState } from './core-mixed-pressure-guard-arbitration-rendering.js';
 import { bossSpecialLaunchOriginPresentation } from './boss-special-launch-origin-rendering.js';
 import { characterGroundContactPresentation, characterHitRecoilPresentation } from './character-contact-recoil-rendering.js';
+import { characterMotionLayerBudgetPresentation } from './character-motion-layer-budget-rendering.js';
 
 export type EnemyType = 'grunt' | 'hound' | 'brute' | 'archer' | 'bomber' | 'shaman' | 'shieldbearer' | 'assassin' | 'siegeGolem' | 'nullifier' | 'golden' | 'elite' | 'boss';
 export type EnemyTarget = 'hero' | 'core';
@@ -165,7 +168,7 @@ export interface EnemyUpdateContext {
   core: GuardianCore;
   elapsed: number;
   onHeroDamage: (amount: number, source?: DamageReasonSource) => number | void;
-  onCoreDamage: (amount: number, source?: DamageReasonSource) => number | void;
+  onCoreDamage: (amount: number, source?: DamageReasonSource, origin?: Vec2) => number | void;
   enemySpeedMultiplier?: number;
   spawnPressureMultiplier?: number;
   eliteIntervalMultiplier?: number;
@@ -494,7 +497,7 @@ export class EnemyManager {
         const frenzyDamage = enemy.hp / Math.max(1, enemy.maxHp) <= 0.42 ? (enemy.lowHpDamageMultiplier ?? 1) : 1;
         // Legacy source continuity: if (enemy.target === 'core') ctx.onCoreDamage(...)
         if (enemy.target === 'core') {
-          const appliedResult=ctx.onCoreDamage(enemy.damage * frenzyDamage, 'contact');
+          const appliedResult=ctx.onCoreDamage(enemy.damage * frenzyDamage,'contact',enemy.pos);
           const rawDamage=enemy.damage * frenzyDamage;
           const applied=typeof appliedResult==='number'&&Number.isFinite(appliedResult)?Math.max(0,appliedResult):rawDamage;
           const preventionRatio=rawDamage>0?Math.max(0,Math.min(1,1-applied/rawDamage)):0;
@@ -629,6 +632,12 @@ export class EnemyManager {
     ctx.restore();
   }
 
+  projectileImpactLabelBlockers(presentationQuality:PresentationQuality='high',reducedFlash=false):Vec2[]{
+    const impactClusterInputs=[...this.archerProjectileImpactVfx.map((cue)=>({impact:cue.pos,incoming:cue.incoming,sourceClass:'archer' as const})),...this.bossProjectileImpactVfx.map((cue)=>({impact:cue.pos,incoming:cue.incoming,sourceClass:'boss' as const}))];
+    const impactClusters=projectileImpactClusters({impacts:impactClusterInputs,quality:presentationQuality,reducedFlash}),identityKeys=projectileImpactIdentityKeys(this.projectileImpactIdentityCoherence,impactClusters),heldCounts=impactClusters.map((cluster,index)=>projectileImpactHeldCount(this.projectileImpactCountHold,cluster,identityKeys[index]??null)),displayClusters=impactClusters.map((cluster,index)=>({...cluster,count:heldCounts[index]??cluster.count})),fallback=projectileImpactLabelPlacements({clusters:displayClusters,stamps:impactClusterInputs.map(entry=>entry.impact),width:LOGICAL_WIDTH,height:LOGICAL_HEIGHT}),placements=projectileImpactAnchoredPlacements(this.projectileImpactLabelAnchorHold,displayClusters,fallback,identityKeys);
+    return placements.filter((placement)=>placement.visible).map((placement)=>({...placement.pos}));
+  }
+
   renderProjectiles(ctx: CanvasRenderingContext2D, bossSpecialVfxAtlasImage: CanvasImageSource | null = null, bossSpecialVfxAtlasReady = false, battlefieldEnvironmentReactionVfxAtlasImage: CanvasImageSource | null = null, battlefieldEnvironmentReactionVfxAtlasReady = false, bossProjectileLifecycleVfxAtlasImage: CanvasImageSource | null = null, bossProjectileLifecycleVfxAtlasReady = false, presentationQuality: PresentationQuality = 'high', reducedFlash = false, reducedMotion = false): void {
     for (const projectile of this.projectiles) {
       const visualPos=projectile.visualLaunchOffset&&projectile.visualLaunchTtl!==undefined&&projectile.visualLaunchMaxTtl?rangedEnemyVisualLaunchPosition(projectile.pos,projectile.visualLaunchOffset,projectile.visualLaunchTtl,projectile.visualLaunchMaxTtl):projectile.pos;
@@ -753,11 +762,16 @@ export class EnemyManager {
       const hitRecoil={...baseHitRecoil,intensity:baseHitRecoil.intensity*genericRecoilScale,offsetX:baseHitRecoil.offsetX*genericRecoilScale,offsetY:baseHitRecoil.offsetY*genericRecoilScale,rotation:baseHitRecoil.rotation*genericRecoilScale,maxDisplacement:baseHitRecoil.maxDisplacement*genericRecoilScale};
       const enemyHitStagger=enemy.type!=='boss'?enemyHitStaggerPresentation(enemy.type,enemy.hitFlash,enemy.hitImpactTier??'normal',enemy.hitDirectionX??-renderFacingX,enemy.hitDirectionY??-renderFacingY,enemy.renderMotion,reducedMotion):null;
       const specialistAttackHitArbitration = isSpecialistEnemyType(enemy.type) ? specialistAttackHitArbitrationPresentation(enemy.type,{pullback:attackMotion.pullback,lunge:attackMotion.lunge,resolve:attackResolve.resolve,hitStagger:enemyHitStagger?.stagger??0,tier:enemy.hitImpactTier??'normal',fatal:false},reducedMotion) : null;
-      const attackScale=specialistAttackHitArbitration?.attackScale??1;
-      const attackResolveScale=specialistAttackHitArbitration?.attackResolveScale??1;
-      const hitStaggerScale=specialistAttackHitArbitration?.hitStaggerScale??1;
-      const bossStaggerScale=bossStaggerRecoveryArbitration?.staggerScale??1;
-      const recoveryScale=bossStaggerRecoveryArbitration?.recoveryScale??1;
+      const specialistRecoveryHandoff = isSpecialistEnemyType(enemy.type) ? specialistRecoveryHitHandoffPresentation({pullback:attackMotion.pullback,lunge:attackMotion.lunge,resolve:attackResolve.resolve,hitStagger:enemyHitStagger?.stagger??0,tier:enemy.hitImpactTier??'normal'},reducedMotion) : null;
+      const bossRecoveryStaggerHandoff = enemy.type==='boss' ? bossRecoveryStaggerHandoffPresentation({recovery:enemy.bossSpecialRecovery?.recovery??0,stagger:enemy.bossHeavyHitStagger?.stagger??0,tier:enemy.bossHeavyHitStagger?.tier??null,specialTimer:enemy.specialTimer??99},reducedMotion) : null;
+      const motionLayerBudget=(isSpecialistEnemyType(enemy.type)||enemy.type==='boss')?characterMotionLayerBudgetPresentation(enemy.type==='boss'?'boss':'specialist',{attack:isSpecialistEnemyType(enemy.type)?Math.max(attackMotion.pullback,attackMotion.lunge):0,recovery:enemy.type==='boss'?(enemy.bossSpecialRecovery?.recovery??0):attackResolve.resolve,hit:enemy.type==='boss'?(enemy.bossHeavyHitStagger?.stagger??0):(enemyHitStagger?.stagger??0),special:enemy.type==='boss'&&Number.isFinite(enemy.specialTimer)&&((enemy.specialTimer??99)>=0)&&((enemy.specialTimer??99)<=1.2)?Math.max(0,1-(enemy.specialTimer??0)/1.2):0},reducedMotion):null;
+      const attackScale=(specialistAttackHitArbitration?.attackScale??1)*(motionLayerBudget?.attackScale??1);
+      const attackResolveScale=(specialistAttackHitArbitration?.attackResolveScale??1)*(specialistRecoveryHandoff?.attackResolveScale??1)*(motionLayerBudget?.recoveryScale??1);
+      const baseHitStaggerScale=specialistAttackHitArbitration?.hitStaggerScale??1;
+      const hitStaggerScale=(specialistRecoveryHandoff?.owner==='hit'?Math.max(baseHitStaggerScale,specialistRecoveryHandoff.hitStaggerScale):baseHitStaggerScale*(specialistRecoveryHandoff?.hitStaggerScale??1))*(motionLayerBudget?.hitScale??1);
+      const baseBossStaggerScale=bossStaggerRecoveryArbitration?.staggerScale??1;
+      const bossStaggerScale=(bossRecoveryStaggerHandoff?.owner==='stagger'?Math.max(baseBossStaggerScale,bossRecoveryStaggerHandoff.staggerScale):baseBossStaggerScale*(bossRecoveryStaggerHandoff?.staggerScale??1))*(motionLayerBudget?.hitScale??1);
+      const recoveryScale=(bossStaggerRecoveryArbitration?.recoveryScale??1)*(bossRecoveryStaggerHandoff?.recoveryScale??1)*(motionLayerBudget?.recoveryScale??1);
       const attackPhaseScale = 1 + attackMotion.lunge * attackScale * 0.04 - attackMotion.pullback * attackScale * 0.02;
       const groundContact = characterGroundContactPresentation(enemy.radius, enemy.renderMotion?.motionBlend ?? 0, hitRecoil.intensity, renderFacingX, reducedMotion, renderWeight);
       const bossLocomotion = enemy.type === 'boss' ? bossLocomotionWeightPresentation(bossPhaseForRatio(enemy.hp / Math.max(1, enemy.maxHp)), enemy.renderMotion?.motionBlend ?? 0, enemy.renderMotion?.recovery ?? 0, enemy.renderMotion?.turn ?? 0, reducedMotion) : { phase:1 as const, turnWeight:1, settle:0, offsetY:0, rotation:0, showContactPulse:false, contactAlpha:0, contactRadius:0, shadowBoost:0 };
@@ -864,7 +878,8 @@ export class EnemyManager {
         ctx.stroke();
         ctx.restore();
       }
-      const dynamicSilhouette = motionPresentation.silhouetteAlpha > 0.02 && (enemy.type === 'elite' || enemy.type === 'boss' || isSpecialistEnemyType(enemy.type));
+      const recoverySilhouetteAlphaScale=(specialistRecoveryHandoff?.silhouetteAlphaScale??1)*(specialistRecoveryHandoff?.silhouetteReentryScale??1)*(bossRecoveryStaggerHandoff?.silhouetteAlphaScale??1)*(bossRecoveryStaggerHandoff?.silhouetteReentryScale??1);
+      const dynamicSilhouette = motionPresentation.silhouetteAlpha*recoverySilhouetteAlphaScale > 0.02 && (enemy.type === 'elite' || enemy.type === 'boss' || isSpecialistEnemyType(enemy.type));
       const specialistSignatureScale=specialistLocomotionOwnershipScale;
       const bossLocomotionScale=bossLocomotionOwnershipScale*bossGroundRebase.locomotionSettleScale;
       ctx.save();
@@ -882,7 +897,7 @@ export class EnemyManager {
       const recoilDisplacementGuard = hitRecoil.maxDisplacement;
       if (dynamicSilhouette) {
         ctx.save();
-        ctx.globalAlpha = motionPresentation.silhouetteAlpha;
+        ctx.globalAlpha = motionPresentation.silhouetteAlpha*recoverySilhouetteAlphaScale;
         ctx.translate(-(enemy.renderMotion?.facingX ?? 1) * (enemy.radius * 0.28 + 3 + recoilDisplacementGuard * 0.02), -(enemy.renderMotion?.facingY ?? 0) * (enemy.radius * 0.18 + 2));
         ctx.fillStyle = enemy.type === 'boss' ? 'rgba(255,125,140,.55)' : enemy.type === 'elite' ? 'rgba(255,222,120,.52)' : 'rgba(187,216,255,.45)';
         ctx.beginPath(); ctx.arc(0, 0, enemy.radius * 0.92, 0, Math.PI * 2); ctx.fill();
@@ -1338,7 +1353,7 @@ export class EnemyManager {
     const blastRadius = SPECIALIST_COMBAT_CONTRACT.bomberBlastRadius;
     this.queueRegularEnemyActionVfx('bomber','resolve',enemy.pos,0.42);
     if (distance(enemy.pos, ctx.hero.pos) <= blastRadius + ctx.hero.radius) ctx.onHeroDamage(enemy.damage, 'explosion');
-    if (distance(enemy.pos, ctx.core.pos) <= blastRadius + ctx.core.radius) ctx.onCoreDamage(enemy.damage);
+    if (distance(enemy.pos, ctx.core.pos) <= blastRadius + ctx.core.radius) ctx.onCoreDamage(enemy.damage, 'explosion', enemy.pos);
     enemy.alive = false;
   }
 
@@ -1401,7 +1416,7 @@ export class EnemyManager {
         const entryOffset=projectileImpactEntryOffset(p.visualLaunchOffset,p.visualLaunchTtl,p.visualLaunchMaxTtl,this.activeReducedMotion);
         let ordinaryImpactAlphaScale=1;
         if (p.target === 'core') {
-          const appliedResult=ctx.onCoreDamage(p.damage, 'projectile');
+          const appliedResult=ctx.onCoreDamage(p.damage, 'projectile', p.pos);
           const applied=typeof appliedResult==='number'&&Number.isFinite(appliedResult)?Math.max(0,appliedResult):p.damage;
           const preventionRatio=p.damage>0?Math.max(0,Math.min(1,1-applied/p.damage)):0;
           const maxTtl=.36,guard=coreProjectileGuardImpactHandoffPresentation({preventedRatio:preventionRatio,impactTtl:maxTtl,impactMaxTtl:maxTtl},false);

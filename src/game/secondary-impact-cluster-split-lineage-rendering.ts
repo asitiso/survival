@@ -12,3 +12,5 @@ export function advanceSecondaryImpactClusterSplitLineage(previous:SecondaryImpa
   return{entries,nextId};
 }
 export function secondaryImpactSplitLineageFor(state:SecondaryImpactClusterSplitLineageState,pos:Vec2){let best:SecondaryImpactSplitLineageEntry|undefined,bestD=Infinity;for(const entry of state.entries){if(entry.retired)continue;const d=Math.hypot(pos.x-entry.x,pos.y-entry.y);if(d<=LOOKUP_RADIUS&&d<bestD){best=entry;bestD=d;}}return{key:best?.key??`unbound:${Math.floor(pos.x/64)}:${Math.floor(pos.y/64)}`,ttl:best?.ttl??0,presentationOnly:true as const};}
+
+export function secondaryImpactActiveLineageAnchorFor(state:SecondaryImpactClusterSplitLineageState,key:string){const entry=state.entries.find(candidate=>!candidate.retired&&candidate.key===key);return entry?{key:entry.key,pos:{x:entry.x,y:entry.y},ttl:entry.ttl,presentationOnly:true as const}:null;}

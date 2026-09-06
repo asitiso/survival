@@ -1,5 +1,5 @@
 import { distance, normalize, type Vec2 } from '../core/math.js';
-import type { ActionId } from './config.js';
+import { LOGICAL_HEIGHT, LOGICAL_WIDTH, type ActionId } from './config.js';
 import type { GuardianCore, Hero } from './entities.js';
 import { heroSpellIdentity } from './hero-spells.js';
 import { spellEvolution } from './spell-evolutions.js';
@@ -29,7 +29,17 @@ import { projectileMultiHitImpactHandoff } from './projectile-multihit-impact-re
 import { secondaryImpactCanonicalPresentation, type SecondaryImpactKind } from './secondary-impact-canonical-rendering.js';
 import { secondaryImpactClusterReadabilityBudgetPresentation } from './secondary-impact-cluster-readability-budget-rendering.js';
 import { advanceSecondaryImpactClusterIdentityHold, createSecondaryImpactClusterIdentityHoldState, secondaryImpactClusterIdentityFor, type SecondaryImpactClusterIdentityHoldState } from './secondary-impact-cluster-identity-hold-rendering.js';
-import { advanceSecondaryImpactClusterSplitLineage, createSecondaryImpactClusterSplitLineageState, secondaryImpactSplitLineageFor, type SecondaryImpactClusterSplitLineageState } from './secondary-impact-cluster-split-lineage-rendering.js';
+import { advanceSecondaryImpactClusterSplitLineage, createSecondaryImpactClusterSplitLineageState, secondaryImpactActiveLineageAnchorFor, secondaryImpactSplitLineageFor, type SecondaryImpactClusterSplitLineageState } from './secondary-impact-cluster-split-lineage-rendering.js';
+import { secondaryImpactLineageLabelPresentation } from './secondary-impact-lineage-label-anchor-rendering.js';
+import { secondaryImpactLineageLabelPlacement } from './secondary-impact-lineage-label-placement-rendering.js';
+import { advanceSecondaryImpactLineageLabelPlacementHold, secondaryImpactLineageHeldPlacement, type SecondaryImpactLineageLabelPlacementHoldEntry } from './secondary-impact-lineage-label-placement-hold-rendering.js';
+import { secondaryImpactLineageLabelPriorityOrder } from './secondary-impact-lineage-label-priority-rendering.js';
+import { secondaryImpactLineageLabelEdgeBias } from './secondary-impact-lineage-label-edge-bias-rendering.js';
+import { secondaryImpactLineageLabelConnectorPresentation } from './secondary-impact-lineage-label-connector-rendering.js';
+import { secondaryImpactLineageLabelConnectorCapacityBudget } from './secondary-impact-lineage-label-connector-capacity-budget-rendering.js';
+import { secondaryImpactLineageLabelMotionSettle, type SecondaryImpactLineageLabelMotionEntry } from './secondary-impact-lineage-label-motion-settle-rendering.js';
+import { secondaryImpactLineageLabelCountEmphasis, type SecondaryImpactLineageLabelCountMemoryEntry } from './secondary-impact-lineage-label-count-emphasis-rendering.js';
+import { secondaryImpactLineageLabelCapacityBudget } from './secondary-impact-lineage-label-capacity-budget-rendering.js';
 
 export type SpellId = 'fireBolt' | 'chainLightning' | 'frostNova' | 'flameField' | 'meteorStorm' | 'blackHole';
 
@@ -223,6 +233,9 @@ export class SpellSystem {
   private projectileImpactVisuals: ProjectileImpactVisual[] = [];
   private secondaryImpactClusterIdentityHold: SecondaryImpactClusterIdentityHoldState = createSecondaryImpactClusterIdentityHoldState();
   private secondaryImpactClusterSplitLineage: SecondaryImpactClusterSplitLineageState = createSecondaryImpactClusterSplitLineageState();
+  private secondaryImpactLineageLabelPlacementHold:SecondaryImpactLineageLabelPlacementHoldEntry[]=[];
+  private secondaryImpactLineageLabelMotionMemory:SecondaryImpactLineageLabelMotionEntry[]=[];
+  private secondaryImpactLineageLabelCountMemory:SecondaryImpactLineageLabelCountMemoryEntry[]=[];
   private persistentZoneExpireVfx: Array<{heroId:HeroId;kind:'flameField'|'blackHole';pos:Vec2;radius:number;ttl:number;maxTtl:number}> = [];
   private ultimatePostImpactResidues: Array<{heroId:HeroId;kind:UltimatePostImpactResidueVfxKind;pos:Vec2;radius:number;ttl:number;maxTtl:number}> = [];
 
@@ -238,6 +251,9 @@ export class SpellSystem {
     this.projectileImpactVisuals = [];
     this.secondaryImpactClusterIdentityHold = createSecondaryImpactClusterIdentityHoldState();
     this.secondaryImpactClusterSplitLineage = createSecondaryImpactClusterSplitLineageState();
+    this.secondaryImpactLineageLabelPlacementHold=[];
+    this.secondaryImpactLineageLabelMotionMemory=[];
+    this.secondaryImpactLineageLabelCountMemory=[];
     this.persistentZoneExpireVfx = [];
     this.ultimatePostImpactResidues = [];
   }
@@ -258,6 +274,7 @@ export class SpellSystem {
     this.projectileImpactVisuals = this.projectileImpactVisuals.filter((v) => v.ttl > 0);
     this.secondaryImpactClusterIdentityHold = advanceSecondaryImpactClusterIdentityHold(this.secondaryImpactClusterIdentityHold,this.projectileImpactVisuals.filter((impact)=>impact.secondaryKind!==undefined).map((impact)=>({pos:impact.pos})),dt);
     this.secondaryImpactClusterSplitLineage = advanceSecondaryImpactClusterSplitLineage(this.secondaryImpactClusterSplitLineage,this.projectileImpactVisuals.filter((impact)=>impact.secondaryKind!==undefined).map((impact)=>({pos:impact.pos})),dt);
+    this.secondaryImpactLineageLabelPlacementHold=advanceSecondaryImpactLineageLabelPlacementHold(this.secondaryImpactLineageLabelPlacementHold,dt);
     this.persistentZoneExpireVfx = this.persistentZoneExpireVfx.filter((v)=>v.ttl>0);
     this.ultimatePostImpactResidues = this.ultimatePostImpactResidues.filter((v)=>v.ttl>0);
   }
@@ -301,7 +318,7 @@ export class SpellSystem {
 
   get hasActiveBlackHole(): boolean { return this.holes.length > 0; }
 
-  render(ctx: CanvasRenderingContext2D, motion?: ResidualCombatMotionPolicy, propVfxAtlasImage?: HTMLImageElement | null, propVfxAtlasReady = false, heroProjectileAtlasImage?: HTMLImageElement | null, heroProjectileAtlasReady = false, heroSpellSignatureAtlasImage?: HTMLImageElement | null, heroSpellSignatureAtlasReady = false, ultimateSignatureAtlasImage?: HTMLImageElement | null, ultimateSignatureAtlasReady = false, persistentSpellZoneVfxAtlasImage?: HTMLImageElement | null, persistentSpellZoneVfxAtlasReady = false, crowdControlPropagationVfxAtlasImage?: HTMLImageElement | null, crowdControlPropagationVfxAtlasReady = false, reducedFlash = false, ultimatePostImpactResidueVfxAtlasImage?: HTMLImageElement | null, ultimatePostImpactResidueVfxAtlasReady = false, reducedMotion = false, presentationQuality: PresentationQuality = 'high'): void {
+  render(ctx: CanvasRenderingContext2D, motion?: ResidualCombatMotionPolicy, propVfxAtlasImage?: HTMLImageElement | null, propVfxAtlasReady = false, heroProjectileAtlasImage?: HTMLImageElement | null, heroProjectileAtlasReady = false, heroSpellSignatureAtlasImage?: HTMLImageElement | null, heroSpellSignatureAtlasReady = false, ultimateSignatureAtlasImage?: HTMLImageElement | null, ultimateSignatureAtlasReady = false, persistentSpellZoneVfxAtlasImage?: HTMLImageElement | null, persistentSpellZoneVfxAtlasReady = false, crowdControlPropagationVfxAtlasImage?: HTMLImageElement | null, crowdControlPropagationVfxAtlasReady = false, reducedFlash = false, ultimatePostImpactResidueVfxAtlasImage?: HTMLImageElement | null, ultimatePostImpactResidueVfxAtlasReady = false, reducedMotion = false, presentationQuality: PresentationQuality = 'high', primaryProjectileLabelBlockers:readonly Vec2[]=[]): void {
     const drawVfxStamp = (id: 'fireBolt' | 'chainLightning' | 'frostNova' | 'flameField' | 'meteorStorm' | 'blackHole', x: number, y: number, size: number, alpha: number): void => {
       if (!propVfxAtlasReady || !propVfxAtlasImage || alpha <= 0 || size <= 0) return;
       const sprite = battlefieldSpellVfxSprite(id);
@@ -426,10 +443,14 @@ export class SpellSystem {
 
     if (heroProjectileAtlasReady && heroProjectileAtlasImage) {
       const secondaryImpacts=this.projectileImpactVisuals.filter((impact)=>impact.secondaryKind!==undefined);
-      const secondaryBudget=secondaryImpactClusterReadabilityBudgetPresentation(secondaryImpacts.map((impact)=>{const identity=secondaryImpactClusterIdentityFor(this.secondaryImpactClusterIdentityHold,impact.pos),lineage=secondaryImpactSplitLineageFor(this.secondaryImpactClusterSplitLineage,impact.pos),lineageKey=lineage.key;return{pos:impact.pos,ttl:impact.ttl,maxTtl:impact.maxTtl,stableClusterKey:lineageKey,heldCount:identity.heldCount};}),presentationQuality,reducedFlash);
+      const secondaryMetadata=secondaryImpacts.map((impact)=>{const identity=secondaryImpactClusterIdentityFor(this.secondaryImpactClusterIdentityHold,impact.pos),lineage=secondaryImpactSplitLineageFor(this.secondaryImpactClusterSplitLineage,impact.pos);return{impact,lineageKey:lineage.key,heldCount:identity.heldCount};});
+      const secondaryBudget=secondaryImpactClusterReadabilityBudgetPresentation(secondaryMetadata.map(({impact,lineageKey,heldCount})=>({pos:impact.pos,ttl:impact.ttl,maxTtl:impact.maxTtl,stableClusterKey:lineageKey,heldCount})),presentationQuality,reducedFlash);
+      const secondaryLineageLabels=new Map<string,{heldCount:number;ttl:number;maxTtl:number;budgetVisible:boolean}>();
       let secondaryIndex=0;
       for (const impact of this.projectileImpactVisuals) {
-        const budget=impact.secondaryKind!==undefined?secondaryBudget[secondaryIndex++]:null;if(budget&&!budget.visible)continue;
+        const metadata=impact.secondaryKind!==undefined?secondaryMetadata[secondaryIndex]:null,budget=impact.secondaryKind!==undefined?secondaryBudget[secondaryIndex++]:null;
+        if(metadata){const prior=secondaryLineageLabels.get(metadata.lineageKey);secondaryLineageLabels.set(metadata.lineageKey,{heldCount:Math.max(prior?.heldCount??0,metadata.heldCount),ttl:Math.max(prior?.ttl??0,impact.ttl),maxTtl:Math.max(prior?.maxTtl??0,impact.maxTtl),budgetVisible:Boolean(prior?.budgetVisible)||Boolean(budget?.visible)});}
+        if(budget&&!budget.visible)continue;
         const sprite = heroProjectileImpactVfxSprite(impact.heroId);
         const progress = 1 - Math.max(0, impact.ttl / impact.maxTtl);
         const size = impact.size * (0.72 + progress * 0.5) * (budget?.sizeScale??1);
@@ -438,6 +459,8 @@ export class SpellSystem {
         ctx.drawImage(heroProjectileAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, impactVisualPos.x - size / 2, impactVisualPos.y - size / 2, size, size);
         ctx.restore();
       }
+      const secondaryOccupied:Vec2[]=[],secondaryPriority=secondaryImpactLineageLabelPriorityOrder([...secondaryLineageLabels].map(([lineageKey,meta])=>({lineageKey,heldCount:meta.heldCount,ttl:meta.ttl,budgetVisible:meta.budgetVisible}))),secondaryCapacity=secondaryImpactLineageLabelCapacityBudget(secondaryPriority.map(entry=>entry.lineageKey),presentationQuality),secondaryCapacityKeys=new Set(secondaryCapacity.visibleLineageKeys),secondaryConnectorCapacity=secondaryImpactLineageLabelConnectorCapacityBudget(presentationQuality);let secondaryConnectorCount=0;
+      for(const priority of secondaryPriority){if(!secondaryCapacityKeys.has(priority.lineageKey))continue;const lineageKey=priority.lineageKey,labelMeta=secondaryLineageLabels.get(lineageKey)!;const anchor=secondaryImpactActiveLineageAnchorFor(this.secondaryImpactClusterSplitLineage,lineageKey),label=secondaryImpactLineageLabelPresentation({lineageKey,anchor:anchor?.pos,heldCount:labelMeta.heldCount,ttl:labelMeta.ttl,maxTtl:labelMeta.maxTtl,budgetVisible:labelMeta.budgetVisible},reducedFlash);if(!label.visible||!anchor)continue;const fallbackPlacement=secondaryImpactLineageLabelPlacement({anchor:anchor.pos,blockers:primaryProjectileLabelBlockers,occupied:secondaryOccupied,width:LOGICAL_WIDTH,height:LOGICAL_HEIGHT}),held=secondaryImpactLineageHeldPlacement(this.secondaryImpactLineageLabelPlacementHold,lineageKey,fallbackPlacement,primaryProjectileLabelBlockers,secondaryOccupied,LOGICAL_WIDTH,LOGICAL_HEIGHT);this.secondaryImpactLineageLabelPlacementHold=held.memory;const placement=held.placement;if(!placement.visible){const retired=secondaryImpactLineageLabelMotionSettle(this.secondaryImpactLineageLabelMotionMemory,lineageKey,placement.pos,false,reducedMotion);this.secondaryImpactLineageLabelMotionMemory=retired.memory;continue;}const edgeBiased=secondaryImpactLineageLabelEdgeBias({pos:placement.pos,blockers:primaryProjectileLabelBlockers,occupied:secondaryOccupied,width:LOGICAL_WIDTH,height:LOGICAL_HEIGHT});const settled=secondaryImpactLineageLabelMotionSettle(this.secondaryImpactLineageLabelMotionMemory,lineageKey,edgeBiased.pos,true,reducedMotion);this.secondaryImpactLineageLabelMotionMemory=settled.memory;const connector=secondaryImpactLineageLabelConnectorPresentation({anchor:anchor.pos,labelPos:settled.presentation.pos,visible:settled.presentation.visible,biasApplied:edgeBiased.biasApplied,settled:settled.presentation.settled},reducedFlash);if(connector.visible&&secondaryConnectorCount<secondaryConnectorCapacity.maxVisible){secondaryConnectorCount++;ctx.save();ctx.globalAlpha=connector.alpha;ctx.strokeStyle='#bcecff';ctx.lineWidth=connector.lineWidth;ctx.beginPath();ctx.moveTo(connector.from.x,connector.from.y);ctx.lineTo(connector.to.x,connector.to.y);ctx.stroke();ctx.restore();}const emphasis=secondaryImpactLineageLabelCountEmphasis(this.secondaryImpactLineageLabelCountMemory,lineageKey,labelMeta.heldCount,true,reducedFlash);this.secondaryImpactLineageLabelCountMemory=emphasis.memory;const renderPos=settled.presentation.pos;secondaryOccupied.push(renderPos);ctx.save();ctx.globalAlpha=label.alpha;ctx.fillStyle='#f7f4ff';ctx.font='800 10px system-ui';ctx.textAlign='center';ctx.shadowColor='rgba(16,10,28,.82)';ctx.shadowBlur=5;ctx.translate(renderPos.x,renderPos.y);ctx.scale(emphasis.presentation.scale,emphasis.presentation.scale);ctx.fillText(label.text,0,0);ctx.restore();}
     }
 
     for (const arc of this.arcs) {

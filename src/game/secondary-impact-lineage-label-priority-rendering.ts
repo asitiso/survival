@@ -1,0 +1,2 @@
+export interface SecondaryImpactLineageLabelPriorityInput{lineageKey:string;heldCount:number;ttl:number;budgetVisible:boolean;}
+export function secondaryImpactLineageLabelPriorityOrder(input:readonly SecondaryImpactLineageLabelPriorityInput[]):SecondaryImpactLineageLabelPriorityInput[]{return input.filter(entry=>entry.budgetVisible&&entry.heldCount>1&&entry.ttl>0).map(entry=>({...entry})).sort((a,b)=>b.heldCount-a.heldCount||b.ttl-a.ttl||a.lineageKey.localeCompare(b.lineageKey));}

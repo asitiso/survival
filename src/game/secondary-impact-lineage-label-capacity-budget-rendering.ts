@@ -1,0 +1,2 @@
+export type SecondaryImpactLabelCapacityQuality='low'|'medium'|'high';
+export function secondaryImpactLineageLabelCapacityBudget(prioritizedLineageKeys:readonly string[],quality:SecondaryImpactLabelCapacityQuality){const maxVisible=quality==='high'?4:quality==='medium'?3:2,visibleLineageKeys=prioritizedLineageKeys.slice(0,maxVisible);return{maxVisible,visibleLineageKeys,presentationOnly:true as const};}

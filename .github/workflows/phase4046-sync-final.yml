@@ -36,3 +36,4 @@ jobs:
           git add -A
           git commit -m 'Sync verified local Phase 4046 source'
           git push origin main
+# exact split segment fix staged

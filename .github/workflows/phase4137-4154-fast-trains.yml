@@ -23,5 +23,5 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-      - name: Run Phase 4137-4154 fast trains v2
-        run: python3 .github/phase4137-4154-fast-v2.py
+      - name: Run Phase 4137-4154 fast trains v3
+        run: python3 .github/phase4137-4154-fast-v3.py

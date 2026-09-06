@@ -1,0 +1,23 @@
+name: Phase 4065-4070 Fast Train
+
+on:
+  push:
+    branches:
+      - work/phase4065-4070-fast
+
+permissions:
+  contents: read
+
+jobs:
+  tdd:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - run: node --test tests/phase4065-4070-battlefield-threat-priority.test.mjs

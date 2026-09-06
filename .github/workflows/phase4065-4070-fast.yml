@@ -1,4 +1,4 @@
-name: Phase 4065-4070 Fast Train
+name: Phase 4065-4076 Fast Train
 
 on:
   push:
@@ -20,4 +20,7 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm run build
-      - run: node --test tests/phase4065-4070-battlefield-threat-priority.test.mjs
+      - run: |
+          node --test \
+            tests/phase4065-4070-battlefield-threat-priority.test.mjs \
+            tests/phase4071-4076-battlefield-spatial-priority.test.mjs

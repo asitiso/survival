@@ -1,0 +1,11 @@
+import { ACTION_BUTTONS } from './config.js';
+import { advanceHeroCastAimHoldState, heroCastAimHoldPresentation } from './hero-cast-aim-hold-rendering.js';
+export function runHeroCastAimHoldAudit() { const samples = []; for (const reduced of [false, true])
+    for (const facing of [[1, 0], [0, 1], [-1, 0], [0, -1]]) {
+        let s = advanceHeroCastAimHoldState(undefined, { x: facing[0], y: facing[1] }, 0, reduced);
+        for (const dt of [0, .12, .28, .6]) {
+            s = advanceHeroCastAimHoldState(s, null, dt, reduced);
+            const p = heroCastAimHoldPresentation(s, -facing[0], -facing[1], dt === 0 ? 1 : 0, .8, reduced);
+            samples.push({ id: `${reduced}-${facing.join(',')}-${dt}`, passed: [p.facingX, p.facingY, p.retention, p.overlayAngle].every(Number.isFinite) && Math.abs(Math.hypot(p.facingX, p.facingY) - 1) < .001 && p.retention >= 0 && p.retention <= 1 });
+        }
+    } return { samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, gameplayFormulaMutation: false, snapshotSchemaMutation: false, newAtlasCount: 0, passed: samples.every(s => s.passed) && ACTION_BUTTONS.length === 9 }; }

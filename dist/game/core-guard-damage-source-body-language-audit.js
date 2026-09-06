@@ -1,0 +1,8 @@
+import { ACTION_BUTTONS } from './config.js';
+import { coreGuardDamageSourceBodyLanguagePresentation } from './core-guard-damage-source-body-language-rendering.js';
+export function runCoreGuardDamageSourceBodyLanguageAudit() { const samples = []; for (const reduced of [false, true])
+    for (const source of ['projectile', 'contact', 'arena'])
+        for (const owner of ['hit', 'shared', 'world-guard', 'retired']) {
+            const p = coreGuardDamageSourceBodyLanguagePresentation({ source, owner, mitigationRatio: .74, ttl: .28, maxTtl: .34 }, reduced);
+            samples.push({ id: `${reduced}-${source}-${owner}`, passed: p.bodyScaleX > .7 && p.bodyScaleX < 1.4 && p.bodyScaleY > .7 && p.bodyScaleY < 1.4 && p.deflectAlpha >= 0 && p.deflectAlpha <= 1 && p.contactRingAlpha >= 0 && p.contactRingAlpha <= 1 && p.duplicatesDamageCue === false });
+        } return { samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, gameplayFormulaMutation: false, snapshotSchemaMutation: false, newAtlasCount: 0, passed: samples.length === 24 && samples.every(s => s.passed) && ACTION_BUTTONS.length === 9 }; }

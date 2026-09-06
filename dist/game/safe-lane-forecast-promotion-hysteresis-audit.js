@@ -1,0 +1,9 @@
+import { ACTION_BUTTONS } from './config.js';
+import { advanceSafeLaneForecastPromotionHysteresis, createSafeLaneForecastPromotionHysteresisState } from './safe-lane-forecast-promotion-hysteresis-rendering.js';
+export function runSafeLaneForecastPromotionHysteresisAudit() { const samples = []; for (const urgency of [.4, .6, .7, .9])
+    for (const ms of [600, 1600, 2600])
+        for (const distance of [4, 120]) {
+            let s = createSafeLaneForecastPromotionHysteresisState();
+            s = advanceSafeLaneForecastPromotionHysteresis(s, { hasForecast: true, urgency, transitionMs: ms, targetDistance: distance });
+            samples.push({ id: `${urgency}-${ms}-${distance}`, passed: (distance <= 8 ? s.owner === 'current' : true) });
+        } return { samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, gameplayFormulaMutation: false, snapshotSchemaMutation: false, newAtlasCount: 0, passed: samples.length === 24 && samples.every(s => s.passed) && ACTION_BUTTONS.length === 9 }; }

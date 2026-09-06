@@ -1,0 +1,1 @@
+export function secondaryImpactLineageLabelConnectorCapacityBudget(quality = 'high') { const maxVisible = quality === 'low' ? 1 : 2; return { quality, maxVisible, hidesLabels: false, presentationOnly: true }; }

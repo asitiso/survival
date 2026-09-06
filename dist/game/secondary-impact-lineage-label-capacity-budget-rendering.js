@@ -1,0 +1,1 @@
+export function secondaryImpactLineageLabelCapacityBudget(prioritizedLineageKeys, quality) { const maxVisible = quality === 'high' ? 4 : quality === 'medium' ? 3 : 2, visibleLineageKeys = prioritizedLineageKeys.slice(0, maxVisible); return { maxVisible, visibleLineageKeys, presentationOnly: true }; }

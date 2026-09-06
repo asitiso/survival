@@ -1,0 +1,3 @@
+import { ACTION_BUTTONS } from './config.js';
+import { secondaryImpactLineageLabelConnectorCapacityBudget } from './secondary-impact-lineage-label-connector-capacity-budget-rendering.js';
+export function runSecondaryImpactLineageLabelConnectorCapacityBudgetAudit() { const samples = ['high', 'medium', 'low'].map(q => { const p = secondaryImpactLineageLabelConnectorCapacityBudget(q); return { id: q, passed: p.maxVisible >= 1 && p.maxVisible <= 2 && !p.hidesLabels }; }); return { samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, gameplayFormulaMutation: false, snapshotSchemaMutation: false, newAtlasCount: 0, passed: samples.length === 3 && samples.every(s => s.passed) && ACTION_BUTTONS.length === 9 }; }

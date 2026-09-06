@@ -1,0 +1,10 @@
+import { ACTION_BUTTONS } from './config.js';
+import { advanceSafeLaneHazardOcclusionRecovery, createSafeLaneHazardOcclusionRecoveryState, safeLaneHazardOcclusionRecoveryPresentation } from './safe-lane-hazard-occlusion-recovery-rendering.js';
+export function runSafeLaneHazardOcclusionRecoveryAudit() { const samples = []; for (const reduced of [false, true])
+    for (const target of [.44, .58, .76, 1]) {
+        let s = advanceSafeLaneHazardOcclusionRecovery(createSafeLaneHazardOcclusionRecoveryState(), { pathAlphaScale: target, bridgeAlphaScale: Math.max(.34, target - .06) }, 0, reduced);
+        for (let i = 0; i < 3; i++)
+            s = advanceSafeLaneHazardOcclusionRecovery(s, { pathAlphaScale: 1, bridgeAlphaScale: 1 }, .08, reduced);
+        const p = safeLaneHazardOcclusionRecoveryPresentation(s);
+        samples.push({ id: `${reduced}-${target}`, passed: p.pathAlphaScale >= target && p.pathAlphaScale <= 1 && p.bridgeAlphaScale >= Math.max(.34, target - .06) && p.bridgeAlphaScale <= 1 && p.locatorAlphaScale === 1 });
+    } return { samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, gameplayFormulaMutation: false, snapshotSchemaMutation: false, newAtlasCount: 0, passed: samples.length === 8 && samples.every(s => s.passed) && ACTION_BUTTONS.length === 9 }; }

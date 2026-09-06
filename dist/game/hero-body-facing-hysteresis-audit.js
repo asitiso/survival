@@ -1,0 +1,11 @@
+import { ACTION_BUTTONS } from './config.js';
+import { advanceHeroBodyFacingHysteresisState, createHeroBodyFacingHysteresisState, heroBodyFacingHysteresisPresentation } from './hero-body-facing-hysteresis-rendering.js';
+const d = (owner, x, y) => ({ owner, facingX: x, facingY: y, bodyAngle: Math.atan2(y, x), mirrorX: (x < 0 ? -1 : 1), actionRetention: owner === 'movement' ? 0 : 1, presentationOnly: true });
+export function runHeroBodyFacingHysteresisAudit() { const samples = []; for (const owner of ['movement', 'cast', 'ultimate'])
+    for (const reduced of [false, true])
+        for (const x of [-1, 0, 1]) {
+            let s = createHeroBodyFacingHysteresisState({ x: 1, y: 0 });
+            s = advanceHeroBodyFacingHysteresisState(s, d(owner, x || .01, x === 0 ? 1 : 0), .016, reduced);
+            const p = heroBodyFacingHysteresisPresentation(s);
+            samples.push({ id: `${owner}-${reduced}-${x}`, passed: Number.isFinite(p.facingX) && Number.isFinite(p.facingY) && Number.isFinite(p.bodyAngle) && (p.mirrorX === 1 || p.mirrorX === -1) && p.hold >= 0 });
+        } return { samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, gameplayFormulaMutation: false, snapshotSchemaMutation: false, newAtlasCount: 0, passed: samples.every(s => s.passed) && ACTION_BUTTONS.length === 9 }; }

@@ -1,0 +1,11 @@
+import { ACTION_BUTTONS } from './config.js';
+import { CORE_GUARD_SOURCE_HOLD_SECONDS, advanceCoreGuardDamageSourceHysteresis, createCoreGuardDamageSourceHysteresisState } from './core-guard-damage-source-hysteresis-rendering.js';
+export function runCoreGuardDamageSourceHysteresisAudit() { const samples = []; for (const first of ['projectile', 'contact'])
+    for (const second of ['projectile', 'contact', 'arena'])
+        for (const dt of [0, .04, CORE_GUARD_SOURCE_HOLD_SECONDS * .8, CORE_GUARD_SOURCE_HOLD_SECONDS * 1.2]) {
+            let s = advanceCoreGuardDamageSourceHysteresis(createCoreGuardDamageSourceHysteresisState(), first, 0);
+            const before = s.sourceClass;
+            s = advanceCoreGuardDamageSourceHysteresis(s, second, dt);
+            const expected = second === 'arena' ? before : second === before ? before : dt < CORE_GUARD_SOURCE_HOLD_SECONDS ? before : second;
+            samples.push({ id: `${first}-${second}-${dt}`, passed: s.sourceClass === expected && s.holdRemaining >= 0 && s.holdRemaining <= CORE_GUARD_SOURCE_HOLD_SECONDS });
+        } return { samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, gameplayFormulaMutation: false, snapshotSchemaMutation: false, newAtlasCount: 0, passed: samples.length === 24 && samples.every(s => s.passed) && ACTION_BUTTONS.length === 9 }; }

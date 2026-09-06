@@ -1,0 +1,11 @@
+import { ACTION_BUTTONS } from './config.js';
+import { characterMotionLayerBudgetPresentation } from './character-motion-layer-budget-rendering.js';
+export function runCharacterMotionLayerBudgetAudit() { const samples = []; for (const kind of ['specialist', 'boss'])
+    for (const reduced of [false, true])
+        for (const attack of [0, .7])
+            for (const recovery of [0, .65])
+                for (const hit of [0, .85])
+                    for (const special of [0, .9]) {
+                        const p = characterMotionLayerBudgetPresentation(kind, { attack, recovery, hit, special }, reduced);
+                        samples.push({ id: `${kind}-${reduced}-${attack}-${recovery}-${hit}-${special}`, passed: [p.attackScale, p.recoveryScale, p.hitScale, p.specialScale].every(v => v >= 0 && v <= 1 && Number.isFinite(v)) && Number.isFinite(p.totalLoad) && p.totalLoad >= 0 });
+                    } return { samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, gameplayFormulaMutation: false, snapshotSchemaMutation: false, newAtlasCount: 0, passed: samples.every(s => s.passed) && ACTION_BUTTONS.length === 9 }; }

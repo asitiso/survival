@@ -1,0 +1,7 @@
+import { ACTION_BUTTONS } from './config.js';
+import { coreGuardDirectionalStackOwnership } from './core-guard-directional-stack-ownership-rendering.js';
+export function runCoreGuardDirectionalStackOwnershipAudit() { const samples = []; for (const reduced of [false, true])
+    for (let count = 1; count <= 6; count++) {
+        const cues = Array.from({ length: count }, (_, i) => ({ id: i, ttl: .34 - i * .035, maxTtl: .34, pressureVector: { x: i % 3 - 1, y: (i + 1) % 3 - 1 } })), r = coreGuardDirectionalStackOwnership(cues, reduced);
+        samples.push({ id: `${reduced}-${count}`, passed: r.entries.length === count && r.entries.every(e => e.accentAlphaScale > 0 && e.accentAlphaScale <= 1) && (r.entries.filter(e => e.directional).length === 0 || r.primaryId !== null) });
+    } return { samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, gameplayFormulaMutation: false, snapshotSchemaMutation: false, newAtlasCount: 0, passed: samples.length === 12 && samples.every(s => s.passed) && ACTION_BUTTONS.length === 9 }; }

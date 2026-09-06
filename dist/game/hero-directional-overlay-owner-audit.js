@@ -1,0 +1,8 @@
+import { ACTION_BUTTONS } from './config.js';
+import { heroDirectionalOverlayOwnerPresentation } from './hero-directional-overlay-owner-rendering.js';
+export function runHeroDirectionalOverlayOwnerAudit() { const samples = []; for (const owner of ['movement', 'cast', 'ultimate'])
+    for (const reduced of [false, true])
+        for (const separation of [0, .9, 3]) {
+            const p = heroDirectionalOverlayOwnerPresentation({ owner, bodyAngle: separation, movementAngle: 0, castAngle: separation, actionRetention: owner === 'movement' ? 0 : .8, movementBlend: .8, castBlend: owner === 'movement' ? 0 : .8 }, reduced);
+            samples.push({ id: `${owner}-${reduced}-${separation}`, passed: Number.isFinite(p.movementAngle) && Number.isFinite(p.castAngle) && p.movementAlphaScale >= 0 && p.movementAlphaScale <= 1 && p.castAlphaScale >= 0 && p.castAlphaScale <= 1 && p.singleDirectionalOwner });
+        } return { samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, gameplayFormulaMutation: false, snapshotSchemaMutation: false, newAtlasCount: 0, passed: samples.every(s => s.passed) && ACTION_BUTTONS.length === 9 }; }

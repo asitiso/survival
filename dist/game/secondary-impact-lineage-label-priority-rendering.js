@@ -1,0 +1,1 @@
+export function secondaryImpactLineageLabelPriorityOrder(input) { return input.filter(entry => entry.budgetVisible && entry.heldCount > 1 && entry.ttl > 0).map(entry => ({ ...entry })).sort((a, b) => b.heldCount - a.heldCount || b.ttl - a.ttl || a.lineageKey.localeCompare(b.lineageKey)); }

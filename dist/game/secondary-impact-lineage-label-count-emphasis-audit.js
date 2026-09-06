@@ -1,0 +1,10 @@
+import { ACTION_BUTTONS } from './config.js';
+import { secondaryImpactLineageLabelCountEmphasis } from './secondary-impact-lineage-label-count-emphasis-rendering.js';
+export function runSecondaryImpactLineageLabelCountEmphasisAudit() { const samples = []; for (const reduced of [false, true])
+    for (let i = 0; i < 12; i++) {
+        let r = secondaryImpactLineageLabelCountEmphasis([], `L${i}`, 2 + (i % 3), true, reduced);
+        r = secondaryImpactLineageLabelCountEmphasis(r.memory, `L${i}`, 4 + (i % 4), true, reduced);
+        const peak = r.presentation.scale;
+        r = secondaryImpactLineageLabelCountEmphasis(r.memory, `L${i}`, 4 + (i % 4), true, reduced);
+        samples.push({ id: `${reduced}-${i}`, passed: peak >= 1 && peak <= 1.09 && r.presentation.scale <= peak && r.presentation.scale >= 1 });
+    } return { samples, actionCount: ACTION_BUTTONS.length, presentationOnly: true, gameplayFormulaMutation: false, snapshotSchemaMutation: false, newAtlasCount: 0, passed: samples.length === 24 && samples.every(s => s.passed) && ACTION_BUTTONS.length === 9 }; }

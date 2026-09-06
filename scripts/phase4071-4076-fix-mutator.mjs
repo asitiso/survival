@@ -1,9 +1,7 @@
 import fs from 'node:fs';
 const path='scripts/phase4071-4076-integrate.mjs';
 let text=fs.readFileSync(path,'utf8');
-const from='"*.38*arrivalContinuity.edgeAlphaScale*reactionCarry.aftermathAlphaScale*arrivalSettleRecovery.footprintAlphaScale*impactRetirement.footprintAlphaScale*impactResolutionBudget.effectStrength"';
-const to='".38*arrivalContinuity.edgeAlphaScale*reactionCarry.aftermathAlphaScale*arrivalSettleRecovery.footprintAlphaScale*impactRetirement.footprintAlphaScale*impactResolutionBudget.effectStrength"';
-if(text.includes(from))text=text.replace(from,to);
+text=text.split('"*.38*arrivalContinuity').join('".38*arrivalContinuity');
 const marker="*projectileLayerBudget.projectileDecorationScale;ctx.strokeStyle='#ffb26f'";
 const markerAt=text.indexOf(marker);
 if(markerAt<0)throw new Error('duplicate boss-travel marker missing');

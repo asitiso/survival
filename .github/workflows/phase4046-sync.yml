@@ -23,7 +23,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat sync/phase4046/part-* > /tmp/phase4046.patch.xz.b64
+          test "$(git hash-object sync/phase4046/fix-09-0)" = "9f5eae31bda27a4ac6b2836fa7c0d19a3ceb013d"
+          test "$(git hash-object sync/phase4046/fix-09-1)" = "a10db98ce5d6f4f102d4f1c2904adcc9e44f73f5"
+          test "$(git hash-object sync/phase4046/fix-09-2)" = "27f1a2ce8aced5ab582d54d7019d34ceffe6727a"
+          test "$(git hash-object sync/phase4046/fix-09-3)" = "8dfba9b71985005276c481983ee921b34f9eacc6"
+          cat sync/phase4046/part-0{0..8} sync/phase4046/fix-09-{0..3} sync/phase4046/part-1{0..6} > /tmp/phase4046.patch.xz.b64
           base64 -d /tmp/phase4046.patch.xz.b64 > /tmp/phase4046.patch.xz
           xz -t /tmp/phase4046.patch.xz
           xz -dc /tmp/phase4046.patch.xz > /tmp/phase4046.patch

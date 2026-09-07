@@ -56,6 +56,48 @@ export function combatImpactVisual(tier) {
         return { fontSize: 21, rayCount: 4, ringRadius: 24, weight: 850 };
     return { fontSize: 17, rayCount: 0, ringRadius: 16, weight: 800 };
 }
+export function healingDamageArbitrationPresentation(input) {
+    const stress = Math.max(0, Math.min(1, input.battlefieldStress ?? 0));
+    const shaman = input.sourceKind === 'shaman';
+    const routineCapacity = Math.max(1, Math.round(4 - stress * 3));
+    let numberVisible = shaman || Math.max(0, input.clusterIndex) < routineCapacity;
+    let numberAlpha = (shaman ? .68 : .46) * (1 - stress * (shaman ? .18 : .44));
+    const recent = !!input.recentDamageTier;
+    if (input.recentDamageTier === 'critical')
+        numberAlpha *= .56;
+    if (input.defenseBreakNearby)
+        numberAlpha *= .52;
+    if (input.resolvedResultNearby) {
+        numberAlpha *= shaman ? .46 : .22;
+        if (!shaman)
+            numberVisible = false;
+    }
+    if (input.reducedFlash)
+        numberAlpha *= .68;
+    if (!numberVisible)
+        numberAlpha = 0;
+    const displacement = input.reducedMotion ? 10 : 18;
+    return { numberVisible, numberAlpha: Math.max(0, Math.min(.78, numberAlpha)), numberOffsetX: recent ? (input.reducedMotion ? 4 : 7) : 0, numberOffsetY: recent ? displacement : 12, returnCueAlpha: recent ? (input.reducedFlash ? .10 : .18) : 0 };
+}
+export function healingResponsePresentation(input) {
+    const stress = Math.max(0, Math.min(1, input.battlefieldStress ?? 0));
+    const shaman = input.sourceKind === 'shaman';
+    let alpha = shaman ? .42 : .24;
+    alpha *= shaman ? 1 - stress * .30 : 1 - stress * .58;
+    if (input.priorityTarget)
+        alpha *= 1.35;
+    if (input.protectedWarning)
+        alpha *= shaman ? .68 : .42;
+    if (input.safeLaneVisible)
+        alpha *= shaman ? .76 : .58;
+    if (input.reducedFlash)
+        alpha *= .68;
+    if (input.priorityTarget)
+        alpha = Math.max(.16, alpha);
+    alpha = Math.max(.035, Math.min(.62, alpha));
+    const connectorAlpha = shaman ? Math.min(.34, alpha * .82) : 0;
+    return { alpha, connectorAlpha, radius: shaman ? 20 : 18, lineWidth: shaman ? 1.7 : 1.4, pulse: input.reducedMotion ? 0 : (shaman ? 2.8 : 1.8) };
+}
 const IMPACT_SHAKE = { awakened: 2.4, final: 6.2, ultimate: 7.4, bossHit: 9.2, eliteKill: 4.8 };
 const RESULT_COLOR = { normalHit: '#eef5ff', weakpointHit: '#9fe8ff', guardBreak: '#b8ddff', weakpointBreak: '#ffe49a', bossStagger: '#ffd06e', enemyKill: '#fff0b8' };
 export class CombatFeedbackSystem {
@@ -71,9 +113,11 @@ export class CombatFeedbackSystem {
     directionalRecoilMaxTtl = 0;
     resultCues = [];
     defenseResponseCues = [];
+    healingResponseCues = [];
     resultCooldowns = new Map();
-    get activeCount() { return this.cues.length + this.resultCues.length + this.defenseResponseCues.length; }
+    get activeCount() { return this.cues.length + this.resultCues.length + this.defenseResponseCues.length + this.healingResponseCues.length; }
     get defenseResponseCount() { return this.defenseResponseCues.length; }
+    get healingResponseCount() { return this.healingResponseCues.length; }
     get shakeIntensity() { return this.shake; }
     get cameraScaleOffset() {
         if (this.cameraPressureTtl <= 0 || this.cameraPressureMaxTtl <= 0)
@@ -96,7 +140,7 @@ export class CombatFeedbackSystem {
         const recoilRatio = this.directionalRecoilTtl > 0 && this.directionalRecoilMaxTtl > 0 ? Math.max(0, Math.min(1, this.directionalRecoilTtl / this.directionalRecoilMaxTtl)) : 0;
         return { x: shakeOffset.x + this.directionalRecoil.x * recoilRatio, y: shakeOffset.y + this.directionalRecoil.y * recoilRatio };
     }
-    reset() { this.cues = []; this.resultCues = []; this.defenseResponseCues = []; this.resultCooldowns.clear(); this.shake = 0; this.shakePhase = 0; this.impactVisualCooldown = 0; this.cameraPressureOffset = 0; this.cameraPressureTtl = 0; this.cameraPressureMaxTtl = 0; this.directionalRecoil = { x: 0, y: 0 }; this.directionalRecoilTtl = 0; this.directionalRecoilMaxTtl = 0; }
+    reset() { this.cues = []; this.resultCues = []; this.defenseResponseCues = []; this.healingResponseCues = []; this.resultCooldowns.clear(); this.shake = 0; this.shakePhase = 0; this.impactVisualCooldown = 0; this.cameraPressureOffset = 0; this.cameraPressureTtl = 0; this.cameraPressureMaxTtl = 0; this.directionalRecoil = { x: 0, y: 0 }; this.directionalRecoilTtl = 0; this.directionalRecoilMaxTtl = 0; }
     addHit(pos, amount, tier = 'normal', enemyType, source, targetId) {
         const resolved = typeof tier === 'boolean' ? (tier ? 'critical' : 'normal') : tier;
         this.cues.push({ kind: 'hit', pos: { ...pos }, anchorPos: { ...pos }, amount, ttl: 0.46, maxTtl: 0.46, tier: resolved, ...(enemyType ? { enemyType } : {}), ...(source ? { source: { ...source } } : {}), ...(targetId !== undefined ? { targetId } : {}) });
@@ -144,6 +188,14 @@ export class CombatFeedbackSystem {
         this.cues.push({ kind: 'impact', pos: { ...pos }, ttl, maxTtl: ttl, impactKind: kind });
         this.impactVisualCooldown = kind === 'final' || kind === 'ultimate' ? 0.07 : 0.045;
         this.trim();
+    }
+    addHealingResponse(pos, response, sourceKind, source, targetId, targetType) {
+        if (!(response.hpRestored > 0))
+            return;
+        const maxTtl = sourceKind === 'shaman' ? .34 : .26;
+        this.healingResponseCues.push({ pos: { ...pos }, response: { ...response }, sourceKind, ttl: maxTtl, maxTtl, ...(source ? { source: { ...source } } : {}), ...(targetId !== undefined ? { targetId } : {}), ...(targetType ? { targetType } : {}) });
+        if (this.healingResponseCues.length > 18)
+            this.healingResponseCues.splice(0, this.healingResponseCues.length - 18);
     }
     addDefenseResponse(pos, response, source) {
         let responseKind = null;
@@ -200,6 +252,9 @@ export class CombatFeedbackSystem {
         for (const cue of this.defenseResponseCues)
             cue.ttl -= dt;
         this.defenseResponseCues = this.defenseResponseCues.filter((cue) => cue.ttl > 0);
+        for (const cue of this.healingResponseCues)
+            cue.ttl -= dt;
+        this.healingResponseCues = this.healingResponseCues.filter((cue) => cue.ttl > 0);
         for (const cue of this.cues) {
             cue.ttl -= dt;
             if (cue.kind === 'hit')
@@ -208,6 +263,62 @@ export class CombatFeedbackSystem {
         this.cues = this.cues.filter((cue) => cue.ttl > 0);
     }
     render(ctx, quality = 'high', resultContext = {}) {
+        let remainingRoutineHealingNumbers = this.healingResponseCues.reduce((count, cue) => count + (cue.sourceKind === 'regenerating' ? 1 : 0), 0);
+        for (const cue of this.healingResponseCues) {
+            const ratio = Math.max(0, Math.min(1, cue.ttl / Math.max(.001, cue.maxTtl)));
+            const matchingHit = cue.targetId !== undefined ? this.cues.find((candidate) => candidate.kind === 'hit' && candidate.targetId === cue.targetId && candidate.ttl > 0) : undefined;
+            const recentTarget = !!matchingHit;
+            const priorityType = cue.targetType === 'boss' || cue.targetType === 'elite' || cue.targetType === 'shaman' || cue.targetType === 'shieldbearer' || cue.targetType === 'assassin' || cue.targetType === 'siegeGolem' || cue.targetType === 'nullifier';
+            const visual = healingResponsePresentation({ sourceKind: cue.sourceKind, priorityTarget: recentTarget || priorityType, ...(resultContext.battlefieldStress !== undefined ? { battlefieldStress: resultContext.battlefieldStress } : {}), ...(resultContext.protectedWarning !== undefined ? { protectedWarning: resultContext.protectedWarning } : {}), ...(resultContext.safeLaneVisible !== undefined ? { safeLaneVisible: resultContext.safeLaneVisible } : {}), ...(resultContext.reducedFlash !== undefined ? { reducedFlash: resultContext.reducedFlash } : {}), ...(resultContext.reducedMotion !== undefined ? { reducedMotion: resultContext.reducedMotion } : {}) });
+            if (cue.sourceKind === 'regenerating')
+                remainingRoutineHealingNumbers -= 1;
+            const resolvedResultNearby = this.resultCues.some((candidate) => Math.hypot(candidate.pos.x - cue.pos.x, candidate.pos.y - cue.pos.y) <= 38 && actionResultPresentation({ ...resultContext, kind: candidate.resultKind, sourceDistance: 0 }).priority >= 2);
+            const defenseBreakNearby = this.defenseResponseCues.some((candidate) => (candidate.responseKind === 'guardBreak' || candidate.responseKind === 'shieldBreak') && Math.hypot(candidate.pos.x - cue.pos.x, candidate.pos.y - cue.pos.y) <= 38);
+            const arbitration = healingDamageArbitrationPresentation({ sourceKind: cue.sourceKind, recentDamageTier: matchingHit && matchingHit.kind === 'hit' ? matchingHit.tier : null, resolvedResultNearby, defenseBreakNearby, clusterIndex: cue.sourceKind === 'regenerating' ? remainingRoutineHealingNumbers : 0, ...(resultContext.battlefieldStress !== undefined ? { battlefieldStress: resultContext.battlefieldStress } : {}), ...(resultContext.reducedFlash !== undefined ? { reducedFlash: resultContext.reducedFlash } : {}), ...(resultContext.reducedMotion !== undefined ? { reducedMotion: resultContext.reducedMotion } : {}) });
+            const progress = 1 - ratio, pulse = Math.sin(progress * Math.PI) * visual.pulse, radius = visual.radius + progress * 2 + pulse;
+            ctx.save();
+            ctx.strokeStyle = cue.sourceKind === 'shaman' ? '#91f7b4' : '#79dea0';
+            ctx.lineCap = 'round';
+            if (cue.sourceKind === 'shaman' && cue.source && visual.connectorAlpha > 0) {
+                const dx = cue.pos.x - cue.source.x, dy = cue.pos.y - cue.source.y, d = Math.hypot(dx, dy);
+                if (d > 1) {
+                    const ux = dx / d, uy = dy / d;
+                    ctx.globalAlpha = ratio * visual.connectorAlpha;
+                    ctx.lineWidth = Math.max(.8, visual.lineWidth * .72);
+                    ctx.beginPath();
+                    ctx.moveTo(cue.source.x + ux * Math.min(18, d * .18), cue.source.y + uy * Math.min(18, d * .18));
+                    ctx.lineTo(cue.pos.x - ux * Math.min(radius + 4, d * .22), cue.pos.y - uy * Math.min(radius + 4, d * .22));
+                    ctx.stroke();
+                }
+            }
+            if (arbitration.returnCueAlpha > 0 && matchingHit && matchingHit.kind === 'hit') {
+                ctx.globalAlpha = ratio * arbitration.returnCueAlpha;
+                ctx.lineWidth = 1.1;
+                ctx.beginPath();
+                ctx.moveTo(cue.pos.x - 6, cue.pos.y + 10);
+                ctx.lineTo(cue.pos.x + 5, cue.pos.y + 15);
+                ctx.stroke();
+            }
+            ctx.globalAlpha = ratio * visual.alpha;
+            ctx.lineWidth = visual.lineWidth;
+            ctx.beginPath();
+            ctx.arc(cue.pos.x, cue.pos.y + 3, radius, 0, Math.PI * 2);
+            ctx.stroke();
+            if (arbitration.numberVisible) {
+                const text = `+${Math.max(1, Math.round(cue.response.hpRestored)).toLocaleString()}`;
+                const textX = cue.pos.x + arbitration.numberOffsetX, textY = cue.pos.y + arbitration.numberOffsetY;
+                ctx.globalAlpha = Math.min(1, ratio * 1.5) * arbitration.numberAlpha;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.font = `800 ${cue.sourceKind === 'shaman' ? 15 : 13}px system-ui`;
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = 'rgba(4,12,8,.72)';
+                ctx.fillStyle = cue.sourceKind === 'shaman' ? '#b8ffd0' : '#9df0ba';
+                ctx.strokeText(text, textX, textY);
+                ctx.fillText(text, textX, textY);
+            }
+            ctx.restore();
+        }
         for (const cue of this.defenseResponseCues) {
             const ratio = Math.max(0, Math.min(1, cue.ttl / Math.max(.001, cue.maxTtl)));
             const visual = defenseResponsePresentation({ kind: cue.responseKind, ...(resultContext.battlefieldStress !== undefined ? { battlefieldStress: resultContext.battlefieldStress } : {}), ...(resultContext.protectedWarning !== undefined ? { protectedWarning: resultContext.protectedWarning } : {}), ...(resultContext.safeLaneVisible !== undefined ? { safeLaneVisible: resultContext.safeLaneVisible } : {}), ...(resultContext.reducedFlash !== undefined ? { reducedFlash: resultContext.reducedFlash } : {}), ...(resultContext.reducedMotion !== undefined ? { reducedMotion: resultContext.reducedMotion } : {}) });

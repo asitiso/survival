@@ -18,7 +18,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Apply Phase 4359-4364 integration
+      - name: Apply Phase 4359-4364 runtime integration
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -29,36 +29,6 @@ jobs:
                   raise SystemExit(f'missing pattern in {path}: {old!r}')
               p.write_text(s.replace(old,new,1))
 
-          # Boss encounter: replace the whole hitMagic method by structural boundaries.
-          p=Path('src/game/boss-encounters.ts'); s=p.read_text()
-          s=s.replace(
-              "export interface MagicTargetSink { hitMagic(pos: Vec2, strength: number): void; }",
-              "export interface MagicHitResult { hit:boolean; nodeId:number|null; destroyed:boolean; allDestroyed:boolean; }\nexport interface MagicTargetSink { hitMagic(pos: Vec2, strength: number): MagicHitResult; }",
-              1,
-          )
-          start=s.find("  hitMagic(pos: Vec2, strength: number): void {")
-          end=s.find("\n\n  get modifiers:",start)
-          if start<0 or end<0: raise SystemExit('boss hitMagic structural boundaries not found')
-          method="""  hitMagic(pos: Vec2, strength: number): MagicHitResult {
-              let target: BossEncounterNode | null = null;
-              let best = Number.POSITIVE_INFINITY;
-              for (const node of this.nodes) {
-                if (!node.alive) continue;
-                const d = distance(pos, node.pos);
-                if (d <= node.radius + 82 && d < best) { target = node; best = d; }
-              }
-              if (!target) return {hit:false,nodeId:null,destroyed:false,allDestroyed:false};
-              target.hp = Math.max(0, target.hp - Math.max(1, strength));
-              if (target.hp > 0) return {hit:true,nodeId:target.id,destroyed:false,allDestroyed:false};
-              target.alive = false;
-              this.destroyedNodes += 1;
-              const allDestroyed=this.nodes.every((node) => !node.alive);
-              if (this.archetype === 'inferno' && allDestroyed) this.vulnerabilityTimer = 6;
-              return {hit:true,nodeId:target.id,destroyed:true,allDestroyed};
-            }"""
-          p.write_text(s[:start]+method+s[end:])
-
-          # Combat feedback: add result cue storage/coalescing; rendering comes in Train 3.
           replace_once('src/game/combat-feedback.ts',
               "import { directionalHitVfxProfile, directionalHitVector, hitApproachProfile, directionalImpactRecoilProfile } from './visual-presence.js';",
               "import { directionalHitVfxProfile, directionalHitVector, hitApproachProfile, directionalImpactRecoilProfile } from './visual-presence.js';\nimport { actionResultMinimumGap, type ActionResultKind } from './action-result-readability.js';")
@@ -84,7 +54,6 @@ jobs:
               "    for (const cue of this.cues) {",
               "    for(const [kind,remaining] of this.resultCooldowns){const next=Math.max(0,remaining-dt);if(next<=0)this.resultCooldowns.delete(kind);else this.resultCooldowns.set(kind,next);}\n    for(const cue of this.resultCues)cue.ttl-=dt;\n    this.resultCues=this.resultCues.filter((cue)=>cue.ttl>0);\n    for (const cue of this.cues) {")
 
-          # Enemy manager: recognize outcomes without changing damage calculation.
           replace_once('src/game/enemies.ts',"    let remaining = amount;","    let remaining = amount;\n    let guardBroken=false;")
           replace_once('src/game/enemies.ts',"      const guardBroken=guardBefore>0&&(enemy.guardHp ?? 0)<=0;","      guardBroken=guardBefore>0&&(enemy.guardHp ?? 0)<=0;")
           replace_once('src/game/enemies.ts',
@@ -97,7 +66,6 @@ jobs:
               "    if (!killed) return false;",
               "    if (!killed) return false;\n    this.feedback?.addActionResult?.(enemy.pos,'enemyKill',source);")
 
-          # Spell system: translate weakpoint contact/break metadata.
           replace_once('src/game/spells.ts',
               "export class SpellSystem {",
               "export class SpellSystem {\n  private hitMagicTarget(world:SpellWorld,pos:Vec2,strength:number,source?:Vec2):void {\n    const result=world.magicTargets?.hitMagic(pos,strength);\n    if(!result?.hit)return;\n    world.feedback?.addActionResult?.(pos,result.destroyed?'weakpointBreak':'weakpointHit',source??world.hero.pos);\n  }")
@@ -125,7 +93,7 @@ jobs:
         run: |
           git config user.name asitiso
           git config user.email asitiso.woo@gmail.com
-          git add src/game/boss-encounters.ts src/game/combat-feedback.ts src/game/enemies.ts src/game/spells.ts
+          git add src/game/combat-feedback.ts src/game/enemies.ts src/game/spells.ts
           git add -f dist/game/action-result-readability.js dist/game/boss-encounters.js dist/game/combat-feedback.js dist/game/enemies.js dist/game/spells.js
           git commit -m "feat: confirm meaningful combat outcomes"
           git push origin HEAD:work/phase4353-4370-cast-impact-readability

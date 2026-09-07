@@ -1,4 +1,4 @@
-name: Phase 4527 Swift Dense TDD
+name: Phase 4527 Swift Dense GREEN
 
 on:
   push:
@@ -6,21 +6,99 @@ on:
       - '.sync/phase4496.ready'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  validate:
+  validate-and-push:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
           ref: work/phase4515-4532-swift-cadence-readability
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Implement Swift dense arbitration
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          identity=Path('src/game/elite-affix-identity-assets.ts')
+          s=identity.read_text()
+          marker="export type FrenziedThresholdPhase = 'inactive' | 'entered' | 'active' | 'released';"
+          assert s.count(marker)==1, f'identity marker count={s.count(marker)}'
+          insert="""export interface SwiftCadenceDensityInput {
+  activeCount: number;
+  indexFromPriority: number;
+  priorityTarget?: boolean;
+  higherPriorityCue?: boolean;
+  battlefieldStress?: number;
+  reducedMotion?: boolean;
+  reducedFlash?: boolean;
+}
+export interface SwiftCadenceDensityPresentation {
+  visible: boolean;
+  alphaScale: number;
+  motionScale: number;
+}
+export function swiftCadenceDensityPresentation(state: SwiftCadenceLifecycleState | undefined, input: SwiftCadenceDensityInput): SwiftCadenceDensityPresentation {
+  if (!state) return { visible: false, alphaScale: 0, motionScale: 0 };
+  const stress = clamp(Number.isFinite(input.battlefieldStress) ? (input.battlefieldStress ?? 0) : 0, 0, 1);
+  const priority = Boolean(input.priorityTarget) || state.phase === 'strike';
+  const capacity = Math.max(1, Math.round(4 - stress * 3));
+  let visible = priority || Math.max(0, input.indexFromPriority) < capacity;
+  if (input.higherPriorityCue && state.phase !== 'strike') visible = false;
+  let alphaScale = priority ? Math.max(0.68, 1 - stress * 0.18) : visible ? Math.max(0.38, 1 - stress * 0.55) : 0.16;
+  if (input.higherPriorityCue && state.phase === 'strike') alphaScale = Math.min(0.42, alphaScale * 0.48);
+  if (input.reducedFlash) alphaScale *= 0.68;
+  return { visible, alphaScale, motionScale: input.reducedMotion ? 0 : visible ? 1 : 0.2 };
+}
+
+"""
+          s=s.replace(marker,insert+marker,1)
+          identity.write_text(s)
+
+          p=Path('src/game/enemies.ts')
+          s=p.read_text()
+          def once(old,new,label):
+              global s
+              count=s.count(old)
+              assert count==1, f'{label}: expected 1 match, got {count}'
+              s=s.replace(old,new,1)
+
+          once(
+          "import { advanceFrenziedThresholdLifecycle, advanceSwiftCadenceLifecycle, eliteAffixIdentityEmphasis, eliteAffixIdentityIcon, eliteAffixIdentityRowLayout, frenziedThresholdDensityPresentation, frenziedThresholdPresentation, swiftStrikeOwnershipPresentation, type FrenziedThresholdLifecycleState, type SwiftCadenceLifecycleState } from './elite-affix-identity-assets.js';",
+          "import { advanceFrenziedThresholdLifecycle, advanceSwiftCadenceLifecycle, eliteAffixIdentityEmphasis, eliteAffixIdentityIcon, eliteAffixIdentityRowLayout, frenziedThresholdDensityPresentation, frenziedThresholdPresentation, swiftCadenceDensityPresentation, swiftCadencePresentation, swiftStrikeOwnershipPresentation, type FrenziedThresholdLifecycleState, type SwiftCadenceLifecycleState } from './elite-affix-identity-assets.js';",
+          'swift density imports')
+
+          once(
+          "    const frenziedPriorityRank=new Map(frenziedPriority.map((enemy,index)=>[enemy,index]));\n    for (const enemy of this.enemies) {",
+          "    const frenziedPriorityRank=new Map(frenziedPriority.map((enemy,index)=>[enemy,index]));\n    const activeSwift=this.enemies.filter((enemy)=>enemy.eliteAffixes?.includes('swift')&&enemy.swiftCadencePresentation);\n    const swiftPriority=[...activeSwift].sort((a,b)=>{const score=(enemy:Enemy)=>{const target=enemy.target==='core'?corePos:heroPos;const d=target?distance(enemy.pos,target):9999;return (enemy.target==='core'?4:0)+(d<=120?4:0)+(enemy.hitFlash>0?2:0)+(enemy.swiftCadencePresentation?.phase==='strike'?3:enemy.swiftCadencePresentation?.phase==='ready'?1:0);};return score(b)-score(a);});\n    const swiftPriorityRank=new Map(swiftPriority.map((enemy,index)=>[enemy,index]));\n    for (const enemy of this.enemies) {",
+          'swift density ranking')
+
+          once(
+          "        if(enemy.eliteAffixes.includes('frenzied')){",
+          "        if(enemy.eliteAffixes.includes('swift')&&enemy.swiftCadencePresentation&&targetPos){\n          const swift=swiftCadencePresentation(enemy.swiftCadencePresentation,reducedMotion,reducedFlash),swiftPriorityTarget=enemy.target==='core'||targetDistance<=120||enemy.hitFlash>0||enemy.swiftCadencePresentation?.phase==='strike',swiftDensity=swiftCadenceDensityPresentation(enemy.swiftCadencePresentation,{activeCount:activeSwift.length,indexFromPriority:swiftPriorityRank.get(enemy)??activeSwift.length,priorityTarget:swiftPriorityTarget,higherPriorityCue:hazardPressure>=.72,battlefieldStress:Math.max(0,Math.min(1,hazardPressure)),reducedMotion,reducedFlash});\n          if(swift.alpha>0&&swiftDensity.visible){const mag=Math.max(1,targetDistance),nx=targetDx/mag,ny=targetDy/mag,start=enemy.radius+8,end=start+swift.chevronLength*(.8+.2*swiftDensity.motionScale),perpX=-ny,perpY=nx,wing=4;ctx.save();ctx.globalAlpha=swift.alpha*swiftDensity.alphaScale;ctx.strokeStyle='#9edfff';ctx.lineWidth=swift.lineWidth;ctx.beginPath();ctx.moveTo(nx*start,ny*start);ctx.lineTo(nx*end,ny*end);ctx.stroke();ctx.beginPath();ctx.moveTo(nx*end,ny*end);ctx.lineTo(nx*(end-5)+perpX*wing,ny*(end-5)+perpY*wing);ctx.moveTo(nx*end,ny*end);ctx.lineTo(nx*(end-5)-perpX*wing,ny*(end-5)-perpY*wing);ctx.stroke();ctx.restore();}\n        }\n        if(enemy.eliteAffixes.includes('frenzied')){",
+          'swift local cadence cue')
+
+          p.write_text(s)
+          PY
       - run: npm run build
-      - name: Phase 4527-4532 focused RED test
-        run: node --test tests/phase4527-4532-swift-dense-arbitration.test.mjs
+      - name: Focused Swift regression
+        run: node --test tests/phase4515-4520-swift-cadence-lifecycle.test.mjs tests/phase4521-4526-swift-strike-ownership.test.mjs tests/phase4527-4532-swift-dense-arbitration.test.mjs
       - run: git diff --check
+      - name: Commit generated GREEN result
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name asitiso
+          git config user.email asitiso.woo@gmail.com
+          git add src/game/enemies.ts src/game/elite-affix-identity-assets.ts
+          git add -f dist/game/enemies.js dist/game/elite-affix-identity-assets.js
+          git diff --cached --check
+          git commit -m "feat: arbitrate Phase 4527-4532 swift cadence density"
+          git push origin HEAD:work/phase4515-4532-swift-cadence-readability

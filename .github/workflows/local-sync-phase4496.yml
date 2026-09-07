@@ -73,7 +73,8 @@ jobs:
           set -euo pipefail
           git config user.name asitiso
           git config user.email asitiso.woo@gmail.com
-          git add src/game/enemies.ts dist/game/enemies.js dist/game/elite-affix-identity-assets.js
+          git add src/game/enemies.ts
+          git add -f dist/game/enemies.js dist/game/elite-affix-identity-assets.js
           git diff --cached --check
           git commit -m "feat: connect Phase 4521-4526 swift strike ownership"
           git push origin HEAD:work/phase4515-4532-swift-cadence-readability

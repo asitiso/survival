@@ -1,4 +1,4 @@
-name: Phase 4533-4538 Primary Ownership RED
+name: Phase 4533-4538 Primary Ownership GREEN
 
 on:
   push:
@@ -6,10 +6,10 @@ on:
       - '.sync/phase4496.ready'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  red:
+  green:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -21,6 +21,48 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Add minimal primary affix ownership selector
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('src/game/elite-affix-identity-assets.ts')
+          s=p.read_text()
+          marker="export type SwiftCadencePhase = 'approach' | 'ready' | 'strike' | 'recovery';"
+          assert 'eliteAffixPrimaryPresentationOwner' not in s
+          block="""export type EliteAffixCueReason = 'passive' | 'response' | 'threshold-enter' | 'actual-strike' | 'shield-break';
+          export interface EliteAffixCueCandidate { id: EliteAffixId; reason: EliteAffixCueReason; }
+          export interface EliteAffixPrimaryPresentationOwner extends EliteAffixCueCandidate { priority: number; }
+          const ELITE_AFFIX_CUE_PRIORITY: Readonly<Record<EliteAffixCueReason, number>> = {
+            passive: 1,
+            response: 2,
+            'threshold-enter': 3,
+            'actual-strike': 4,
+            'shield-break': 5,
+          };
+          export function eliteAffixPrimaryPresentationOwner(candidates: readonly EliteAffixCueCandidate[]): EliteAffixPrimaryPresentationOwner | undefined {
+            let owner: EliteAffixPrimaryPresentationOwner | undefined;
+            for (const candidate of candidates) {
+              const priority = ELITE_AFFIX_CUE_PRIORITY[candidate.reason];
+              if (!owner || priority > owner.priority) owner = { ...candidate, priority };
+            }
+            return owner;
+          }
+
+          """
+          p.write_text(s.replace(marker,block+marker))
+          PY
       - run: npm run build
-      - name: Phase 4533-4538 RED
+      - name: Phase 4533-4538 GREEN
         run: node --test tests/phase4533-4538-elite-affix-primary-ownership.test.mjs
+      - name: Commit verified Train 1
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/game/elite-affix-identity-assets.ts
+          git add -f dist/game/elite-affix-identity-assets.js
+          git commit -m 'feat: add elite multi-affix primary presentation ownership'
+          git push origin HEAD:work/phase4533-4550-elite-multiaffix-arbitration

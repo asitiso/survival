@@ -1,5 +1,6 @@
 import { enemyImpactVfxDescriptor } from './enemy-presentation.js';
 import { directionalHitVfxProfile, directionalHitVector, hitApproachProfile, directionalImpactRecoilProfile } from './visual-presence.js';
+import { actionResultMinimumGap } from './action-result-readability.js';
 const CAMERA_PRESSURE = {
     meteor: { scaleOffset: 0.024, duration: 0.24 },
     vortex: { scaleOffset: -0.018, duration: 0.30 },
@@ -64,7 +65,9 @@ export class CombatFeedbackSystem {
     directionalRecoil = { x: 0, y: 0 };
     directionalRecoilTtl = 0;
     directionalRecoilMaxTtl = 0;
-    get activeCount() { return this.cues.length; }
+    resultCues = [];
+    resultCooldowns = new Map();
+    get activeCount() { return this.cues.length + this.resultCues.length; }
     get shakeIntensity() { return this.shake; }
     get cameraScaleOffset() {
         if (this.cameraPressureTtl <= 0 || this.cameraPressureMaxTtl <= 0)
@@ -87,7 +90,7 @@ export class CombatFeedbackSystem {
         const recoilRatio = this.directionalRecoilTtl > 0 && this.directionalRecoilMaxTtl > 0 ? Math.max(0, Math.min(1, this.directionalRecoilTtl / this.directionalRecoilMaxTtl)) : 0;
         return { x: shakeOffset.x + this.directionalRecoil.x * recoilRatio, y: shakeOffset.y + this.directionalRecoil.y * recoilRatio };
     }
-    reset() { this.cues = []; this.shake = 0; this.shakePhase = 0; this.impactVisualCooldown = 0; this.cameraPressureOffset = 0; this.cameraPressureTtl = 0; this.cameraPressureMaxTtl = 0; this.directionalRecoil = { x: 0, y: 0 }; this.directionalRecoilTtl = 0; this.directionalRecoilMaxTtl = 0; }
+    reset() { this.cues = []; this.resultCues = []; this.resultCooldowns.clear(); this.shake = 0; this.shakePhase = 0; this.impactVisualCooldown = 0; this.cameraPressureOffset = 0; this.cameraPressureTtl = 0; this.cameraPressureMaxTtl = 0; this.directionalRecoil = { x: 0, y: 0 }; this.directionalRecoilTtl = 0; this.directionalRecoilMaxTtl = 0; }
     addHit(pos, amount, tier = 'normal', enemyType, source) {
         const resolved = typeof tier === 'boolean' ? (tier ? 'critical' : 'normal') : tier;
         this.cues.push({ kind: 'hit', pos: { ...pos }, amount, ttl: 0.46, maxTtl: 0.46, tier: resolved, ...(enemyType ? { enemyType } : {}), ...(source ? { source: { ...source } } : {}) });
@@ -125,6 +128,15 @@ export class CombatFeedbackSystem {
         this.impactVisualCooldown = kind === 'final' || kind === 'ultimate' ? 0.07 : 0.045;
         this.trim();
     }
+    addActionResult(pos, kind, source) {
+        if ((this.resultCooldowns.get(kind) ?? 0) > 0)
+            return;
+        const ttl = kind === 'normalHit' ? 0.16 : kind === 'weakpointHit' ? 0.20 : 0.28;
+        this.resultCues.push({ kind: 'result', pos: { ...pos }, resultKind: kind, ttl, maxTtl: ttl, ...(source ? { source: { ...source } } : {}) });
+        if (this.resultCues.length > 18)
+            this.resultCues.splice(0, this.resultCues.length - 18);
+        this.resultCooldowns.set(kind, actionResultMinimumGap(kind));
+    }
     update(dt) {
         this.shakePhase += dt;
         this.shake = Math.max(0, this.shake - dt * 20);
@@ -139,6 +151,16 @@ export class CombatFeedbackSystem {
             this.directionalRecoil = { x: 0, y: 0 };
             this.directionalRecoilMaxTtl = 0;
         }
+        for (const [kind, remaining] of this.resultCooldowns) {
+            const next = Math.max(0, remaining - dt);
+            if (next <= 0)
+                this.resultCooldowns.delete(kind);
+            else
+                this.resultCooldowns.set(kind, next);
+        }
+        for (const cue of this.resultCues)
+            cue.ttl -= dt;
+        this.resultCues = this.resultCues.filter((cue) => cue.ttl > 0);
         for (const cue of this.cues) {
             cue.ttl -= dt;
             if (cue.kind === 'hit')

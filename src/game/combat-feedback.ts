@@ -3,6 +3,7 @@ import type { EnemyType } from './enemies.js';
 import { enemyImpactVfxDescriptor } from './enemy-presentation.js';
 import type { PresentationQuality } from './presentation-budget.js';
 import { directionalHitVfxProfile, directionalHitVector, hitApproachProfile, directionalImpactRecoilProfile } from './visual-presence.js';
+import { actionResultMinimumGap, type ActionResultKind } from './action-result-readability.js';
 
 export type DamageImpactTier = 'normal' | 'heavy' | 'critical';
 export type ImpactKind = 'awakened' | 'final' | 'ultimate' | 'bossHit' | 'eliteKill';
@@ -57,6 +58,7 @@ interface HitCue {
 }
 interface KillCue { kind: 'kill'; pos: Vec2; ttl: number; maxTtl: number; boss: boolean; }
 interface ImpactCue { kind: 'impact'; pos: Vec2; ttl: number; maxTtl: number; impactKind: ImpactKind; }
+interface ResultCue { kind:'result'; pos:Vec2; ttl:number; maxTtl:number; resultKind:ActionResultKind; source?:Vec2; }
 type Cue = HitCue | KillCue | ImpactCue;
 
 export function impactTierForDamage(amount: number, maxHp: number): DamageImpactTier {
@@ -77,6 +79,7 @@ export interface CombatFeedbackSink {
   addHit(pos: Vec2, amount: number, tier?: boolean | DamageImpactTier, enemyType?:EnemyType, source?:Vec2): void;
   addKill(pos: Vec2, boss?: boolean): void;
   addImpact(pos: Vec2, kind: ImpactKind): void;
+  addActionResult?(pos:Vec2, kind:ActionResultKind, source?:Vec2):void;
 }
 
 const IMPACT_SHAKE: Record<ImpactKind, number> = { awakened: 2.4, final: 6.2, ultimate: 7.4, bossHit: 9.2, eliteKill: 4.8 };
@@ -92,8 +95,10 @@ export class CombatFeedbackSystem implements CombatFeedbackSink {
   private directionalRecoil: Vec2 = { x: 0, y: 0 };
   private directionalRecoilTtl = 0;
   private directionalRecoilMaxTtl = 0;
+  private resultCues:ResultCue[]=[];
+  private resultCooldowns=new Map<ActionResultKind,number>();
 
-  get activeCount(): number { return this.cues.length; }
+  get activeCount(): number { return this.cues.length+this.resultCues.length; }
   get shakeIntensity(): number { return this.shake; }
   get cameraScaleOffset(): number {
     if(this.cameraPressureTtl<=0 || this.cameraPressureMaxTtl<=0)return 0;
@@ -112,7 +117,7 @@ export class CombatFeedbackSystem implements CombatFeedbackSink {
     return {x:shakeOffset.x+this.directionalRecoil.x*recoilRatio,y:shakeOffset.y+this.directionalRecoil.y*recoilRatio};
   }
 
-  reset(): void { this.cues = []; this.shake = 0; this.shakePhase = 0; this.impactVisualCooldown = 0; this.cameraPressureOffset=0; this.cameraPressureTtl=0; this.cameraPressureMaxTtl=0; this.directionalRecoil={x:0,y:0}; this.directionalRecoilTtl=0; this.directionalRecoilMaxTtl=0; }
+  reset(): void { this.cues = []; this.resultCues=[]; this.resultCooldowns.clear(); this.shake = 0; this.shakePhase = 0; this.impactVisualCooldown = 0; this.cameraPressureOffset=0; this.cameraPressureTtl=0; this.cameraPressureMaxTtl=0; this.directionalRecoil={x:0,y:0}; this.directionalRecoilTtl=0; this.directionalRecoilMaxTtl=0; }
 
   addHit(pos: Vec2, amount: number, tier: boolean | DamageImpactTier = 'normal', enemyType?:EnemyType, source?:Vec2): void {
     const resolved: DamageImpactTier = typeof tier === 'boolean' ? (tier ? 'critical' : 'normal') : tier;
@@ -145,6 +150,14 @@ export class CombatFeedbackSystem implements CombatFeedbackSink {
     this.trim();
   }
 
+  addActionResult(pos:Vec2,kind:ActionResultKind,source?:Vec2):void {
+    if((this.resultCooldowns.get(kind)??0)>0)return;
+    const ttl=kind==='normalHit'?0.16:kind==='weakpointHit'?0.20:0.28;
+    this.resultCues.push({kind:'result',pos:{...pos},resultKind:kind,ttl,maxTtl:ttl,...(source?{source:{...source}}:{})});
+    if(this.resultCues.length>18)this.resultCues.splice(0,this.resultCues.length-18);
+    this.resultCooldowns.set(kind,actionResultMinimumGap(kind));
+  }
+
   update(dt: number): void {
     this.shakePhase += dt;
     this.shake = Math.max(0, this.shake - dt * 20);
@@ -153,6 +166,9 @@ export class CombatFeedbackSystem implements CombatFeedbackSink {
     if(this.cameraPressureTtl<=0){this.cameraPressureOffset=0;this.cameraPressureMaxTtl=0;}
     this.directionalRecoilTtl=Math.max(0,this.directionalRecoilTtl-dt);
     if(this.directionalRecoilTtl<=0){this.directionalRecoil={x:0,y:0};this.directionalRecoilMaxTtl=0;}
+    for(const [kind,remaining] of this.resultCooldowns){const next=Math.max(0,remaining-dt);if(next<=0)this.resultCooldowns.delete(kind);else this.resultCooldowns.set(kind,next);}
+    for(const cue of this.resultCues)cue.ttl-=dt;
+    this.resultCues=this.resultCues.filter((cue)=>cue.ttl>0);
     for (const cue of this.cues) {
       cue.ttl -= dt;
       if (cue.kind === 'hit') cue.pos.y -= dt * (cue.tier === 'critical' ? 82 : cue.tier === 'heavy' ? 68 : 56);

@@ -81,6 +81,39 @@ export function eliteAffixIdentityEmphasis(id: EliteAffixId, hpRatio: number, ma
   return 0;
 }
 
+export type SwiftCadencePhase = 'approach' | 'ready' | 'strike' | 'recovery';
+export interface SwiftCadenceLifecycleState { phase: SwiftCadencePhase; active: boolean; transitionTtl: number; }
+export interface SwiftCadenceLifecycleInput { inAttackRange: boolean; attackTimer: number; attackInterval: number; struck: boolean; dt: number; }
+export interface SwiftCadencePresentation { alpha: number; chevronLength: number; lineWidth: number; motionScale: number; }
+
+export function advanceSwiftCadenceLifecycle(previous: SwiftCadenceLifecycleState | undefined, input: SwiftCadenceLifecycleInput): SwiftCadenceLifecycleState {
+  const step = Math.max(0, Number.isFinite(input.dt) ? input.dt : 0);
+  const interval = Math.max(0.001, Number.isFinite(input.attackInterval) ? input.attackInterval : 1);
+  const timer = Math.max(0, Number.isFinite(input.attackTimer) ? input.attackTimer : interval);
+  if (input.struck) return { phase: 'strike', active: true, transitionTtl: 0.10 };
+  if (previous?.phase === 'strike') {
+    const transitionTtl = Math.max(0, previous.transitionTtl - step);
+    if (transitionTtl > 0) return { phase: 'strike', active: true, transitionTtl };
+    return { phase: 'recovery', active: true, transitionTtl: 0.14 };
+  }
+  if (previous?.phase === 'recovery') {
+    const transitionTtl = Math.max(0, previous.transitionTtl - step);
+    if (transitionTtl > 0) return { phase: 'recovery', active: true, transitionTtl };
+  }
+  const readyThreshold = Math.min(0.18, interval * 0.30);
+  if (input.inAttackRange && timer <= readyThreshold) return { phase: 'ready', active: true, transitionTtl: 0 };
+  return { phase: 'approach', active: false, transitionTtl: 0 };
+}
+
+export function swiftCadencePresentation(state: SwiftCadenceLifecycleState | undefined, reducedMotion = false, reducedFlash = false): SwiftCadencePresentation {
+  if (!state) return { alpha: 0, chevronLength: 0, lineWidth: 0, motionScale: 0 };
+  let alpha = state.phase === 'strike' ? 0.64 : state.phase === 'ready' ? 0.34 : state.phase === 'recovery' ? 0.24 : 0.18;
+  if (reducedFlash) alpha *= 0.62;
+  const chevronLength = state.phase === 'strike' ? 18 : state.phase === 'ready' ? 13 : state.phase === 'recovery' ? 9 : 7;
+  const lineWidth = state.phase === 'strike' ? 2.4 : state.phase === 'ready' ? 2 : 1.5;
+  const motionScale = reducedMotion ? 0 : state.phase === 'strike' ? 1 : state.phase === 'ready' ? 0.65 : state.phase === 'recovery' ? 0.35 : 0.45;
+  return { alpha, chevronLength, lineWidth, motionScale };
+}
 
 export type FrenziedThresholdPhase = 'inactive' | 'entered' | 'active' | 'released';
 export interface FrenziedThresholdLifecycleState { phase:FrenziedThresholdPhase; active:boolean; transitionTtl:number; }

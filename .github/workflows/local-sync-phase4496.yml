@@ -1,4 +1,4 @@
-name: Phase 4532 Regression Diagnose 2
+name: Phase 4532 Regression Diagnose 3
 
 on:
   push:
@@ -15,17 +15,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: work/phase4515-4532-swift-cadence-readability
-      - name: Broaden Phase 4263 source-contract search
+      - name: Locate Phase 4263 files and contracts
         shell: bash
         run: |
           set -euo pipefail
-          echo '--- tests explicitIdx ---'
-          grep -R -n "explicitIdx" tests || true
-          echo '--- tests drawEnemyOpponentFrameBody ---'
-          grep -R -n "drawEnemyOpponentFrameBody" tests || true
-          echo '--- source drawEnemyOpponentFrameBody ---'
-          grep -n -A45 -B10 "drawEnemyOpponentFrameBody" src/game/enemies.ts || true
-          echo '--- source scalarOr pose ---'
-          grep -n -A8 -B8 "scalarOr('pose'" src/game/enemies.ts || true
-          echo '--- source explicitPose ---'
-          grep -n -A8 -B8 "explicitPose" src/game/enemies.ts || true
+          echo '--- filenames 4263 ---'
+          find tests -maxdepth 1 -type f -iname '*4263*' -print | sort
+          echo '--- any 4263 text ---'
+          grep -R -n "4263" tests | head -80 || true
+          echo '--- any poseIdx text ---'
+          grep -R -n "poseIdx\|explicitIdx\|explicitPose\|scalarOr.*pose" tests src/game/enemies.ts | head -160 || true
+          echo '--- test count ---'
+          find tests -maxdepth 1 -name '*.test.mjs' -type f | wc -l

@@ -2637,7 +2637,7 @@ export class Game {
     this.enemies.setEndlessScaling(
       endlessMods.enemyHealthMultiplier,
       endlessMods.enemyDamageMultiplier,
-      endlessMods.projectilePressureMultiplier * ascensionMutatorMods.projectileSpeedMultiplier,
+      endlessMods.projectilePressureMultiplier * pressure.projectileSpeedMultiplier * ascensionMutatorMods.projectileSpeedMultiplier,
       ascensionMutatorMods.eliteHealthMultiplier,
     );
 
@@ -3239,6 +3239,7 @@ export class Game {
     const contract = getContractModifiers(this.endlessState.contracts, this.elapsed * 1000);
     const tacticMultiplier = this.elapsed*1000 < this.mythicTacticBoostUntilMs ? this.mythicTacticBossDamageMultiplier : 1;
     out.bossDamageTakenMultiplier = clamp(out.bossDamageTakenMultiplier * heroAscension.bossDamageMultiplier * finalForm.bossDamageMultiplier * signature.bossDamageMultiplier * oath.bossDamageMultiplier * overdrive.bossDamageMultiplier * contract.bossDamageMultiplier * tacticMultiplier, 0.7, 1.85);
+    out.specialCadenceMultiplier *= threatLevelModifiers(this.runThreatLevel).bossSpecialCadenceMultiplier;
     out.specialCadenceMultiplier = clamp(out.specialCadenceMultiplier, 0.62, 1.4);
     out.summonCountMultiplier = clamp(out.summonCountMultiplier, 0.72, 1.55);
     out.dashDistanceMultiplier = clamp(out.dashDistanceMultiplier, 0.82, 1.55);

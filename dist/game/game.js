@@ -186,6 +186,7 @@ import { coreGuardPressureVectorOrientationPresentation } from './core-guard-pre
 import { advanceCoreGuardPressureVectorHysteresis, createCoreGuardPressureVectorHysteresisState } from './core-guard-pressure-vector-hysteresis-rendering.js';
 import { advanceCoreGuardDamageSourceHysteresis, createCoreGuardDamageSourceHysteresisState } from './core-guard-damage-source-hysteresis-rendering.js';
 import { FREEZE_CONTROL_VFX_ATLAS, freezeControlVfxClassForEnemyType, freezeControlVfxSprite } from './freeze-control-vfx-assets.js';
+import { advanceFreezeStatusLifecycle, createFreezeStatusLifecycleState, freezeCrowdBudget, freezeStatusEdgePresentation, freezeStatusPresentation } from './freeze-status-readability.js';
 import { REGULAR_ENEMY_ACTION_VFX_ATLAS } from './regular-enemy-action-vfx-assets.js';
 import { ELITE_AFFIX_LIFECYCLE_VFX_ATLAS } from './elite-affix-lifecycle-vfx-assets.js';
 import { ENEMY_TARGET_PRESSURE_VFX_ATLAS } from './enemy-target-pressure-vfx-assets.js';
@@ -803,6 +804,7 @@ export class Game {
     freezeControlVfxAtlasImage = null;
     freezeControlVfxAtlasReady = false;
     freezeShatterVfx = [];
+    freezeStatusLifecycleByEnemy = new Map();
     regularEnemyActionVfxAtlasImage = null;
     regularEnemyActionVfxAtlasReady = false;
     eliteAffixLifecycleVfxAtlasImage = null;
@@ -2413,6 +2415,7 @@ export class Game {
         this.coreGuardPressureVectorLastAt = -99;
         this.observedCoreHpForVfx = this.core.hp;
         this.freezeShatterVfx = [];
+        this.freezeStatusLifecycleByEnemy.clear();
         this.finalFormWorldVfx = [];
         this.fusionWorldVfx = [];
         this.heroMeterWorldVfx = [];
@@ -4262,6 +4265,25 @@ export class Game {
         for (const cue of this.freezeShatterVfx)
             cue.ttl -= safeDt;
         this.freezeShatterVfx = this.freezeShatterVfx.filter((cue) => cue.ttl > 0);
+        const liveFreezeEnemyIds = new Set();
+        for (const enemy of this.enemies.enemies) {
+            if (!enemy.alive)
+                continue;
+            liveFreezeEnemyIds.add(enemy.id);
+            const previous = this.freezeStatusLifecycleByEnemy.get(enemy.id);
+            if (enemy.slowTimer <= 0 && !previous)
+                continue;
+            const enemyClass = freezeControlVfxClassForEnemyType(enemy.type);
+            const presentation = freezeStatusPresentation({ slowFactor: enemy.slowFactor, slowTimer: enemy.slowTimer, enemyClass, reducedFlash: this.presentationSettings.reducedFlash });
+            const lifecycle = advanceFreezeStatusLifecycle(previous ?? createFreezeStatusLifecycleState(), { active: presentation.visible, targetAlpha: presentation.alpha, targetSizeScale: presentation.visible ? presentation.sizeScale : .72 }, safeDt, this.presentationSettings.reducedMotion);
+            if (lifecycle.visible)
+                this.freezeStatusLifecycleByEnemy.set(enemy.id, lifecycle);
+            else
+                this.freezeStatusLifecycleByEnemy.delete(enemy.id);
+        }
+        for (const enemyId of [...this.freezeStatusLifecycleByEnemy.keys()])
+            if (!liveFreezeEnemyIds.has(enemyId))
+                this.freezeStatusLifecycleByEnemy.delete(enemyId);
         if (this.core.hp > this.observedCoreHpForVfx + .5)
             this.queueSurvivalResponseVfx('coreRecover');
         this.observedCoreHpForVfx = this.core.hp;
@@ -4658,21 +4680,45 @@ export class Game {
     }
     drawEnemyStatusCues(ctx, motion) {
         const frost = enemyStatusCue('freeze');
-        const frozen = this.enemies.enemies.filter((enemy) => enemy.alive && enemy.slowTimer > 0);
+        const frozen = this.enemies.enemies.filter((enemy) => enemy.alive && (enemy.slowTimer > 0 || Boolean(this.freezeStatusLifecycleByEnemy.get(enemy.id)?.visible)));
         const primaryFrozenEnemyId = motion.owner === 'freeze-status'
             ? frozen.reduce((best, enemy) => !best || distance(this.hero.pos, enemy.pos) < distance(this.hero.pos, best.pos) ? enemy : best, null)?.id ?? null
             : null;
+        const currentTargetId = this.autoCastNormal ? this.autoCombatBrain.currentTargetId() : this.manualTargetMemory.currentTargetId();
+        const liveEnemyCount = this.enemies.enemies.reduce((count, enemy) => count + (enemy.alive ? 1 : 0), 0);
+        const battlefieldStress = Math.max(0, Math.min(1, (liveEnemyCount + this.bossArena.hazards.length * 2 - 8) / 22));
+        const protectedWarning = Boolean((this.bossPhaseCue && this.bossPhaseCueTimer > 0) || this.dangerState.heroCritical || this.dangerState.coreCritical);
+        const safeLaneVisible = Boolean(this.currentMythicSafeLanePresentation);
+        const crowd = freezeCrowdBudget(frozen.map((enemy) => ({
+            id: enemy.id,
+            enemyClass: freezeControlVfxClassForEnemyType(enemy.type),
+            distanceToHero: distance(this.hero.pos, enemy.pos),
+            currentTarget: enemy.id === currentTargetId,
+            resultCueNearby: this.feedback.hasActionResultNear(enemy.pos, 48),
+        })), { battlefieldStress, protectedWarning, safeLaneVisible });
+        const crowdById = new Map(crowd.entries.map((entry) => [entry.id, entry]));
         ctx.save();
         for (const enemy of frozen) {
+            const crowdEntry = crowdById.get(enemy.id);
+            if (!crowdEntry)
+                continue;
             const amplitude = enemy.id === primaryFrozenEnemyId ? motion.freezeStatusMotionAmplitude : 0;
+            const enemyClass = freezeControlVfxClassForEnemyType(enemy.type);
+            const presentation = freezeStatusPresentation({ slowFactor: enemy.slowFactor, slowTimer: enemy.slowTimer, enemyClass, reducedFlash: this.presentationSettings.reducedFlash });
+            const lifecycle = this.freezeStatusLifecycleByEnemy.get(enemy.id) ?? advanceFreezeStatusLifecycle(createFreezeStatusLifecycleState(), { active: presentation.visible, targetAlpha: presentation.alpha, targetSizeScale: presentation.visible ? presentation.sizeScale : .72 }, 1 / 60, this.presentationSettings.reducedMotion);
+            if (!lifecycle.visible)
+                continue;
+            const pulse = Math.sin(this.elapsed * 5 + enemy.id) * amplitude * presentation.pulseAmplitude * crowdEntry.pulseScale * lifecycle.pulseScale;
             if (this.freezeControlVfxAtlasReady && this.freezeControlVfxAtlasImage) {
-                const enemyClass = freezeControlVfxClassForEnemyType(enemy.type), sprite = freezeControlVfxSprite(enemyClass, 'active');
-                const size = Math.max(enemyClass === 'boss' ? 142 : enemyClass === 'elite' ? 112 : enemyClass === 'specialist' ? 92 : 78, enemy.radius * (enemyClass === 'boss' ? 2.5 : 3.15));
-                ctx.globalAlpha = Math.min(this.presentationSettings.reducedFlash ? .46 : .72, .56 + Math.sin(this.elapsed * 5 + enemy.id) * amplitude);
-                ctx.drawImage(this.freezeControlVfxAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, enemy.pos.x - size / 2, enemy.pos.y - size / 2, size, size);
+                const sprite = freezeControlVfxSprite(enemyClass, 'active');
+                const rawSize = Math.max(presentation.baseSize, enemy.radius * (enemyClass === 'boss' ? 2.5 : 3.15)) * lifecycle.sizeScale * crowdEntry.sizeScale;
+                const edge = freezeStatusEdgePresentation({ x: enemy.pos.x, y: enemy.pos.y, size: rawSize, viewportWidth: LOGICAL_WIDTH, viewportHeight: LOGICAL_HEIGHT });
+                const size = rawSize * edge.sizeScale;
+                ctx.globalAlpha = Math.max(0, Math.min(1, lifecycle.alpha * crowdEntry.alphaScale + pulse));
+                ctx.drawImage(this.freezeControlVfxAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, enemy.pos.x - size / 2 + edge.offsetX, enemy.pos.y - size / 2 + edge.offsetY, size, size);
             }
             else {
-                ctx.globalAlpha = 0.52 + Math.sin(this.elapsed * 5 + enemy.id) * amplitude;
+                ctx.globalAlpha = Math.max(0, Math.min(1, lifecycle.alpha * crowdEntry.alphaScale + pulse));
                 ctx.strokeStyle = frost.color;
                 ctx.lineWidth = 2.5;
                 ctx.beginPath();

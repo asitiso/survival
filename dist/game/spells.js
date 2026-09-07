@@ -44,6 +44,8 @@ import { effectiveAlphaFloorBudgetPresentation, impactEffectiveAlphaFloorPresent
 import { impactSecondaryCeilingPresentation, secondaryCeilingBudgetPresentation } from './threat-impact-secondary-ceiling-rendering.js';
 import { impactReadabilityContrastPresentation, readabilityContrastBudgetPresentation } from './threat-impact-readability-contrast-rendering.js';
 import { valueChromaFilter } from './threat-impact-value-chroma-ownership-rendering.js';
+import { glowOwnershipPresentation } from './threat-impact-glow-ownership-rendering.js';
+import { denseGlowFamilyPresentation } from './threat-impact-dense-halo-budget-rendering.js';
 import { finalReadabilitySettleBudgetPresentation, impactFinalReadabilitySettlePresentation } from './threat-impact-final-readability-settle-rendering.js';
 import { impactSecondaryRecoveryGatePresentation, secondaryRecoveryGateBudgetPresentation } from './threat-impact-secondary-recovery-gate-rendering.js';
 import { focusTransferCoherenceBudgetPresentation, impactFocusTransferCoherencePresentation } from './threat-impact-focus-transfer-coherence-rendering.js';
@@ -434,9 +436,10 @@ export class SpellSystem {
                 ctx.stroke();
                 ctx.restore();
             }
+            const heroProjectileGlow = glowOwnershipPresentation({ family: 'projectile', crowd: Math.min(1, this.projectiles.length / 12), critical: projectile.evolutionTier >= 2, bossProtected: false, safeLaneVisible: false }, reducedMotion, reducedFlash), denseHeroProjectileGlow = denseGlowFamilyPresentation({ family: 'projectile', crowd: Math.min(1, this.projectiles.length / 12), critical: projectile.evolutionTier >= 2, bossProtected: false, safeLaneVisible: false }, reducedMotion, reducedFlash);
             ctx.save();
             ctx.shadowColor = projectile.secondary;
-            ctx.shadowBlur = 18;
+            ctx.shadowBlur = 18 * heroProjectileGlow.glowBlurScale * denseHeroProjectileGlow.glowBlurScale;
             ctx.fillStyle = projectile.primary;
             ctx.globalAlpha = heroProjectileAtlasReady ? 0.28 : 1;
             ctx.beginPath();
@@ -629,12 +632,13 @@ export class SpellSystem {
         for (const arc of this.arcs) {
             const alpha = Math.max(0, arc.ttl / 0.18);
             const visualFirst = arc.visualStart ?? arc.points[0];
+            const spellGlow = glowOwnershipPresentation({ family: 'spell', crowd: Math.min(1, this.arcs.length / 6), critical: false, bossProtected: false, safeLaneVisible: false }, reducedMotion, reducedFlash), denseSpellGlow = denseGlowFamilyPresentation({ family: 'spell', crowd: Math.min(1, this.arcs.length / 6), critical: false, bossProtected: false, safeLaneVisible: false }, reducedMotion, reducedFlash);
             ctx.save();
             ctx.globalAlpha = alpha;
             ctx.strokeStyle = arc.color;
             ctx.lineWidth = 6;
             ctx.shadowColor = arc.color;
-            ctx.shadowBlur = 15;
+            ctx.shadowBlur = 15 * spellGlow.glowBlurScale * denseSpellGlow.glowBlurScale;
             ctx.beginPath();
             if (visualFirst)
                 ctx.moveTo(visualFirst.x, visualFirst.y);

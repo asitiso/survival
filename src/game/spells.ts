@@ -53,6 +53,7 @@ import { effectiveAlphaFloorBudgetPresentation, impactEffectiveAlphaFloorPresent
 import { impactSecondaryCeilingPresentation, secondaryCeilingBudgetPresentation } from './threat-impact-secondary-ceiling-rendering.js';
 import { impactReadabilityContrastPresentation, readabilityContrastBudgetPresentation } from './threat-impact-readability-contrast-rendering.js';
 import { valueChromaFilter } from './threat-impact-value-chroma-ownership-rendering.js';
+import { glowOwnershipPresentation } from './threat-impact-glow-ownership-rendering.js';
 import { finalReadabilitySettleBudgetPresentation, impactFinalReadabilitySettlePresentation } from './threat-impact-final-readability-settle-rendering.js';
 import { impactSecondaryRecoveryGatePresentation, secondaryRecoveryGateBudgetPresentation } from './threat-impact-secondary-recovery-gate-rendering.js';
 import { focusTransferCoherenceBudgetPresentation, impactFocusTransferCoherencePresentation } from './threat-impact-focus-transfer-coherence-rendering.js';
@@ -494,8 +495,9 @@ export class SpellSystem {
       const travelBudget=heroTravelBridgeDensityBudgetPresentation({activeCount:activeHeroTravelBridges.length,indexFromNewest:heroTravelBridgeRank.get(projectile)??activeHeroTravelBridges.length,life:(projectile.visualLaunchTravelTtl??0)/Math.max(.001,projectile.visualLaunchTravelMaxTtl??.13),evolutionTier:projectile.evolutionTier},reducedMotion,reducedFlash);
       if(travelHandoff&&travelHandoff.visible&&travelBudget.visible){ctx.save();ctx.globalAlpha=Math.min(travel?.alpha??0,travelHandoff.alpha)*travelBudget.alphaScale*travelThreatCarry.alphaScale*threatOwnership.travelAlphaScale;ctx.strokeStyle=projectile.secondary;ctx.lineWidth=Math.max(1.1,projectile.radius*.12);ctx.beginPath();ctx.moveTo(travelHandoff.start.x,travelHandoff.start.y);ctx.lineTo(travelHandoff.end.x,travelHandoff.end.y);ctx.stroke();ctx.restore();}
       if(trail.owner==='launch'){ctx.save();ctx.globalAlpha=trail.alpha*threatOwnership.launchAlphaScale;ctx.strokeStyle=projectile.secondary;ctx.lineWidth=Math.max(1.4,projectile.radius*.18);ctx.beginPath();ctx.moveTo(trail.tail.x,trail.tail.y);ctx.lineTo(trail.head.x,trail.head.y);ctx.stroke();ctx.restore();}
+      const heroProjectileGlow=glowOwnershipPresentation({family:'projectile',crowd:Math.min(1,this.projectiles.length/12),critical:projectile.evolutionTier>=2,bossProtected:false,safeLaneVisible:false},reducedMotion,reducedFlash);
       ctx.save();
-      ctx.shadowColor = projectile.secondary; ctx.shadowBlur = 18;
+      ctx.shadowColor = projectile.secondary; ctx.shadowBlur = 18 * heroProjectileGlow.glowBlurScale;
       ctx.fillStyle = projectile.primary; ctx.globalAlpha = heroProjectileAtlasReady ? 0.28 : 1; ctx.beginPath(); ctx.arc(projectile.pos.x, projectile.pos.y, projectile.radius, 0, Math.PI * 2); ctx.fill();
       if (heroProjectileAtlasReady && heroProjectileAtlasImage) {
         const sprite = heroProjectileVfxSprite(projectile.heroId);
@@ -589,7 +591,8 @@ export class SpellSystem {
     for (const arc of this.arcs) {
       const alpha = Math.max(0, arc.ttl / 0.18);
       const visualFirst=arc.visualStart??arc.points[0];
-      ctx.save(); ctx.globalAlpha = alpha; ctx.strokeStyle = arc.color; ctx.lineWidth = 6; ctx.shadowColor = arc.color; ctx.shadowBlur = 15;
+      const spellGlow=glowOwnershipPresentation({family:'spell',crowd:Math.min(1,this.arcs.length/6),critical:false,bossProtected:false,safeLaneVisible:false},reducedMotion,reducedFlash);
+      ctx.save(); ctx.globalAlpha = alpha; ctx.strokeStyle = arc.color; ctx.lineWidth = 6; ctx.shadowColor = arc.color; ctx.shadowBlur = 15*spellGlow.glowBlurScale;
       ctx.beginPath();
       if(visualFirst)ctx.moveTo(visualFirst.x,visualFirst.y);
       for(let i=1;i<arc.points.length;i++){const p=arc.points[i]!;ctx.lineTo(p.x,p.y);}

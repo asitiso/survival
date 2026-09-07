@@ -1,0 +1,31 @@
+name: Local Sync Phase 4424
+on:
+  push:
+    branches:
+      - sync/phase4353-4370-local-final
+    paths:
+      - .sync/phase4424-trigger
+permissions:
+  contents: write
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Decode verified local patch
+        run: base64 -d .sync/phase4407-4424.patch.gz.b64 | gzip -d > /tmp/phase4407-4424.patch
+      - name: Recreate verified local tree and push result
+        run: |
+          set -euo pipefail
+          git config user.name asitiso
+          git config user.email asitiso.woo@gmail.com
+          git fetch origin work/phase4389-4406-damage-number-packing
+          git switch -C work/phase4407-4424-freeze-slow-lifecycle origin/work/phase4389-4406-damage-number-packing
+          git apply --index /tmp/phase4407-4424.patch
+          TREE=$(git write-tree)
+          test "$TREE" = "1f735ea25c0382b386e5e5a076ef25a37c39b4f9"
+          git diff --cached --check
+          git commit -m "feat: improve Phase 4407-4424 freeze slow lifecycle readability"
+          git push origin HEAD:work/phase4407-4424-freeze-slow-lifecycle

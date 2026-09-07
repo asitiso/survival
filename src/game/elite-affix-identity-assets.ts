@@ -100,6 +100,26 @@ export function eliteAffixPrimaryPresentationOwner(candidates: readonly EliteAff
   return owner;
 }
 
+export interface EliteAffixPresentationOwnerState { ownerId: EliteAffixId | null; priority: number; holdTtl: number; }
+export type EliteAffixOwnershipRole = 'primary' | 'secondary';
+export interface EliteAffixOwnershipRolePresentation { visible: true; alphaScale: number; motionScale: number; }
+const ELITE_AFFIX_OWNER_HOLD_SECONDS = 0.14;
+export function advanceEliteAffixPresentationOwner(previous: EliteAffixPresentationOwnerState | undefined, candidates: readonly EliteAffixCueCandidate[], dt: number): EliteAffixPresentationOwnerState {
+  const step = Math.max(0, Number.isFinite(dt) ? dt : 0);
+  const best = eliteAffixPrimaryPresentationOwner(candidates);
+  if (!previous?.ownerId) return best ? { ownerId: best.id, priority: best.priority, holdTtl: ELITE_AFFIX_OWNER_HOLD_SECONDS } : { ownerId: null, priority: 0, holdTtl: 0 };
+  if (best && best.priority > previous.priority) return { ownerId: best.id, priority: best.priority, holdTtl: ELITE_AFFIX_OWNER_HOLD_SECONDS };
+  const holdTtl = Math.max(0, previous.holdTtl - step);
+  if (holdTtl > 0) return { ownerId: previous.ownerId, priority: previous.priority, holdTtl };
+  return best ? { ownerId: best.id, priority: best.priority, holdTtl: ELITE_AFFIX_OWNER_HOLD_SECONDS } : { ownerId: null, priority: 0, holdTtl: 0 };
+}
+export function eliteAffixOwnershipRolePresentation(role: EliteAffixOwnershipRole, reducedMotion = false, reducedFlash = false): EliteAffixOwnershipRolePresentation {
+  let alphaScale = role === 'primary' ? 1 : 0.46;
+  if (reducedFlash) alphaScale *= 0.62;
+  const motionScale = reducedMotion ? 0 : role === 'primary' ? 1 : 0.38;
+  return { visible: true, alphaScale, motionScale };
+}
+
 export type SwiftCadencePhase = 'approach' | 'ready' | 'strike' | 'recovery';
 export interface SwiftCadenceLifecycleState { phase: SwiftCadencePhase; active: boolean; transitionTtl: number; }
 export interface SwiftCadenceLifecycleInput { inAttackRange: boolean; attackTimer: number; attackInterval: number; struck: boolean; dt: number; }

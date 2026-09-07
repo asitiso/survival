@@ -72,6 +72,26 @@ export function eliteAffixPrimaryPresentationOwner(candidates) {
     }
     return owner;
 }
+const ELITE_AFFIX_OWNER_HOLD_SECONDS = 0.14;
+export function advanceEliteAffixPresentationOwner(previous, candidates, dt) {
+    const step = Math.max(0, Number.isFinite(dt) ? dt : 0);
+    const best = eliteAffixPrimaryPresentationOwner(candidates);
+    if (!previous?.ownerId)
+        return best ? { ownerId: best.id, priority: best.priority, holdTtl: ELITE_AFFIX_OWNER_HOLD_SECONDS } : { ownerId: null, priority: 0, holdTtl: 0 };
+    if (best && best.priority > previous.priority)
+        return { ownerId: best.id, priority: best.priority, holdTtl: ELITE_AFFIX_OWNER_HOLD_SECONDS };
+    const holdTtl = Math.max(0, previous.holdTtl - step);
+    if (holdTtl > 0)
+        return { ownerId: previous.ownerId, priority: previous.priority, holdTtl };
+    return best ? { ownerId: best.id, priority: best.priority, holdTtl: ELITE_AFFIX_OWNER_HOLD_SECONDS } : { ownerId: null, priority: 0, holdTtl: 0 };
+}
+export function eliteAffixOwnershipRolePresentation(role, reducedMotion = false, reducedFlash = false) {
+    let alphaScale = role === 'primary' ? 1 : 0.46;
+    if (reducedFlash)
+        alphaScale *= 0.62;
+    const motionScale = reducedMotion ? 0 : role === 'primary' ? 1 : 0.38;
+    return { visible: true, alphaScale, motionScale };
+}
 export function advanceSwiftCadenceLifecycle(previous, input) {
     const step = Math.max(0, Number.isFinite(input.dt) ? input.dt : 0);
     const interval = Math.max(0.001, Number.isFinite(input.attackInterval) ? input.attackInterval : 1);

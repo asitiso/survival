@@ -1,0 +1,26 @@
+name: Phase 4335 Clean SHA Verify
+on:
+  push:
+    branches:
+      - verify/phase4335-4352-clean-6d0e9cb
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 6d0e9cba63d025fccd365f4e9b13ee7b98759030
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: node --test tests/phase4335-4340-target-intent-ownership.test.mjs tests/phase4341-4346-target-switch-readability.test.mjs tests/phase4347-4352-target-intent-budget.test.mjs tests/phase4317-4322-auto-humanization.test.mjs tests/phase4323-4328-manual-forgiveness.test.mjs tests/phase4329-4334-threat-control-matrix.test.mjs
+      - run: npm test
+      - run: npm run verify:raster
+      - run: npm run verify:release
+      - run: npm run verify:candidate
+      - run: git diff --check

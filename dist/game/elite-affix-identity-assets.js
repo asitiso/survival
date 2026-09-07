@@ -56,6 +56,22 @@ export function eliteAffixIdentityEmphasis(id, hpRatio, manaShieldRatio) {
         return 1;
     return 0;
 }
+const ELITE_AFFIX_CUE_PRIORITY = {
+    passive: 1,
+    response: 2,
+    'threshold-enter': 3,
+    'actual-strike': 4,
+    'shield-break': 5,
+};
+export function eliteAffixPrimaryPresentationOwner(candidates) {
+    let owner;
+    for (const candidate of candidates) {
+        const priority = ELITE_AFFIX_CUE_PRIORITY[candidate.reason];
+        if (!owner || priority > owner.priority)
+            owner = { ...candidate, priority };
+    }
+    return owner;
+}
 export function advanceSwiftCadenceLifecycle(previous, input) {
     const step = Math.max(0, Number.isFinite(input.dt) ? input.dt : 0);
     const interval = Math.max(0.001, Number.isFinite(input.attackInterval) ? input.attackInterval : 1);

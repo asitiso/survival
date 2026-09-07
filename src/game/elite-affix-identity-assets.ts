@@ -81,6 +81,25 @@ export function eliteAffixIdentityEmphasis(id: EliteAffixId, hpRatio: number, ma
   return 0;
 }
 
+export type EliteAffixCueReason = 'passive' | 'response' | 'threshold-enter' | 'actual-strike' | 'shield-break';
+export interface EliteAffixCueCandidate { id: EliteAffixId; reason: EliteAffixCueReason; }
+export interface EliteAffixPrimaryPresentationOwner extends EliteAffixCueCandidate { priority: number; }
+const ELITE_AFFIX_CUE_PRIORITY: Readonly<Record<EliteAffixCueReason, number>> = {
+  passive: 1,
+  response: 2,
+  'threshold-enter': 3,
+  'actual-strike': 4,
+  'shield-break': 5,
+};
+export function eliteAffixPrimaryPresentationOwner(candidates: readonly EliteAffixCueCandidate[]): EliteAffixPrimaryPresentationOwner | undefined {
+  let owner: EliteAffixPrimaryPresentationOwner | undefined;
+  for (const candidate of candidates) {
+    const priority = ELITE_AFFIX_CUE_PRIORITY[candidate.reason];
+    if (!owner || priority > owner.priority) owner = { ...candidate, priority };
+  }
+  return owner;
+}
+
 export type SwiftCadencePhase = 'approach' | 'ready' | 'strike' | 'recovery';
 export interface SwiftCadenceLifecycleState { phase: SwiftCadencePhase; active: boolean; transitionTtl: number; }
 export interface SwiftCadenceLifecycleInput { inAttackRange: boolean; attackTimer: number; attackInterval: number; struck: boolean; dt: number; }

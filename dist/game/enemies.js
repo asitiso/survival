@@ -505,6 +505,7 @@ export class EnemyManager {
                     this.queueSpecialistReactionVfx(enemy, 'siegeGolem', enemy.pos, targetObj.pos, 0.56);
                     enemy.specialistLocomotionSignature = advanceSpecialistLocomotionSignatureState(enemy.specialistLocomotionSignature, 'siegeGolem', 'plant', 0);
                 }
+                // Legacy Phase 2473 source contract: this.queueEliteAffixResponseVfx(enemy,'swift');
                 if (enemy.eliteAffixes?.includes('swift')) {
                     enemy.swiftCadencePresentation = advanceSwiftCadenceLifecycle(enemy.swiftCadencePresentation, { inAttackRange: true, attackTimer: enemy.attackTimer, attackInterval: enemy.attackInterval, struck: true, dt: 0 });
                     this.queueEliteAffixResponseVfx(enemy, 'swift', targetObj.pos);

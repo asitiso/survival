@@ -1,0 +1,85 @@
+name: Phase 4335 Apply Render Integration
+on:
+  push:
+    branches:
+      - work/phase4335-4352-target-intent-readability
+    paths:
+      - .phase4335-apply-render
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Patch committed target cue into live battlefield render
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('src/game/game.ts')
+          s=p.read_text()
+          import_needle="import { AutoCombatBrain } from './auto-combat-brain.js';"
+          imports="""import { AutoCombatBrain } from './auto-combat-brain.js';
+          import { autoWeakpointAimPoint } from './auto-weakpoint-aim.js';
+          import { manualWeakpointAssistAimPoint } from './manual-weakpoint-assist.js';
+          import { targetIntentCuePresentation } from './target-intent-cue.js';"""
+          if import_needle not in s:
+              raise SystemExit('AutoCombatBrain import anchor missing')
+          s=s.replace(import_needle,imports,1)
+          anchor="  private drawDangerTelegraphs(ctx: CanvasRenderingContext2D): void {\n"
+          if anchor not in s:
+              raise SystemExit('drawDangerTelegraphs anchor missing')
+          method="""  private drawTargetIntentCue(ctx:CanvasRenderingContext2D):void{
+            const mode=this.autoCastNormal?'auto':'manual';
+            const committedTargetId=mode==='auto'?this.autoCombatBrain.currentTargetId():this.manualTargetMemory.currentTargetId();
+            const target=committedTargetId===null?null:this.enemies.enemies.find((enemy)=>enemy.alive&&enemy.id===committedTargetId)??null;
+            if(!target)return;
+            let weakpointAim:Vec2|null=null;
+            if(target.type==='boss'){
+              weakpointAim=mode==='auto'
+                ?autoWeakpointAimPoint({autoAim:true,target,heroPos:this.hero.pos,activeBossId:this.bossEncounter.activeBossId,nodes:this.bossEncounter.nodes,preferredNodeId:this.autoCombatBrain.currentWeakpointId()})
+                :manualWeakpointAssistAimPoint({target,heroPos:this.hero.pos,activeBossId:this.bossEncounter.activeBossId,nodes:this.bossEncounter.nodes});
+            }
+            const liveEnemyCount=this.enemies.enemies.reduce((count,enemy)=>count+(enemy.alive?1:0),0);
+            const battlefieldStress=Math.max(0,Math.min(1,(liveEnemyCount+this.bossArena.hazards.length*2-8)/22));
+            const protectedWarning=Boolean((this.bossPhaseCue&&this.bossPhaseCueTimer>0)||this.dangerState.heroCritical||this.dangerState.coreCritical);
+            const cue=targetIntentCuePresentation({mode,committedTargetId,targetAlive:target.alive,targetRadius:target.radius,weakpointAvailable:Boolean(weakpointAim&&distance(weakpointAim,target.pos)>1),battlefieldStress,protectedWarning,safeLaneVisible:Boolean(this.currentMythicSafeLanePresentation),reducedMotion:this.presentationSettings.reducedMotion,reducedFlash:this.presentationSettings.reducedFlash});
+            if(!cue.visible)return;
+            const pulse=cue.pulseAmplitude>0?Math.sin(this.elapsed*5.1+target.id)*cue.pulseAmplitude:0;
+            const radius=cue.radius+pulse;
+            ctx.save();
+            ctx.globalAlpha=cue.alpha;
+            ctx.strokeStyle=mode==='auto'?'#8fdcff':'#ffe39a';
+            ctx.lineWidth=cue.lineWidth;
+            ctx.lineCap='round';
+            for(let i=0;i<4;i++){const center=i*Math.PI*.5;ctx.beginPath();ctx.arc(target.pos.x,target.pos.y,radius,center-cue.segmentArc*.5,center+cue.segmentArc*.5);ctx.stroke();}
+            if(cue.showWeakpointDirection&&weakpointAim){ctx.globalAlpha=cue.weakpointAlpha;ctx.lineWidth=Math.max(1,cue.lineWidth*.82);ctx.beginPath();ctx.moveTo(target.pos.x,target.pos.y);ctx.lineTo(weakpointAim.x,weakpointAim.y);ctx.stroke();ctx.beginPath();ctx.arc(weakpointAim.x,weakpointAim.y,2.5,0,Math.PI*2);ctx.stroke();}
+            ctx.restore();
+          }
+
+          """
+          s=s.replace(anchor,method+anchor,1)
+          danger_start="  private drawDangerTelegraphs(ctx: CanvasRenderingContext2D): void {\n    const cues ="
+          danger_repl="  private drawDangerTelegraphs(ctx: CanvasRenderingContext2D): void {\n    this.drawTargetIntentCue(ctx);\n    const cues ="
+          if danger_start not in s:
+              raise SystemExit('danger telegraph body anchor missing')
+          s=s.replace(danger_start,danger_repl,1)
+          p.write_text(s)
+          PY
+      - run: npm run build
+      - run: node --test tests/phase4335-4340-target-intent-ownership.test.mjs tests/phase4317-4322-auto-humanization.test.mjs tests/phase4323-4328-manual-forgiveness.test.mjs
+      - name: Commit scoped render integration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/game/game.ts dist/game/game.js dist/game/auto-combat-brain.js dist/game/target-intent-cue.js
+          git diff --cached --check
+          git commit -m "feat: render committed combat target intent"
+          git push origin HEAD:work/phase4335-4352-target-intent-readability

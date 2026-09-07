@@ -151,6 +151,10 @@ export class CombatFeedbackSystem {
             this.resultCues.splice(0, this.resultCues.length - 18);
         this.resultCooldowns.set(kind, actionResultMinimumGap(kind));
     }
+    hasActionResultNear(pos, radius) {
+        const safeRadius = Math.max(0, Number.isFinite(radius) ? radius : 0);
+        return this.resultCues.some((cue) => Math.hypot(cue.pos.x - pos.x, cue.pos.y - pos.y) <= safeRadius);
+    }
     update(dt) {
         this.shakePhase += dt;
         this.shake = Math.max(0, this.shake - dt * 20);

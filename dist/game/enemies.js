@@ -12,7 +12,7 @@ import { mythicLastLawIdentityProfile } from './endless/mythic-last-law-identity
 import { activeMythicTacticAttackLink } from './endless/mythic-tactic-attack-link.js';
 import { enemySpritePresentation, enemySpriteRect, isEnemySpriteType } from './enemy-sprite-assets.js';
 import { bossSpritePresentation, bossSpriteRect } from './boss-sprite-assets.js';
-import { advanceFrenziedThresholdLifecycle, advanceSwiftCadenceLifecycle, eliteAffixIdentityEmphasis, eliteAffixIdentityIcon, eliteAffixIdentityRowLayout, frenziedThresholdDensityPresentation, frenziedThresholdPresentation, swiftStrikeOwnershipPresentation } from './elite-affix-identity-assets.js';
+import { advanceFrenziedThresholdLifecycle, advanceSwiftCadenceLifecycle, eliteAffixIdentityEmphasis, eliteAffixIdentityIcon, eliteAffixIdentityRowLayout, frenziedThresholdDensityPresentation, frenziedThresholdPresentation, swiftCadenceDensityPresentation, swiftCadencePresentation, swiftStrikeOwnershipPresentation } from './elite-affix-identity-assets.js';
 import { isSpecialistIntentType, specialistIntentEmphasis, specialistIntentIcon, specialistIntentOnBodyLayout } from './specialist-intent-identity-assets.js';
 import { projectileImpactSourceContinuity } from './projectile-impact-source-continuity.js';
 import { projectileImpactClusters } from './projectile-impact-cluster-compression.js';
@@ -985,6 +985,9 @@ export class EnemyManager {
         const activeFrenzied = this.enemies.filter((enemy) => enemy.eliteAffixes?.includes('frenzied') && enemy.frenziedPresentation?.phase !== 'inactive');
         const frenziedPriority = [...activeFrenzied].sort((a, b) => { const score = (enemy) => { const target = enemy.target === 'core' ? corePos : heroPos; const d = target ? distance(enemy.pos, target) : 9999; return (enemy.target === 'core' ? 4 : 0) + (d <= 120 ? 4 : 0) + (enemy.hitFlash > 0 ? 2 : 0) + (enemy.frenziedPresentation?.phase === 'entered' ? 1 : 0); }; return score(b) - score(a); });
         const frenziedPriorityRank = new Map(frenziedPriority.map((enemy, index) => [enemy, index]));
+        const activeSwift = this.enemies.filter((enemy) => enemy.eliteAffixes?.includes('swift') && enemy.swiftCadencePresentation);
+        const swiftPriority = [...activeSwift].sort((a, b) => { const score = (enemy) => { const target = enemy.target === 'core' ? corePos : heroPos; const d = target ? distance(enemy.pos, target) : 9999; return (enemy.target === 'core' ? 4 : 0) + (d <= 120 ? 4 : 0) + (enemy.hitFlash > 0 ? 2 : 0) + (enemy.swiftCadencePresentation?.phase === 'strike' ? 3 : enemy.swiftCadencePresentation?.phase === 'ready' ? 1 : 0); }; return score(b) - score(a); });
+        const swiftPriorityRank = new Map(swiftPriority.map((enemy, index) => [enemy, index]));
         for (const enemy of this.enemies) {
             ctx.save();
             ctx.translate(enemy.pos.x, enemy.pos.y);
@@ -1440,6 +1443,27 @@ export class EnemyManager {
                         ctx.rotate((index === 0 ? 1 : -1) * (0.10 + index * 0.04));
                         ctx.globalAlpha = reducedFlash ? 0.26 : 0.42;
                         ctx.drawImage(eliteAffixLifecycleVfxAtlasImage, activeSprite.sx, activeSprite.sy, activeSprite.sw, activeSprite.sh, -size / 2, -size / 2, size, size);
+                        ctx.restore();
+                    }
+                }
+                if (enemy.eliteAffixes.includes('swift') && enemy.swiftCadencePresentation && targetPos) {
+                    const swift = swiftCadencePresentation(enemy.swiftCadencePresentation, reducedMotion, reducedFlash), swiftPriorityTarget = enemy.target === 'core' || targetDistance <= 120 || enemy.hitFlash > 0 || enemy.swiftCadencePresentation?.phase === 'strike', swiftDensity = swiftCadenceDensityPresentation(enemy.swiftCadencePresentation, { activeCount: activeSwift.length, indexFromPriority: swiftPriorityRank.get(enemy) ?? activeSwift.length, priorityTarget: swiftPriorityTarget, higherPriorityCue: hazardPressure >= .72, battlefieldStress: Math.max(0, Math.min(1, hazardPressure)), reducedMotion, reducedFlash });
+                    if (swift.alpha > 0 && swiftDensity.visible) {
+                        const mag = Math.max(1, targetDistance), nx = targetDx / mag, ny = targetDy / mag, start = enemy.radius + 8, end = start + swift.chevronLength * (.8 + .2 * swiftDensity.motionScale), perpX = -ny, perpY = nx, wing = 4;
+                        ctx.save();
+                        ctx.globalAlpha = swift.alpha * swiftDensity.alphaScale;
+                        ctx.strokeStyle = '#9edfff';
+                        ctx.lineWidth = swift.lineWidth;
+                        ctx.beginPath();
+                        ctx.moveTo(nx * start, ny * start);
+                        ctx.lineTo(nx * end, ny * end);
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(nx * end, ny * end);
+                        ctx.lineTo(nx * (end - 5) + perpX * wing, ny * (end - 5) + perpY * wing);
+                        ctx.moveTo(nx * end, ny * end);
+                        ctx.lineTo(nx * (end - 5) - perpX * wing, ny * (end - 5) - perpY * wing);
+                        ctx.stroke();
                         ctx.restore();
                     }
                 }

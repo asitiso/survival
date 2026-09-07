@@ -143,6 +143,33 @@ export function swiftStrikeOwnershipPresentation(input: SwiftStrikeOwnershipInpu
   return { visible: true, connectorAlpha, chevronScale, priorityScale, motionScale: input.reducedMotion ? 0 : 1 };
 }
 
+export interface SwiftCadenceDensityInput {
+  activeCount: number;
+  indexFromPriority: number;
+  priorityTarget?: boolean;
+  higherPriorityCue?: boolean;
+  battlefieldStress?: number;
+  reducedMotion?: boolean;
+  reducedFlash?: boolean;
+}
+export interface SwiftCadenceDensityPresentation {
+  visible: boolean;
+  alphaScale: number;
+  motionScale: number;
+}
+export function swiftCadenceDensityPresentation(state: SwiftCadenceLifecycleState | undefined, input: SwiftCadenceDensityInput): SwiftCadenceDensityPresentation {
+  if (!state) return { visible: false, alphaScale: 0, motionScale: 0 };
+  const stress = clamp(Number.isFinite(input.battlefieldStress) ? (input.battlefieldStress ?? 0) : 0, 0, 1);
+  const priority = Boolean(input.priorityTarget) || state.phase === 'strike';
+  const capacity = Math.max(1, Math.round(4 - stress * 3));
+  let visible = priority || Math.max(0, input.indexFromPriority) < capacity;
+  if (input.higherPriorityCue && state.phase !== 'strike') visible = false;
+  let alphaScale = priority ? Math.max(0.68, 1 - stress * 0.18) : visible ? Math.max(0.38, 1 - stress * 0.55) : 0.16;
+  if (input.higherPriorityCue && state.phase === 'strike') alphaScale = Math.min(0.42, alphaScale * 0.48);
+  if (input.reducedFlash) alphaScale *= 0.68;
+  return { visible, alphaScale, motionScale: input.reducedMotion ? 0 : visible ? 1 : 0.2 };
+}
+
 export type FrenziedThresholdPhase = 'inactive' | 'entered' | 'active' | 'released';
 export interface FrenziedThresholdLifecycleState { phase:FrenziedThresholdPhase; active:boolean; transitionTtl:number; }
 export interface FrenziedThresholdPresentation { alpha:number; radiusOffset:number; lineWidth:number; pulse:number; }

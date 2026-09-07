@@ -1,4 +1,4 @@
-name: Phase 4532 Regression Diagnose
+name: Phase 4532 Regression Diagnose 2
 
 on:
   push:
@@ -15,12 +15,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: work/phase4515-4532-swift-cadence-readability
-      - name: Locate Phase 4263 contract and current helper source
+      - name: Broaden Phase 4263 source-contract search
         shell: bash
         run: |
           set -euo pipefail
-          grep -R -n -F "phase 4263-frame opponent body helper preserves explicit pose override ordering" tests || true
-          grep -R -n -F "explicitIdx > poseIdx" tests || true
-          grep -n -A28 -B8 -F "private drawEnemyOpponentFrameBody(" src/game/enemies.ts || true
-          grep -n -F "const pose=visual ? visual.scalarOr('pose',0) :0;" src/game/enemies.ts || true
-          grep -n -F "typeof explicitPose==='number'" src/game/enemies.ts || true
+          echo '--- tests explicitIdx ---'
+          grep -R -n "explicitIdx" tests || true
+          echo '--- tests drawEnemyOpponentFrameBody ---'
+          grep -R -n "drawEnemyOpponentFrameBody" tests || true
+          echo '--- source drawEnemyOpponentFrameBody ---'
+          grep -n -A45 -B10 "drawEnemyOpponentFrameBody" src/game/enemies.ts || true
+          echo '--- source scalarOr pose ---'
+          grep -n -A8 -B8 "scalarOr('pose'" src/game/enemies.ts || true
+          echo '--- source explicitPose ---'
+          grep -n -A8 -B8 "explicitPose" src/game/enemies.ts || true

@@ -1,4 +1,4 @@
-name: Phase 4527 Swift Dense GREEN
+name: Phase 4515-4532 Final Verification
 
 on:
   push:
@@ -6,40 +6,36 @@ on:
       - '.sync/phase4496.ready'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  validate:
+  verify:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: work/phase4515-4532-swift-cadence-readability
           fetch-depth: 0
-      - name: Prepare feature branch and patch helper
-        shell: bash
-        run: |
-          set -euo pipefail
-          cp .sync/phase4527-green.py /tmp/phase4527-green.py
-          git fetch origin work/phase4515-4532-swift-cadence-readability
-          git switch -C work/phase4515-4532-swift-cadence-readability origin/work/phase4515-4532-swift-cadence-readability
-          python /tmp/phase4527-green.py .
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run build
-      - name: Focused Swift regression
-        run: node --test tests/phase4515-4520-swift-cadence-lifecycle.test.mjs tests/phase4521-4526-swift-strike-ownership.test.mjs tests/phase4527-4532-swift-dense-arbitration.test.mjs
-      - run: git diff --check
-      - name: Commit and push verified result
+      - name: Full regression
+        run: npm test
+      - name: Fresh build
+        run: npm run build
+      - name: Raster verification
+        run: npm run verify:raster
+      - name: Release verification
+        run: npm run verify:release
+      - name: Candidate verification
+        run: npm run verify:candidate
+      - name: Final tree checks
         shell: bash
         run: |
           set -euo pipefail
-          git config user.name asitiso
-          git config user.email asitiso.woo@gmail.com
-          git add src/game/enemies.ts src/game/elite-affix-identity-assets.ts
-          git add -f dist/game/enemies.js dist/game/elite-affix-identity-assets.js
-          git diff --cached --check
-          git commit -m "feat: arbitrate Phase 4527-4532 swift cadence density"
-          git push origin HEAD:work/phase4515-4532-swift-cadence-readability
+          git diff --check
+          test -z "$(git status --porcelain)"
+          git rev-parse HEAD
+          git rev-parse HEAD^{tree}

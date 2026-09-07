@@ -7042,7 +7042,7 @@ export class Game {
             if (forecast && forecast.urgency >= .65 && safeLaneVisual.bridgeVisible) {
                 ctx.globalAlpha = (.18 + .22 * forecast.urgency) * safeLaneVisual.bridgeAlphaScale * safeLaneAttention.bridgeAlphaScale * safeLaneAttentionRecovery.bridgeRecoveryScale * safeLaneHazardRecovery.bridgeAlphaScale;
                 ctx.strokeStyle = '#7fd9ff';
-                ctx.setLineDash([4, 8 * forecastDashGapScale]);
+                ctx.setLineDash([4, 8 * forecastDashGapScale * (1 + (1 - safeLaneFinalSettle.settle) * .24)]);
                 ctx.beginPath();
                 ctx.moveTo(forecast.currentTarget.x, forecast.currentTarget.y);
                 ctx.lineTo(forecast.nextTarget.x, forecast.nextTarget.y);
@@ -7247,7 +7247,7 @@ export class Game {
                 ctx.globalAlpha = .24 * hazardResidueRelease.clearedGroundAlphaScale * hazardGroundResolution.clearedGroundAlphaScale;
                 ctx.strokeStyle = color;
                 ctx.lineWidth = 1.4;
-                ctx.setLineDash([3, 7 * hazardDashGapScale]);
+                ctx.setLineDash([3, 7 * hazardDashGapScale * hazardFinalSettle.dashGapScale]);
                 ctx.beginPath();
                 ctx.arc(hazard.pos.x, hazard.pos.y, Math.max(12, hazard.radius * 1.04), 0, Math.PI * 2);
                 ctx.stroke();

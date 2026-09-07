@@ -1,4 +1,4 @@
-name: Phase 4532 Tracked Build Sync
+name: Phase 4515-4532 Final Verification Clean
 
 on:
   push:
@@ -6,10 +6,10 @@ on:
       - '.sync/phase4496.ready'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  sync:
+  verify:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -21,27 +21,28 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Regenerate tracked build output
+      - name: Initial clean tree
         shell: bash
         run: |
           set -euo pipefail
-          npm run build
+          test -z "$(git status --porcelain)"
+      - name: Full regression
+        run: npm test
+      - name: Fresh build
+        run: npm run build
+      - name: Raster verification
+        run: npm run verify:raster
+      - name: Release verification
+        run: npm run verify:release
+      - name: Candidate verification
+        run: npm run verify:candidate
+      - name: Final clean tree
+        shell: bash
+        run: |
+          set -euo pipefail
           git diff --check
           status="$(git status --porcelain)"
-          printf '%s\n' "$status"
-          test "$status" = ' M dist/game/enemies.js'
-      - name: Commit synchronized dist
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name asitiso
-          git config user.email asitiso.woo@gmail.com
-          git add -f dist/game/enemies.js
-          git diff --cached --check
-          staged="$(git diff --cached --name-only)"
-          test "$staged" = 'dist/game/enemies.js'
-          git commit -m "build: sync swift cadence output"
-          git push origin HEAD:work/phase4515-4532-swift-cadence-readability
+          printf '%s' "$status"
+          test -z "$status"
           echo "HEAD=$(git rev-parse HEAD)"
           echo "TREE=$(git rev-parse HEAD^{tree})"
-          test -z "$(git status --porcelain)"

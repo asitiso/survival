@@ -1,4 +1,5 @@
 import { distance } from '../core/math.js';
+import { AUTO_WEAKPOINT_AIM_BLEND } from './auto-combat-brain.js';
 export function autoWeakpointAimPoint(input) {
     const target = input.target;
     if (!target)
@@ -9,7 +10,10 @@ export function autoWeakpointAimPoint(input) {
     const live = input.nodes.filter((node) => node.alive && node.hp > 0 && distance(input.heroPos, node.pos) <= maxDistance);
     if (live.length === 0)
         return { ...target.pos };
-    const primary = [...live].sort((a, b) => {
+    const preferred = input.preferredNodeId === undefined || input.preferredNodeId === null
+        ? undefined
+        : live.find((node) => node.id === input.preferredNodeId);
+    const primary = preferred ?? [...live].sort((a, b) => {
         const ar = a.hp / Math.max(1, a.maxHp), br = b.hp / Math.max(1, b.maxHp);
         if (Math.abs(ar - br) > .001)
             return ar - br;
@@ -18,5 +22,9 @@ export function autoWeakpointAimPoint(input) {
             return ad - bd;
         return a.id - b.id;
     })[0];
-    return primary ? { ...primary.pos } : { ...target.pos };
+    if (!primary)
+        return { ...target.pos };
+    if (input.preferredNodeId === undefined || input.preferredNodeId === null)
+        return { ...primary.pos };
+    return { x: target.pos.x + (primary.pos.x - target.pos.x) * AUTO_WEAKPOINT_AIM_BLEND, y: target.pos.y + (primary.pos.y - target.pos.y) * AUTO_WEAKPOINT_AIM_BLEND };
 }

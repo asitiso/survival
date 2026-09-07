@@ -7,10 +7,11 @@ test('phase 503 weakpoint effect audit covers direct and area spells across offs
   assert.ok(audit.samples.length>=24);
   assert.deepEqual(new Set(audit.samples.map((s)=>s.spellId)),new Set(['fireBolt','chainLightning','flameField','meteorStorm','blackHole']));
 });
-test('phase 504 AUTO weakpoint aim materially improves expected weakpoint contact',()=>{
+test('phase 504 AUTO weakpoint aim improves contact without exact-node perfection',()=>{
   const audit=auditAutoWeakpointEffect();
-  assert.ok(audit.averageContactGain>=.18);
-  assert.ok(audit.minAutoContact>=.92);
+  assert.ok(audit.averageContactGain>=.18&&audit.averageContactGain<=.34);
+  assert.ok(audit.minAutoContact>=.78&&audit.minAutoContact<1);
+  assert.ok(audit.estimatedBreakTimeReduction>=.08&&audit.estimatedBreakTimeReduction<=.16);
 });
 test('phase 505 direct spells receive the largest weakpoint benefit without nerfing area spells',()=>{
   const audit=auditAutoWeakpointEffect();

@@ -5,6 +5,7 @@ import { spellEvolution } from './spell-evolutions.js';
 import { composeFusionSpellModifiers } from './fusion-integration.js';
 import { chooseSpellTarget } from './auto-targeting.js';
 import { autoWeakpointAimPoint } from './auto-weakpoint-aim.js';
+import { manualWeakpointAssistAimPoint } from './manual-weakpoint-assist.js';
 import { ultimateChoreographyDescriptor } from './spell-vfx.js';
 import { battlefieldSpellVfxSprite } from './battlefield-props-vfx-assets.js';
 import { heroProjectileImpactVfxSprite, heroProjectileVfxSprite } from './hero-projectile-vfx-assets.js';
@@ -885,7 +886,7 @@ export class SpellSystem {
     targetAimPoint(world, target) {
         if (!target)
             return null;
-        return autoWeakpointAimPoint({ autoAim: world.autoAim === true, target, heroPos: world.hero.pos, activeBossId: world.weakpointAim?.activeBossId ?? null, nodes: world.weakpointAim?.nodes ?? [] });
+        return world.autoAim === true ? autoWeakpointAimPoint({ autoAim: true, target, heroPos: world.hero.pos, activeBossId: world.weakpointAim?.activeBossId ?? null, nodes: world.weakpointAim?.nodes ?? [], preferredNodeId: world.preferredAutoWeakpointId ?? null }) : manualWeakpointAssistAimPoint({ target, heroPos: world.hero.pos, activeBossId: world.weakpointAim?.activeBossId ?? null, nodes: world.weakpointAim?.nodes ?? [] });
     }
     updateProjectiles(dt, world) {
         for (const p of this.projectiles) {

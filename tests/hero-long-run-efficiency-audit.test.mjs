@@ -12,6 +12,7 @@ test('phase 415 hero long-run efficiency covers four heroes three threats and fo
 test('phase 416 long-run best-build efficiency stays inside a fair hero envelope even on threat five',()=>{
   const audit=auditHeroLongRunEfficiency();
   assert.ok(audit.maxHeroEfficiencySpread<=1.20);
+  assert.equal(audit.retentionBaselineThreat,2);
   assert.ok(audit.minThreatFiveRetention>=0.75);
 });
 

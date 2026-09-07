@@ -14,11 +14,11 @@ test('phase 528 marginal challengers do not create target flicker before the mat
   assert.equal(a.unnecessarySwitches,0);
   assert.ok(a.maxSwitchesPerSecond<=2);
 });
-test('phase 529 material target and weakpoint changes are reflected within one rendered frame',()=>{
+test('phase 529 AUTO target and weakpoint changes stay inside a human reaction window instead of frame-perfect switching',()=>{
   const a=auditAutoTransitionLatency();
-  assert.ok(a.materialSwitchLatencyFrames<=1);
-  assert.ok(a.coreThreatSwitchLatencyFrames<=1);
-  assert.ok(a.weakpointSwitchLatencyFrames<=1);
+  assert.ok(a.materialSwitchLatencyFrames>=6&&a.materialSwitchLatencyFrames<=24);
+  assert.ok(a.coreThreatSwitchLatencyFrames>=3&&a.coreThreatSwitchLatencyFrames<=18);
+  assert.ok(a.weakpointSwitchLatencyFrames>=8&&a.weakpointSwitchLatencyFrames<=22);
 });
 test('phase 530 release candidate fails closed when AUTO transition latency regresses',()=>{
   const evidence=collectReleaseCandidateEvidence();

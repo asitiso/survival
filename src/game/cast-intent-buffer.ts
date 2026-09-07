@@ -1,6 +1,6 @@
 import type { ActionId } from './config.js';
 
-export const CAST_INTENT_BUFFER_WINDOW_SECONDS = 0.20;
+export const CAST_INTENT_BUFFER_WINDOW_SECONDS = 0.32;
 
 export const COMBAT_CAST_ACTIONS = [
   'spell1',

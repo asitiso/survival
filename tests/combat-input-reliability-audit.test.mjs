@@ -24,7 +24,7 @@ test('phase 1176 audit covers all six cast actions across early exact and outsid
   const audit=auditCombatInputReliability();
   assert.equal(audit.castActionCount,6);
   assert.equal(audit.timingSamples,18);
-  assert.equal(audit.windowSeconds,0.20);
+  assert.equal(audit.windowSeconds,0.32);
   assert.equal(audit.timingPassed,true);
 });
 

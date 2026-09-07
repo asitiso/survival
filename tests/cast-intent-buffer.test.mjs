@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 const mod=await import('../dist/game/cast-intent-buffer.js').catch(()=>({}));
 const { CAST_INTENT_BUFFER_WINDOW_SECONDS, COMBAT_CAST_ACTIONS, CastIntentBuffer }=mod;
 
-test('phase 1143 early tap buffer window is exactly 0.20 seconds for six cast actions',()=>{
-  assert.equal(CAST_INTENT_BUFFER_WINDOW_SECONDS,0.20);
+test('phase 1143 early tap buffer window is exactly 0.32 seconds for six cast actions',()=>{
+  assert.equal(CAST_INTENT_BUFFER_WINDOW_SECONDS,0.32);
   assert.deepEqual(COMBAT_CAST_ACTIONS,['spell1','spell2','spell3','spell4','ultimate1','ultimate2']);
 });
 
@@ -13,9 +13,9 @@ test('phase 1144 near-ready manual tap queues but farther tap is rejected',()=>{
   assert.equal(typeof CastIntentBuffer,'function');
   if(typeof CastIntentBuffer!=='function') return;
   const buffer=new CastIntentBuffer();
-  assert.equal(buffer.request('spell1',0.20),'queued');
+  assert.equal(buffer.request('spell1',0.32),'queued');
   assert.equal(buffer.isQueued('spell1'),true);
-  assert.equal(buffer.request('spell2',0.200001),'rejected');
+  assert.equal(buffer.request('spell2',0.320001),'rejected');
   assert.equal(buffer.isQueued('spell2'),false);
 });
 

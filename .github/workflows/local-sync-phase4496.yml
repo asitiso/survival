@@ -36,7 +36,10 @@ jobs:
           set -euo pipefail
           git config user.name asitiso
           git config user.email asitiso.woo@gmail.com
-          git add dist/game/enemies.js
+          git add -f dist/game/enemies.js
+          git diff --cached --check
+          staged="$(git diff --cached --name-only)"
+          test "$staged" = 'dist/game/enemies.js'
           git commit -m "build: sync swift cadence output"
           git push origin HEAD:work/phase4515-4532-swift-cadence-readability
           echo "HEAD=$(git rev-parse HEAD)"

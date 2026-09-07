@@ -235,6 +235,7 @@ import { bossTelegraphReengagementLockPresentation, criticalReengagementBudgetPr
 import { effectiveAlphaFloorBudgetPresentation, hazardEffectiveAlphaFloorPresentation, safeLaneEffectiveAlphaFloorPresentation } from './threat-impact-effective-alpha-floor-rendering.js';
 import { bossSecondaryCeilingPresentation, hazardSecondaryCeilingPresentation, secondaryCeilingBudgetPresentation } from './threat-impact-secondary-ceiling-rendering.js';
 import { hazardReadabilityContrastPresentation, readabilityContrastBudgetPresentation, safeLaneReadabilityContrastPresentation } from './threat-impact-readability-contrast-rendering.js';
+import { valueChromaFilter } from './threat-impact-value-chroma-ownership-rendering.js';
 import { finalReadabilitySettleBudgetPresentation, hazardFinalReadabilitySettlePresentation, safeLaneFinalReadabilitySettlePresentation } from './threat-impact-final-readability-settle-rendering.js';
 import { hazardSecondaryRecoveryGatePresentation, safeLaneSecondaryRecoveryGatePresentation, secondaryRecoveryGateBudgetPresentation } from './threat-impact-secondary-recovery-gate-rendering.js';
 import { focusTransferCoherenceBudgetPresentation, hazardFocusTransferCoherencePresentation, safeLaneFocusTransferCoherencePresentation } from './threat-impact-focus-transfer-coherence-rendering.js';
@@ -7164,6 +7165,7 @@ export class Game {
             ctx.globalAlpha = hazard.telegraph > 0 ? hazardBaseAlpha * hazardTelegraphDepth.telegraphEdgeAlphaScale * hazardDepthRelease.telegraphEdgeAlphaScale * hazardStackOrder.edgeAlphaScale * hazardUnifiedStack.bossTelegraphEdgeAlphaScale * hazardSafeLaneSeparation.telegraphEdgeAlphaScale * hazardSpatialSeparationBudget.bossTelegraphEdgeAlphaScale : hazardFillAlpha;
             ctx.fillStyle = color;
             ctx.strokeStyle = color;
+            ctx.filter = hazard.telegraph > 0 ? 'none' : valueChromaFilter(hazardReadabilityContrast.valueScale * hazardFinalSettle.valueScale * hazardReadabilityContrastBudget.secondaryValueScale, hazardReadabilityContrast.chromaScale * hazardFinalSettle.chromaScale * hazardReadabilityContrastBudget.secondaryChromaScale);
             ctx.lineWidth = (hazard.telegraph > 0 ? 4 : 2) * hazardReadabilityContrast.strokeWidthScale * (hazard.telegraph > 0 ? 1 : hazardFinalSettle.strokeWidthScale * hazardReadabilityContrastBudget.secondaryStrokeWidthScale);
             const shape = hazard.geometryShape;
             if (shape === 'corridor' || shape === 'cross') {

@@ -1,0 +1,36 @@
+name: Local Sync Phase 4460
+
+on:
+  push:
+    branches:
+      - sync/phase4353-4370-local-final
+    paths:
+      - .sync/phase4460.ready
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Decode verified local patch
+        run: base64 -d .sync/phase4443-4460.patch.gz.b64 | gzip -d > /tmp/phase4443-4460.patch
+
+      - name: Recreate verified local tree and push result
+        run: |
+          set -euo pipefail
+          git config user.name asitiso
+          git config user.email asitiso.woo@gmail.com
+          git fetch origin work/phase4425-4442-slow-source-identity
+          git switch -C work/phase4443-4460-effective-damage-readability origin/work/phase4425-4442-slow-source-identity
+          git apply --index /tmp/phase4443-4460.patch
+          TREE=$(git write-tree)
+          test "$TREE" = "4a873beb565755306271fffa150d39487eaac137"
+          git diff --cached --check
+          git commit -m "feat: align Phase 4443-4460 effective damage readability"
+          git push origin HEAD:work/phase4443-4460-effective-damage-readability

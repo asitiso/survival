@@ -7015,7 +7015,7 @@ export class Game {
             ctx.globalAlpha = safeLaneBaseAlpha * Math.max(safeLaneHazardRecovery.pathAlphaScale, safeLaneStackProtection.pathAlphaFloor, safeLaneCorridorProtection.pathAlphaFloor, safeLaneDenseArbitration.pathAlphaFloor, safeLaneCanonicalReacquisition.pathAlphaFloor, safeLaneDirectionReacquisition.pathAlphaFloor, safeLaneCriticalReengagement.pathAlphaFloor);
             ctx.strokeStyle = '#8fffd3';
             ctx.fillStyle = '#8fffd3';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 2 * safeLaneReadabilityContrast.strokeWidthScale;
             ctx.setLineDash([7, 7]);
             ctx.beginPath();
             for (const segment of safeLaneGapFeather.bodySegments) {
@@ -7164,7 +7164,7 @@ export class Game {
             ctx.globalAlpha = hazard.telegraph > 0 ? hazardBaseAlpha * hazardTelegraphDepth.telegraphEdgeAlphaScale * hazardDepthRelease.telegraphEdgeAlphaScale * hazardStackOrder.edgeAlphaScale * hazardUnifiedStack.bossTelegraphEdgeAlphaScale * hazardSafeLaneSeparation.telegraphEdgeAlphaScale * hazardSpatialSeparationBudget.bossTelegraphEdgeAlphaScale : hazardFillAlpha;
             ctx.fillStyle = color;
             ctx.strokeStyle = color;
-            ctx.lineWidth = hazard.telegraph > 0 ? 4 : 2;
+            ctx.lineWidth = (hazard.telegraph > 0 ? 4 : 2) * hazardReadabilityContrast.strokeWidthScale;
             const shape = hazard.geometryShape;
             if (shape === 'corridor' || shape === 'cross') {
                 ctx.translate(hazard.pos.x, hazard.pos.y);

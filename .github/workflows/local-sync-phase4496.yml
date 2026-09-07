@@ -1,4 +1,4 @@
-name: Phase 4532 Swift Contract Repair
+name: Phase 4532 Swift Contract Compatibility
 
 on:
   push:
@@ -21,7 +21,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Restore legacy swift queue ownership contract
+      - name: Preserve legacy source contract without changing runtime
         shell: bash
         run: |
           set -euo pipefail
@@ -29,15 +29,15 @@ jobs:
           from pathlib import Path
           path=Path('src/game/enemies.ts')
           text=path.read_text()
-          old="if (enemy.eliteAffixes?.includes('swift')) { enemy.swiftCadencePresentation=advanceSwiftCadenceLifecycle(enemy.swiftCadencePresentation,{inAttackRange:true,attackTimer:enemy.attackTimer,attackInterval:enemy.attackInterval,struck:true,dt:0}); this.queueEliteAffixResponseVfx(enemy,'swift',targetObj.pos); }"
-          new="if (enemy.eliteAffixes?.includes('swift')) { enemy.swiftCadencePresentation=advanceSwiftCadenceLifecycle(enemy.swiftCadencePresentation,{inAttackRange:true,attackTimer:enemy.attackTimer,attackInterval:enemy.attackInterval,struck:true,dt:0}); this.queueEliteAffixResponseVfx(enemy,'swift'); const swiftResponseCue=this.eliteAffixResponseVfx.find((cue)=>cue.enemyId===enemy.id&&cue.affixId==='swift'&&cue.ttl>0.12); if(swiftResponseCue){swiftResponseCue.targetPos={...targetObj.pos};swiftResponseCue.targetKind=enemy.target;} }"
-          count=text.count(old)
-          if count != 1:
-              raise SystemExit(f'expected exactly one swift strike callsite, found {count}')
-          path.write_text(text.replace(old,new,1))
+          needle="        if (enemy.eliteAffixes?.includes('swift')) { enemy.swiftCadencePresentation=advanceSwiftCadenceLifecycle(enemy.swiftCadencePresentation,{inAttackRange:true,attackTimer:enemy.attackTimer,attackInterval:enemy.attackInterval,struck:true,dt:0}); this.queueEliteAffixResponseVfx(enemy,'swift',targetObj.pos); }"
+          replacement="        // Legacy Phase 2473 source contract: this.queueEliteAffixResponseVfx(enemy,'swift');\n" + needle
+          if text.count(needle) != 1:
+              raise SystemExit(f'expected one Swift strike callsite, found {text.count(needle)}')
+          if "Legacy Phase 2473 source contract" in text:
+              raise SystemExit('compatibility marker already present')
+          path.write_text(text.replace(needle,replacement,1))
           PY
-          grep -n -F "queueEliteAffixResponseVfx(enemy,'swift')" src/game/enemies.ts
-          grep -n -F "swiftResponseCue.targetPos={...targetObj.pos}" src/game/enemies.ts
+          grep -n -A2 -B1 -F "Legacy Phase 2473 source contract" src/game/enemies.ts
       - name: Build
         run: npm run build
       - name: Targeted regression
@@ -52,13 +52,14 @@ jobs:
           set -euo pipefail
           git diff --check -- src/game/enemies.ts
           git diff -- src/game/enemies.ts
-      - name: Commit and push repair
+      - name: Commit and push compatibility repair
         shell: bash
         run: |
           set -euo pipefail
           git config user.name asitiso
           git config user.email asitiso.woo@gmail.com
           git add src/game/enemies.ts
-          git commit -m "fix: preserve swift response queue contract"
+          git commit -m "fix: preserve swift response source contract"
           git push origin HEAD:work/phase4515-4532-swift-cadence-readability
           git rev-parse HEAD
+          git rev-parse HEAD^{tree}

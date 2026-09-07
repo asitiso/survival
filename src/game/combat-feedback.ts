@@ -6,6 +6,7 @@ import type { PresentationQuality } from './presentation-budget.js';
 import { directionalHitVfxProfile, directionalHitVector, hitApproachProfile, directionalImpactRecoilProfile } from './visual-presence.js';
 import { actionResultMinimumGap, actionResultPresentation, type ActionResultKind, type ActionResultPresentationInput } from './action-result-readability.js';
 import { damageNumberPresentation } from './damage-number-readability.js';
+import { defenseResponsePresentation, type DefenseResponseKind } from './defense-response-readability.js';
 
 export type DamageImpactTier = 'normal' | 'heavy' | 'critical';
 export type ImpactKind = 'awakened' | 'final' | 'ultimate' | 'bossHit' | 'eliteKill';
@@ -63,6 +64,7 @@ interface HitCue {
 interface KillCue { kind: 'kill'; pos: Vec2; ttl: number; maxTtl: number; boss: boolean; }
 interface ImpactCue { kind: 'impact'; pos: Vec2; ttl: number; maxTtl: number; impactKind: ImpactKind; }
 interface ResultCue { kind:'result'; pos:Vec2; ttl:number; maxTtl:number; resultKind:ActionResultKind; source?:Vec2; }
+interface DefenseResponseCue { pos:Vec2; ttl:number; maxTtl:number; responseKind:DefenseResponseKind; source?:Vec2; }
 type Cue = HitCue | KillCue | ImpactCue;
 
 export function impactTierForDamage(amount: number, maxHp: number): DamageImpactTier {
@@ -79,12 +81,15 @@ export function combatImpactVisual(tier: DamageImpactTier): CombatImpactVisual {
   return { fontSize: 17, rayCount: 0, ringRadius: 16, weight: 800 };
 }
 
+export interface DefenseResponseAccounting { incoming:number; guardBlocked:number; shieldAbsorbed:number; hpIncoming:number; hpApplied:number; mitigation:number; multiplier:number; guardBroken:boolean; shieldBroken:boolean; armored:boolean; bossMultiplier:number; }
+
 export interface CombatFeedbackSink {
   addHit(pos: Vec2, amount: number, tier?: boolean | DamageImpactTier, enemyType?:EnemyType, source?:Vec2, targetId?:number): void;
   tagLatestHitTarget?(targetId:number):void;
   addKill(pos: Vec2, boss?: boolean): void;
   addImpact(pos: Vec2, kind: ImpactKind): void;
   addActionResult?(pos:Vec2, kind:ActionResultKind, source?:Vec2):void;
+  addDefenseResponse?(pos:Vec2, response:DefenseResponseAccounting, source?:Vec2):void;
 }
 
 const IMPACT_SHAKE: Record<ImpactKind, number> = { awakened: 2.4, final: 6.2, ultimate: 7.4, bossHit: 9.2, eliteKill: 4.8 };
@@ -103,9 +108,11 @@ export class CombatFeedbackSystem implements CombatFeedbackSink {
   private directionalRecoilTtl = 0;
   private directionalRecoilMaxTtl = 0;
   private resultCues:ResultCue[]=[];
+  private defenseResponseCues:DefenseResponseCue[]=[];
   private resultCooldowns=new Map<ActionResultKind,number>();
 
-  get activeCount(): number { return this.cues.length+this.resultCues.length; }
+  get activeCount(): number { return this.cues.length+this.resultCues.length+this.defenseResponseCues.length; }
+  get defenseResponseCount():number{return this.defenseResponseCues.length;}
   get shakeIntensity(): number { return this.shake; }
   get cameraScaleOffset(): number {
     if(this.cameraPressureTtl<=0 || this.cameraPressureMaxTtl<=0)return 0;
@@ -124,7 +131,7 @@ export class CombatFeedbackSystem implements CombatFeedbackSink {
     return {x:shakeOffset.x+this.directionalRecoil.x*recoilRatio,y:shakeOffset.y+this.directionalRecoil.y*recoilRatio};
   }
 
-  reset(): void { this.cues = []; this.resultCues=[]; this.resultCooldowns.clear(); this.shake = 0; this.shakePhase = 0; this.impactVisualCooldown = 0; this.cameraPressureOffset=0; this.cameraPressureTtl=0; this.cameraPressureMaxTtl=0; this.directionalRecoil={x:0,y:0}; this.directionalRecoilTtl=0; this.directionalRecoilMaxTtl=0; }
+  reset(): void { this.cues = []; this.resultCues=[]; this.defenseResponseCues=[]; this.resultCooldowns.clear(); this.shake = 0; this.shakePhase = 0; this.impactVisualCooldown = 0; this.cameraPressureOffset=0; this.cameraPressureTtl=0; this.cameraPressureMaxTtl=0; this.directionalRecoil={x:0,y:0}; this.directionalRecoilTtl=0; this.directionalRecoilMaxTtl=0; }
 
   addHit(pos: Vec2, amount: number, tier: boolean | DamageImpactTier = 'normal', enemyType?:EnemyType, source?:Vec2, targetId?:number): void {
     const resolved: DamageImpactTier = typeof tier === 'boolean' ? (tier ? 'critical' : 'normal') : tier;
@@ -167,6 +174,18 @@ export class CombatFeedbackSystem implements CombatFeedbackSink {
     this.trim();
   }
 
+
+  addDefenseResponse(pos:Vec2,response:DefenseResponseAccounting,source?:Vec2):void {
+    let responseKind:DefenseResponseKind|null=null;
+    if(response.guardBlocked>0)responseKind=response.guardBroken?'guardBreak':'guard';
+    else if(response.shieldAbsorbed>0)responseKind=response.shieldBroken?'shieldBreak':'shield';
+    else if(response.armored&&response.mitigation>0)responseKind='armor';
+    if(!responseKind)return;
+    const ttl=responseKind==='guardBreak'||responseKind==='shieldBreak'?.30:.22;
+    this.defenseResponseCues.push({pos:{...pos},responseKind,ttl,maxTtl:ttl,...(source?{source:{...source}}:{})});
+    if(this.defenseResponseCues.length>16)this.defenseResponseCues.splice(0,this.defenseResponseCues.length-16);
+  }
+
   addActionResult(pos:Vec2,kind:ActionResultKind,source?:Vec2):void {
     if((this.resultCooldowns.get(kind)??0)>0)return;
     const ttl=kind==='normalHit'?0.16:kind==='weakpointHit'?0.20:0.28;
@@ -191,6 +210,8 @@ export class CombatFeedbackSystem implements CombatFeedbackSink {
     for(const [kind,remaining] of this.resultCooldowns){const next=Math.max(0,remaining-dt);if(next<=0)this.resultCooldowns.delete(kind);else this.resultCooldowns.set(kind,next);}
     for(const cue of this.resultCues)cue.ttl-=dt;
     this.resultCues=this.resultCues.filter((cue)=>cue.ttl>0);
+    for(const cue of this.defenseResponseCues)cue.ttl-=dt;
+    this.defenseResponseCues=this.defenseResponseCues.filter((cue)=>cue.ttl>0);
     for (const cue of this.cues) {
       cue.ttl -= dt;
       if (cue.kind === 'hit') cue.pos.y -= dt * (cue.tier === 'critical' ? 82 : cue.tier === 'heavy' ? 68 : 56);
@@ -199,6 +220,16 @@ export class CombatFeedbackSystem implements CombatFeedbackSink {
   }
 
   render(ctx: CanvasRenderingContext2D, quality:PresentationQuality='high', resultContext:ActionResultRenderContext={}): void {
+    for(const cue of this.defenseResponseCues){
+      const ratio=Math.max(0,Math.min(1,cue.ttl/Math.max(.001,cue.maxTtl)));
+      const visual=defenseResponsePresentation({kind:cue.responseKind,...(resultContext.battlefieldStress!==undefined?{battlefieldStress:resultContext.battlefieldStress}:{}),...(resultContext.protectedWarning!==undefined?{protectedWarning:resultContext.protectedWarning}:{}),...(resultContext.safeLaneVisible!==undefined?{safeLaneVisible:resultContext.safeLaneVisible}:{}),...(resultContext.reducedFlash!==undefined?{reducedFlash:resultContext.reducedFlash}:{}),...(resultContext.reducedMotion!==undefined?{reducedMotion:resultContext.reducedMotion}:{})});
+      const progress=1-ratio,pulse=Math.sin(progress*Math.PI)*visual.pulse,r=visual.radius+pulse;
+      ctx.save();ctx.globalAlpha=ratio*visual.alpha;ctx.lineWidth=visual.lineWidth;ctx.strokeStyle=cue.responseKind.startsWith('guard')?'#8fffd3':cue.responseKind.startsWith('shield')?'#9fcaff':'#d6c9ad';
+      if(cue.responseKind==='armor'){ctx.beginPath();ctx.arc(cue.pos.x,cue.pos.y+5,r,-.05*Math.PI,.95*Math.PI);ctx.stroke();}
+      else if(cue.responseKind.startsWith('guard')){const a=cue.source?Math.atan2(cue.pos.y-cue.source.y,cue.pos.x-cue.source.x):Math.PI;ctx.beginPath();ctx.arc(cue.pos.x,cue.pos.y,r,a-.8,a+.8);ctx.stroke();if(cue.responseKind==='guardBreak'){ctx.beginPath();ctx.arc(cue.pos.x,cue.pos.y,r+5,a-.55,a+.55);ctx.stroke();}}
+      else {ctx.beginPath();ctx.arc(cue.pos.x,cue.pos.y,r,0,Math.PI*2);ctx.stroke();if(cue.responseKind==='shieldBreak'){ctx.beginPath();ctx.arc(cue.pos.x,cue.pos.y,r+5,-.7,.7);ctx.stroke();}}
+      ctx.restore();
+    }
     let remainingRoutineDamageNumbers=this.cues.reduce((count,cue)=>count+(cue.kind==='hit'&&cue.tier==='normal'?1:0),0);
     for (let cueIndex=0;cueIndex<this.cues.length;cueIndex++) {
       const cue=this.cues[cueIndex]!;

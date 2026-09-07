@@ -3,6 +3,7 @@ import { enemyImpactVfxDescriptor } from './enemy-presentation.js';
 import { directionalHitVfxProfile, directionalHitVector, hitApproachProfile, directionalImpactRecoilProfile } from './visual-presence.js';
 import { actionResultMinimumGap, actionResultPresentation } from './action-result-readability.js';
 import { damageNumberPresentation } from './damage-number-readability.js';
+import { defenseResponsePresentation } from './defense-response-readability.js';
 const CAMERA_PRESSURE = {
     meteor: { scaleOffset: 0.024, duration: 0.24 },
     vortex: { scaleOffset: -0.018, duration: 0.30 },
@@ -69,8 +70,10 @@ export class CombatFeedbackSystem {
     directionalRecoilTtl = 0;
     directionalRecoilMaxTtl = 0;
     resultCues = [];
+    defenseResponseCues = [];
     resultCooldowns = new Map();
-    get activeCount() { return this.cues.length + this.resultCues.length; }
+    get activeCount() { return this.cues.length + this.resultCues.length + this.defenseResponseCues.length; }
+    get defenseResponseCount() { return this.defenseResponseCues.length; }
     get shakeIntensity() { return this.shake; }
     get cameraScaleOffset() {
         if (this.cameraPressureTtl <= 0 || this.cameraPressureMaxTtl <= 0)
@@ -93,7 +96,7 @@ export class CombatFeedbackSystem {
         const recoilRatio = this.directionalRecoilTtl > 0 && this.directionalRecoilMaxTtl > 0 ? Math.max(0, Math.min(1, this.directionalRecoilTtl / this.directionalRecoilMaxTtl)) : 0;
         return { x: shakeOffset.x + this.directionalRecoil.x * recoilRatio, y: shakeOffset.y + this.directionalRecoil.y * recoilRatio };
     }
-    reset() { this.cues = []; this.resultCues = []; this.resultCooldowns.clear(); this.shake = 0; this.shakePhase = 0; this.impactVisualCooldown = 0; this.cameraPressureOffset = 0; this.cameraPressureTtl = 0; this.cameraPressureMaxTtl = 0; this.directionalRecoil = { x: 0, y: 0 }; this.directionalRecoilTtl = 0; this.directionalRecoilMaxTtl = 0; }
+    reset() { this.cues = []; this.resultCues = []; this.defenseResponseCues = []; this.resultCooldowns.clear(); this.shake = 0; this.shakePhase = 0; this.impactVisualCooldown = 0; this.cameraPressureOffset = 0; this.cameraPressureTtl = 0; this.cameraPressureMaxTtl = 0; this.directionalRecoil = { x: 0, y: 0 }; this.directionalRecoilTtl = 0; this.directionalRecoilMaxTtl = 0; }
     addHit(pos, amount, tier = 'normal', enemyType, source, targetId) {
         const resolved = typeof tier === 'boolean' ? (tier ? 'critical' : 'normal') : tier;
         this.cues.push({ kind: 'hit', pos: { ...pos }, anchorPos: { ...pos }, amount, ttl: 0.46, maxTtl: 0.46, tier: resolved, ...(enemyType ? { enemyType } : {}), ...(source ? { source: { ...source } } : {}), ...(targetId !== undefined ? { targetId } : {}) });
@@ -142,6 +145,21 @@ export class CombatFeedbackSystem {
         this.impactVisualCooldown = kind === 'final' || kind === 'ultimate' ? 0.07 : 0.045;
         this.trim();
     }
+    addDefenseResponse(pos, response, source) {
+        let responseKind = null;
+        if (response.guardBlocked > 0)
+            responseKind = response.guardBroken ? 'guardBreak' : 'guard';
+        else if (response.shieldAbsorbed > 0)
+            responseKind = response.shieldBroken ? 'shieldBreak' : 'shield';
+        else if (response.armored && response.mitigation > 0)
+            responseKind = 'armor';
+        if (!responseKind)
+            return;
+        const ttl = responseKind === 'guardBreak' || responseKind === 'shieldBreak' ? .30 : .22;
+        this.defenseResponseCues.push({ pos: { ...pos }, responseKind, ttl, maxTtl: ttl, ...(source ? { source: { ...source } } : {}) });
+        if (this.defenseResponseCues.length > 16)
+            this.defenseResponseCues.splice(0, this.defenseResponseCues.length - 16);
+    }
     addActionResult(pos, kind, source) {
         if ((this.resultCooldowns.get(kind) ?? 0) > 0)
             return;
@@ -179,6 +197,9 @@ export class CombatFeedbackSystem {
         for (const cue of this.resultCues)
             cue.ttl -= dt;
         this.resultCues = this.resultCues.filter((cue) => cue.ttl > 0);
+        for (const cue of this.defenseResponseCues)
+            cue.ttl -= dt;
+        this.defenseResponseCues = this.defenseResponseCues.filter((cue) => cue.ttl > 0);
         for (const cue of this.cues) {
             cue.ttl -= dt;
             if (cue.kind === 'hit')
@@ -187,6 +208,42 @@ export class CombatFeedbackSystem {
         this.cues = this.cues.filter((cue) => cue.ttl > 0);
     }
     render(ctx, quality = 'high', resultContext = {}) {
+        for (const cue of this.defenseResponseCues) {
+            const ratio = Math.max(0, Math.min(1, cue.ttl / Math.max(.001, cue.maxTtl)));
+            const visual = defenseResponsePresentation({ kind: cue.responseKind, ...(resultContext.battlefieldStress !== undefined ? { battlefieldStress: resultContext.battlefieldStress } : {}), ...(resultContext.protectedWarning !== undefined ? { protectedWarning: resultContext.protectedWarning } : {}), ...(resultContext.safeLaneVisible !== undefined ? { safeLaneVisible: resultContext.safeLaneVisible } : {}), ...(resultContext.reducedFlash !== undefined ? { reducedFlash: resultContext.reducedFlash } : {}), ...(resultContext.reducedMotion !== undefined ? { reducedMotion: resultContext.reducedMotion } : {}) });
+            const progress = 1 - ratio, pulse = Math.sin(progress * Math.PI) * visual.pulse, r = visual.radius + pulse;
+            ctx.save();
+            ctx.globalAlpha = ratio * visual.alpha;
+            ctx.lineWidth = visual.lineWidth;
+            ctx.strokeStyle = cue.responseKind.startsWith('guard') ? '#8fffd3' : cue.responseKind.startsWith('shield') ? '#9fcaff' : '#d6c9ad';
+            if (cue.responseKind === 'armor') {
+                ctx.beginPath();
+                ctx.arc(cue.pos.x, cue.pos.y + 5, r, -.05 * Math.PI, .95 * Math.PI);
+                ctx.stroke();
+            }
+            else if (cue.responseKind.startsWith('guard')) {
+                const a = cue.source ? Math.atan2(cue.pos.y - cue.source.y, cue.pos.x - cue.source.x) : Math.PI;
+                ctx.beginPath();
+                ctx.arc(cue.pos.x, cue.pos.y, r, a - .8, a + .8);
+                ctx.stroke();
+                if (cue.responseKind === 'guardBreak') {
+                    ctx.beginPath();
+                    ctx.arc(cue.pos.x, cue.pos.y, r + 5, a - .55, a + .55);
+                    ctx.stroke();
+                }
+            }
+            else {
+                ctx.beginPath();
+                ctx.arc(cue.pos.x, cue.pos.y, r, 0, Math.PI * 2);
+                ctx.stroke();
+                if (cue.responseKind === 'shieldBreak') {
+                    ctx.beginPath();
+                    ctx.arc(cue.pos.x, cue.pos.y, r + 5, -.7, .7);
+                    ctx.stroke();
+                }
+            }
+            ctx.restore();
+        }
         let remainingRoutineDamageNumbers = this.cues.reduce((count, cue) => count + (cue.kind === 'hit' && cue.tier === 'normal' ? 1 : 0), 0);
         for (let cueIndex = 0; cueIndex < this.cues.length; cueIndex++) {
             const cue = this.cues[cueIndex];

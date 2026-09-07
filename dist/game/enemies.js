@@ -1580,6 +1580,15 @@ export class EnemyManager {
             if (distance(candidate.pos, enemy.pos) <= 190 + candidate.radius) {
                 if (candidate.eliteAffixes?.includes('commander'))
                     this.queueEliteAffixResponseVfx(candidate, 'commander');
+                if (enemy.commandAuraOwnerId !== candidate.id) {
+                    if (enemy.commandAuraOwnerId !== undefined)
+                        enemy.commandAuraPreviousOwnerId = enemy.commandAuraOwnerId;
+                    enemy.commandAuraHandoffTtl = 0.18;
+                }
+                enemy.commandAuraOwnerId = candidate.id;
+                enemy.commandAuraOwnerPos = { ...candidate.pos };
+                enemy.commandAuraPresentationTtl = 0.24;
+                this.feedback?.addCommanderAuraResponse?.(candidate.pos, enemy.pos, candidate.id, enemy.id, enemy.type, enemy.target);
                 return candidate.commandAuraMultiplier ?? 1;
             }
         }

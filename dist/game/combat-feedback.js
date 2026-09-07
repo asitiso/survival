@@ -79,6 +79,52 @@ export function healingDamageArbitrationPresentation(input) {
     const displacement = input.reducedMotion ? 10 : 18;
     return { numberVisible, numberAlpha: Math.max(0, Math.min(.78, numberAlpha)), numberOffsetX: recent ? (input.reducedMotion ? 4 : 7) : 0, numberOffsetY: recent ? displacement : 12, returnCueAlpha: recent ? (input.reducedFlash ? .10 : .18) : 0 };
 }
+export function commanderAuraPresentation(input) {
+    const stress = Math.max(0, Math.min(1, input.battlefieldStress ?? 0));
+    const priority = !!input.priorityTarget, capacity = Math.max(1, Math.round(4 - stress * 3));
+    let connectorVisible = priority || Math.max(0, input.clusterIndex ?? 0) < capacity;
+    let boundaryAlpha = .18 * (1 - stress * .52), connectorAlpha = .24 * (1 - stress * .62), chevronAlpha = .34 * (1 - stress * .48);
+    if (priority) {
+        connectorAlpha *= 1.28;
+        chevronAlpha *= 1.24;
+    }
+    if (input.resolvedResultNearby) {
+        connectorAlpha *= priority ? .46 : .20;
+        chevronAlpha *= priority ? .62 : .38;
+        if (!priority)
+            connectorVisible = false;
+    }
+    if (input.defenseBreakNearby) {
+        connectorAlpha *= .56;
+        chevronAlpha *= .68;
+    }
+    if (input.criticalNearby) {
+        connectorAlpha *= .52;
+        chevronAlpha *= .62;
+    }
+    if (input.healingReturnNearby) {
+        connectorAlpha *= .72;
+        chevronAlpha *= .78;
+    }
+    if (input.protectedWarning) {
+        boundaryAlpha *= .42;
+        connectorAlpha *= .38;
+        chevronAlpha *= .58;
+    }
+    if (input.safeLaneVisible) {
+        boundaryAlpha *= .52;
+        connectorAlpha *= .46;
+        chevronAlpha *= .68;
+    }
+    if (input.reducedFlash) {
+        boundaryAlpha *= .62;
+        connectorAlpha *= .62;
+        chevronAlpha *= .68;
+    }
+    if (!connectorVisible)
+        connectorAlpha *= .22;
+    return { boundaryAlpha: Math.max(.025, Math.min(.28, boundaryAlpha)), connectorAlpha: Math.max(.008, Math.min(.34, connectorAlpha)), chevronAlpha: Math.max(.02, Math.min(.48, chevronAlpha)), connectorVisible, boundaryRadius: 196, lineWidth: 1.35, pulse: input.reducedMotion ? 0 : 2.4 };
+}
 export function healingResponsePresentation(input) {
     const stress = Math.max(0, Math.min(1, input.battlefieldStress ?? 0));
     const shaman = input.sourceKind === 'shaman';
@@ -114,10 +160,12 @@ export class CombatFeedbackSystem {
     resultCues = [];
     defenseResponseCues = [];
     healingResponseCues = [];
+    commanderAuraCues = [];
     resultCooldowns = new Map();
     get activeCount() { return this.cues.length + this.resultCues.length + this.defenseResponseCues.length + this.healingResponseCues.length; }
     get defenseResponseCount() { return this.defenseResponseCues.length; }
     get healingResponseCount() { return this.healingResponseCues.length; }
+    get commanderAuraCount() { return this.commanderAuraCues.length; }
     get shakeIntensity() { return this.shake; }
     get cameraScaleOffset() {
         if (this.cameraPressureTtl <= 0 || this.cameraPressureMaxTtl <= 0)
@@ -140,7 +188,7 @@ export class CombatFeedbackSystem {
         const recoilRatio = this.directionalRecoilTtl > 0 && this.directionalRecoilMaxTtl > 0 ? Math.max(0, Math.min(1, this.directionalRecoilTtl / this.directionalRecoilMaxTtl)) : 0;
         return { x: shakeOffset.x + this.directionalRecoil.x * recoilRatio, y: shakeOffset.y + this.directionalRecoil.y * recoilRatio };
     }
-    reset() { this.cues = []; this.resultCues = []; this.defenseResponseCues = []; this.healingResponseCues = []; this.resultCooldowns.clear(); this.shake = 0; this.shakePhase = 0; this.impactVisualCooldown = 0; this.cameraPressureOffset = 0; this.cameraPressureTtl = 0; this.cameraPressureMaxTtl = 0; this.directionalRecoil = { x: 0, y: 0 }; this.directionalRecoilTtl = 0; this.directionalRecoilMaxTtl = 0; }
+    reset() { this.cues = []; this.resultCues = []; this.defenseResponseCues = []; this.healingResponseCues = []; this.commanderAuraCues = []; this.resultCooldowns.clear(); this.shake = 0; this.shakePhase = 0; this.impactVisualCooldown = 0; this.cameraPressureOffset = 0; this.cameraPressureTtl = 0; this.cameraPressureMaxTtl = 0; this.directionalRecoil = { x: 0, y: 0 }; this.directionalRecoilTtl = 0; this.directionalRecoilMaxTtl = 0; }
     addHit(pos, amount, tier = 'normal', enemyType, source, targetId) {
         const resolved = typeof tier === 'boolean' ? (tier ? 'critical' : 'normal') : tier;
         this.cues.push({ kind: 'hit', pos: { ...pos }, anchorPos: { ...pos }, amount, ttl: 0.46, maxTtl: 0.46, tier: resolved, ...(enemyType ? { enemyType } : {}), ...(source ? { source: { ...source } } : {}), ...(targetId !== undefined ? { targetId } : {}) });
@@ -188,6 +236,27 @@ export class CombatFeedbackSystem {
         this.cues.push({ kind: 'impact', pos: { ...pos }, ttl, maxTtl: ttl, impactKind: kind });
         this.impactVisualCooldown = kind === 'final' || kind === 'ultimate' ? 0.07 : 0.045;
         this.trim();
+    }
+    addCommanderAuraResponse(source, target, ownerId, targetId, targetType, targetChannel) {
+        const existing = this.commanderAuraCues.find((cue) => cue.ownerId === ownerId && cue.targetId === targetId);
+        const maxTtl = .22;
+        if (existing) {
+            existing.source = { ...source };
+            existing.target = { ...target };
+            existing.targetType = targetType;
+            existing.targetChannel = targetChannel;
+            existing.ttl = maxTtl;
+            existing.maxTtl = maxTtl;
+            return;
+        }
+        for (const cue of this.commanderAuraCues)
+            if (cue.targetId === targetId && cue.ownerId !== ownerId)
+                cue.ttl = Math.min(cue.ttl, .085);
+        this.commanderAuraCues.push({ source: { ...source }, target: { ...target }, ownerId, targetId, targetType, targetChannel, ttl: maxTtl, maxTtl });
+        while (this.commanderAuraCues.length > 20) {
+            const routineIndex = this.commanderAuraCues.findIndex((cue) => cue.targetChannel !== 'core' && !['elite', 'shaman', 'shieldbearer', 'assassin', 'siegeGolem', 'nullifier'].includes(cue.targetType));
+            this.commanderAuraCues.splice(routineIndex >= 0 ? routineIndex : 0, 1);
+        }
     }
     addHealingResponse(pos, response, sourceKind, source, targetId, targetType) {
         if (!(response.hpRestored > 0))
@@ -255,6 +324,9 @@ export class CombatFeedbackSystem {
         for (const cue of this.healingResponseCues)
             cue.ttl -= dt;
         this.healingResponseCues = this.healingResponseCues.filter((cue) => cue.ttl > 0);
+        for (const cue of this.commanderAuraCues)
+            cue.ttl -= dt;
+        this.commanderAuraCues = this.commanderAuraCues.filter((cue) => cue.ttl > 0);
         for (const cue of this.cues) {
             cue.ttl -= dt;
             if (cue.kind === 'hit')
@@ -263,6 +335,49 @@ export class CombatFeedbackSystem {
         this.cues = this.cues.filter((cue) => cue.ttl > 0);
     }
     render(ctx, quality = 'high', resultContext = {}) {
+        const commanderOwnersDrawn = new Set();
+        let routineCommanderIndex = 0;
+        for (const cue of this.commanderAuraCues) {
+            const ratio = Math.max(0, Math.min(1, cue.ttl / Math.max(.001, cue.maxTtl)));
+            const matchingHit = this.cues.find((candidate) => candidate.kind === 'hit' && candidate.targetId === cue.targetId && candidate.ttl > 0);
+            const priorityType = !!matchingHit || cue.targetChannel === 'core' || cue.targetType === 'elite' || cue.targetType === 'shaman' || cue.targetType === 'shieldbearer' || cue.targetType === 'assassin' || cue.targetType === 'siegeGolem' || cue.targetType === 'nullifier';
+            const resolvedResultNearby = this.resultCues.some((candidate) => Math.hypot(candidate.pos.x - cue.target.x, candidate.pos.y - cue.target.y) <= 42 && actionResultPresentation({ ...resultContext, kind: candidate.resultKind, sourceDistance: 0 }).priority >= 2);
+            const defenseBreakNearby = this.defenseResponseCues.some((candidate) => (candidate.responseKind === 'guardBreak' || candidate.responseKind === 'shieldBreak') && Math.hypot(candidate.pos.x - cue.target.x, candidate.pos.y - cue.target.y) <= 42);
+            const criticalNearby = this.cues.some((candidate) => candidate.kind === 'hit' && candidate.tier === 'critical' && Math.hypot(candidate.pos.x - cue.target.x, candidate.pos.y - cue.target.y) <= 42);
+            const healingReturnNearby = this.healingResponseCues.some((candidate) => candidate.targetId === cue.targetId && candidate.ttl > 0);
+            const clusterIndex = priorityType ? 0 : routineCommanderIndex++;
+            const visual = commanderAuraPresentation({ priorityTarget: priorityType, clusterIndex, resolvedResultNearby, defenseBreakNearby, criticalNearby, healingReturnNearby, ...(resultContext.battlefieldStress !== undefined ? { battlefieldStress: resultContext.battlefieldStress } : {}), ...(resultContext.protectedWarning !== undefined ? { protectedWarning: resultContext.protectedWarning } : {}), ...(resultContext.safeLaneVisible !== undefined ? { safeLaneVisible: resultContext.safeLaneVisible } : {}), ...(resultContext.reducedFlash !== undefined ? { reducedFlash: resultContext.reducedFlash } : {}), ...(resultContext.reducedMotion !== undefined ? { reducedMotion: resultContext.reducedMotion } : {}) });
+            const dx = cue.target.x - cue.source.x, dy = cue.target.y - cue.source.y, d = Math.hypot(dx, dy), ux = d > 1 ? dx / d : 1, uy = d > 1 ? dy / d : 0, pulse = Math.sin((1 - ratio) * Math.PI) * visual.pulse;
+            ctx.save();
+            ctx.strokeStyle = '#ffd67a';
+            ctx.lineCap = 'round';
+            if (!commanderOwnersDrawn.has(cue.ownerId)) {
+                commanderOwnersDrawn.add(cue.ownerId);
+                ctx.globalAlpha = ratio * visual.boundaryAlpha;
+                ctx.lineWidth = visual.lineWidth;
+                ctx.beginPath();
+                ctx.arc(cue.source.x, cue.source.y, visual.boundaryRadius + pulse, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            if (d > 1 && visual.connectorVisible) {
+                ctx.globalAlpha = ratio * visual.connectorAlpha;
+                ctx.lineWidth = Math.max(.7, visual.lineWidth * .76);
+                ctx.beginPath();
+                ctx.moveTo(cue.source.x + ux * 26, cue.source.y + uy * 26);
+                ctx.lineTo(cue.target.x - ux * 18, cue.target.y - uy * 18);
+                ctx.stroke();
+            }
+            const px = -uy, py = ux, tipX = cue.target.x + ux * (12 + pulse), tipY = cue.target.y + uy * (12 + pulse);
+            ctx.globalAlpha = ratio * visual.chevronAlpha;
+            ctx.lineWidth = Math.max(1, visual.lineWidth);
+            ctx.beginPath();
+            ctx.moveTo(tipX, tipY);
+            ctx.lineTo(cue.target.x - ux * 3 + px * 6, cue.target.y - uy * 3 + py * 6);
+            ctx.moveTo(tipX, tipY);
+            ctx.lineTo(cue.target.x - ux * 3 - px * 6, cue.target.y - uy * 3 - py * 6);
+            ctx.stroke();
+            ctx.restore();
+        }
         let remainingRoutineHealingNumbers = this.healingResponseCues.reduce((count, cue) => count + (cue.sourceKind === 'regenerating' ? 1 : 0), 0);
         for (const cue of this.healingResponseCues) {
             const ratio = Math.max(0, Math.min(1, cue.ttl / Math.max(.001, cue.maxTtl)));

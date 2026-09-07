@@ -30,6 +30,8 @@ export class AutoCombatBrain {
         this.lastCastAt = Number.NEGATIVE_INFINITY;
         this.castCursor = 0;
     }
+    currentTargetId() { return this.targetId; }
+    currentWeakpointId() { return this.weakpointId; }
     selectTarget(enemies, heroPos, corePos, nowSeconds) {
         const now = Number.isFinite(nowSeconds) ? nowSeconds : 0;
         const current = this.targetId === null ? null : enemies.find((enemy) => enemy.id === this.targetId && enemy.alive && distance(heroPos, enemy.pos) <= 720) ?? null;

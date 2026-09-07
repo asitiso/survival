@@ -39,6 +39,9 @@ export class AutoCombatBrain {
     this.castCursor=0;
   }
 
+  currentTargetId():number|null{return this.targetId;}
+  currentWeakpointId():number|null{return this.weakpointId;}
+
   selectTarget<T extends SpellTargetCandidate>(enemies:readonly T[],heroPos:Vec2,corePos:Vec2|null,nowSeconds:number):T|null{
     const now=Number.isFinite(nowSeconds)?nowSeconds:0;
     const current=this.targetId===null?null:enemies.find((enemy)=>enemy.id===this.targetId&&enemy.alive&&distance(heroPos,enemy.pos)<=720)??null;

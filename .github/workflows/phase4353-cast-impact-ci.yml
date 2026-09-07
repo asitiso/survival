@@ -1,0 +1,19 @@
+name: Phase 4353 Cast Impact CI
+on:
+  push:
+    branches:
+      - work/phase4353-4370-cast-impact-readability
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Phase 4353 focused tests
+        run: node --test tests/phase4353-4358-action-result-ownership.test.mjs
+      - run: git diff --check

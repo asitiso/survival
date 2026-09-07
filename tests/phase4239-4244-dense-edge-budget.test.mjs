@@ -45,3 +45,11 @@ test('dense budget explicitly reserves room when a safe lane is visible',()=>{
   assert.ok(withLane.secondaryContourScale<withoutLane.secondaryContourScale);
   assert.equal(withLane.safeLaneContourScale,1);
 });
+
+test('dense strong-secondary limit actively demotes lower-priority families',()=>{
+  const budget=denseEdgeBudgetPresentation({criticalCount:3,crowd:1,bossActive:true,safeLaneVisible:true});
+  const families=['projectile','hazard','specialist','impact'].map(family=>denseEdgeFamilyPresentation({family,crowd:1,critical:false,bossProtected:false,safeLaneVisible:true,strongSecondaryLimit:budget.strongSecondaryLimit}));
+  assert.equal(budget.strongSecondaryLimit,1);
+  assert.equal(families.filter(x=>x.strongSecondary).length,1);
+  assert.ok(families.slice(1).every(x=>x.secondaryContourScale<=.84));
+});

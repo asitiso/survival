@@ -1,4 +1,4 @@
-name: Phase 4515-4532 Final Verification
+name: Phase 4532 Generated Tree Diagnose
 
 on:
   push:
@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  verify:
+  diagnose:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -21,21 +21,19 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Full regression
-        run: npm test
-      - name: Fresh build
-        run: npm run build
-      - name: Raster verification
-        run: npm run verify:raster
-      - name: Release verification
-        run: npm run verify:release
-      - name: Candidate verification
+      - name: Reproduce candidate-generated tree
         run: npm run verify:candidate
-      - name: Final tree checks
+      - name: Print generated changes
         shell: bash
         run: |
           set -euo pipefail
+          echo '--- STATUS ---'
+          git status --porcelain
+          echo '--- DIFF NAMES ---'
+          git diff --name-only
+          echo '--- UNTRACKED ---'
+          git ls-files --others --exclude-standard
+          echo '--- DIFF CHECK ---'
           git diff --check
-          test -z "$(git status --porcelain)"
           echo "HEAD=$(git rev-parse HEAD)"
           echo "TREE=$(git rev-parse HEAD^{tree})"

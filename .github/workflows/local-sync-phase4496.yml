@@ -1,4 +1,4 @@
-name: Phase 4521 Swift Strike GREEN
+name: Phase 4527 Swift Dense TDD
 
 on:
   push:
@@ -6,75 +6,21 @@ on:
       - '.sync/phase4496.ready'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  validate-and-push:
+  validate:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
           ref: work/phase4515-4532-swift-cadence-readability
-          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Wire Swift cadence and actual strike ownership
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          p=Path('src/game/enemies.ts')
-          s=p.read_text()
-          def once(old,new,label):
-              global s
-              count=s.count(old)
-              assert count==1, f'{label}: expected 1 match, got {count}'
-              s=s.replace(old,new,1)
-          once(
-          "import { advanceFrenziedThresholdLifecycle, eliteAffixIdentityEmphasis, eliteAffixIdentityIcon, eliteAffixIdentityRowLayout, frenziedThresholdDensityPresentation, frenziedThresholdPresentation, type FrenziedThresholdLifecycleState } from './elite-affix-identity-assets.js';",
-          "import { advanceFrenziedThresholdLifecycle, advanceSwiftCadenceLifecycle, eliteAffixIdentityEmphasis, eliteAffixIdentityIcon, eliteAffixIdentityRowLayout, frenziedThresholdDensityPresentation, frenziedThresholdPresentation, swiftStrikeOwnershipPresentation, type FrenziedThresholdLifecycleState, type SwiftCadenceLifecycleState } from './elite-affix-identity-assets.js';",
-          'swift import')
-          once(
-          "  frenziedPresentation?: FrenziedThresholdLifecycleState | undefined;\n  manaShield: number;",
-          "  frenziedPresentation?: FrenziedThresholdLifecycleState | undefined;\n  swiftCadencePresentation?: SwiftCadenceLifecycleState | undefined;\n  manaShield: number;",
-          'swift state field')
-          once(
-          "  private eliteAffixResponseVfx: Array<{pos:Vec2;enemyId:number;affixId:EliteAffixId;ttl:number;maxTtl:number}> = [];",
-          "  private eliteAffixResponseVfx: Array<{pos:Vec2;enemyId:number;affixId:EliteAffixId;targetPos?:Vec2;targetKind?:EnemyTarget;ttl:number;maxTtl:number}> = [];",
-          'response vfx type')
-          once(
-          "      const contact = enemy.radius + targetObj.radius + 5;\n      if(enemy.type==='nullifier')",
-          "      const contact = enemy.radius + targetObj.radius + 5;\n      if(enemy.eliteAffixes?.includes('swift')) enemy.swiftCadencePresentation=advanceSwiftCadenceLifecycle(enemy.swiftCadencePresentation,{inAttackRange:dist<=contact,attackTimer:enemy.attackTimer,attackInterval:enemy.attackInterval,struck:false,dt});\n      if(enemy.type==='nullifier')",
-          'cadence update')
-          once(
-          "        if (enemy.eliteAffixes?.includes('swift')) this.queueEliteAffixResponseVfx(enemy,'swift');\n        enemy.attackTimer = enemy.attackInterval;",
-          "        if (enemy.eliteAffixes?.includes('swift')) { enemy.swiftCadencePresentation=advanceSwiftCadenceLifecycle(enemy.swiftCadencePresentation,{inAttackRange:true,attackTimer:enemy.attackTimer,attackInterval:enemy.attackInterval,struck:true,dt:0}); this.queueEliteAffixResponseVfx(enemy,'swift',targetObj.pos); }\n        enemy.attackTimer = enemy.attackInterval;",
-          'actual swift strike')
-          once(
-          "  private queueEliteAffixResponseVfx(enemy:Enemy,affixId:EliteAffixId):void {\n    const existing=this.eliteAffixResponseVfx.find((cue)=>cue.enemyId===enemy.id&&cue.affixId===affixId&&cue.ttl>0.12);\n    if(existing)return;\n    const maxTtl=0.42;\n    this.eliteAffixResponseVfx.push({pos:{...enemy.pos},enemyId:enemy.id,affixId,ttl:maxTtl,maxTtl});",
-          "  private queueEliteAffixResponseVfx(enemy:Enemy,affixId:EliteAffixId,targetPos?:Vec2):void {\n    const existing=this.eliteAffixResponseVfx.find((cue)=>cue.enemyId===enemy.id&&cue.affixId===affixId&&cue.ttl>0.12);\n    if(existing)return;\n    const maxTtl=0.42;\n    this.eliteAffixResponseVfx.push({pos:{...enemy.pos},enemyId:enemy.id,affixId,...(targetPos?{targetPos:{...targetPos},targetKind:enemy.target}:{}),ttl:maxTtl,maxTtl});",
-          'queue target ownership')
-          once(
-          "      for (const cue of this.eliteAffixResponseVfx) {\n        const sprite = eliteAffixLifecycleVfxSprite(cue.affixId,'response');\n        const t = Math.max(0, Math.min(1, cue.ttl / cue.maxTtl));\n        const size = 92 + (1 - t) * 22;\n        ctx.save(); ctx.globalAlpha = Math.min(reducedFlash ? 0.48 : 0.88, t);\n        ctx.drawImage(eliteAffixLifecycleVfxAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, cue.pos.x - size / 2, cue.pos.y - size / 2, size, size);\n        ctx.restore();\n      }",
-          "      for (const cue of this.eliteAffixResponseVfx) {\n        const sprite = eliteAffixLifecycleVfxSprite(cue.affixId,'response');\n        const t = Math.max(0, Math.min(1, cue.ttl / cue.maxTtl));\n        const size = 92 + (1 - t) * 22;\n        ctx.save(); ctx.globalAlpha = Math.min(reducedFlash ? 0.48 : 0.88, t);\n        ctx.drawImage(eliteAffixLifecycleVfxAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, cue.pos.x - size / 2, cue.pos.y - size / 2, size, size);\n        ctx.restore();\n        if(cue.affixId==='swift'&&cue.targetPos&&cue.targetKind){const sourceEnemy=this.enemies.find((candidate)=>candidate.id===cue.enemyId);const ownership=swiftStrikeOwnershipPresentation({actualStrike:true,targetKind:cue.targetKind,distanceToTarget:distance(cue.pos,cue.targetPos),recentlyHit:(sourceEnemy?.hitFlash??0)>0,battlefieldStress:Math.max(0,Math.min(1,hazardPressure)),reducedMotion,reducedFlash});if(ownership.visible){const dx=cue.targetPos.x-cue.pos.x,dy=cue.targetPos.y-cue.pos.y,mag=Math.hypot(dx,dy)||1,nx=dx/mag,ny=dy/mag,travel=Math.min(72,Math.max(30,mag*.55)),endX=cue.pos.x+nx*travel,endY=cue.pos.y+ny*travel,perpX=-ny,perpY=nx,wing=6*ownership.chevronScale;ctx.save();ctx.globalAlpha=ownership.connectorAlpha*t;ctx.strokeStyle='#9edfff';ctx.lineWidth=2*ownership.priorityScale;ctx.beginPath();ctx.moveTo(cue.pos.x+nx*10,cue.pos.y+ny*10);ctx.lineTo(endX,endY);ctx.stroke();ctx.beginPath();ctx.moveTo(endX,endY);ctx.lineTo(endX-nx*7+perpX*wing,endY-ny*7+perpY*wing);ctx.moveTo(endX,endY);ctx.lineTo(endX-nx*7-perpX*wing,endY-ny*7-perpY*wing);ctx.stroke();ctx.restore();}}\n      }",
-          'render strike ownership')
-          p.write_text(s)
-          PY
       - run: npm run build
-      - name: Focused Swift tests
-        run: node --test tests/phase4515-4520-swift-cadence-lifecycle.test.mjs tests/phase4521-4526-swift-strike-ownership.test.mjs
+      - name: Phase 4527-4532 focused RED test
+        run: node --test tests/phase4527-4532-swift-dense-arbitration.test.mjs
       - run: git diff --check
-      - name: Commit generated GREEN result
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name asitiso
-          git config user.email asitiso.woo@gmail.com
-          git add src/game/enemies.ts
-          git add -f dist/game/enemies.js dist/game/elite-affix-identity-assets.js
-          git diff --cached --check
-          git commit -m "feat: connect Phase 4521-4526 swift strike ownership"
-          git push origin HEAD:work/phase4515-4532-swift-cadence-readability

@@ -521,9 +521,14 @@ export class EnemyManager {
         const hpRatioBeforeDamage = enemy.hp / Math.max(1, enemy.maxHp);
         let remaining = amount;
         let guardBroken = false;
+        let guardBlocked = 0;
+        let shieldAbsorbed = 0;
+        const guardBeforeDamage = enemy.guardHp ?? 0;
+        const shieldBeforeDamage = enemy.manaShield ?? 0;
         if ((enemy.guardHp ?? 0) > 0) {
             const guardBefore = enemy.guardHp ?? 0;
             const blocked = Math.min(enemy.guardHp ?? 0, remaining * 0.72);
+            guardBlocked = blocked;
             enemy.guardHp = Math.max(0, (enemy.guardHp ?? 0) - blocked);
             guardBroken = guardBefore > 0 && (enemy.guardHp ?? 0) <= 0;
             if (blocked > 0 && enemy.type === 'shieldbearer') {
@@ -534,13 +539,18 @@ export class EnemyManager {
         }
         if ((enemy.manaShield ?? 0) > 0) {
             const absorbed = Math.min(enemy.manaShield ?? 0, remaining);
+            shieldAbsorbed = absorbed;
             enemy.manaShield = Math.max(0, (enemy.manaShield ?? 0) - absorbed);
             remaining -= absorbed;
             if (absorbed > 0 && enemy.eliteAffixes?.includes('manaShield'))
                 this.queueEliteAffixResponseVfx(enemy, 'manaShield');
         }
         const bossEncounterMultiplier = enemy.type === 'boss' ? this.bossEncounterModifiers.bossDamageTakenMultiplier : 1;
+        const damageTakenMultiplier = enemy.damageTakenMultiplier ?? 1;
+        const appliedHpDamage = remaining * (enemy.damageTakenMultiplier ?? 1) * bossEncounterMultiplier;
         enemy.hp -= remaining * (enemy.damageTakenMultiplier ?? 1) * bossEncounterMultiplier;
+        const defenseResponse = { incoming: amount, guardBlocked, shieldAbsorbed, hpIncoming: remaining, hpApplied: appliedHpDamage, mitigation: remaining - appliedHpDamage, multiplier: damageTakenMultiplier * bossEncounterMultiplier, guardBroken, shieldBroken: shieldBeforeDamage > 0 && (enemy.manaShield ?? 0) <= 0, armored: enemy.eliteAffixes?.includes('armored') ?? false, bossMultiplier: bossEncounterMultiplier };
+        this.feedback?.addDefenseResponse?.(enemy.pos, defenseResponse, source);
         if (remaining > 0 && enemy.eliteAffixes?.includes('armored'))
             this.queueEliteAffixResponseVfx(enemy, 'armored');
         if (hpRatioBeforeDamage > 0.42 && enemy.hp / Math.max(1, enemy.maxHp) <= 0.42 && enemy.eliteAffixes?.includes('frenzied'))
@@ -555,8 +565,11 @@ export class EnemyManager {
         enemy.hitDirectionY = hitVector.y;
         if (enemy.type === 'boss' && impactTier !== 'normal')
             enemy.bossHeavyHitStagger = advanceBossHeavyHitStaggerState(enemy.bossHeavyHitStagger, { tier: impactTier, directionX: hitVector.x, directionY: hitVector.y }, 0);
-        this.feedback?.addHit(enemy.pos, amount, impactTier, enemy.type, source);
-        this.feedback?.tagLatestHitTarget?.(enemy.id);
+        if (appliedHpDamage > 0) {
+            const amount = appliedHpDamage;
+            this.feedback?.addHit(enemy.pos, amount, impactTier, enemy.type, source);
+            this.feedback?.tagLatestHitTarget?.(enemy.id);
+        }
         if (guardBroken)
             this.feedback?.addActionResult?.(enemy.pos, 'guardBreak', source);
         if (enemy.type === 'boss' && impactTier !== 'normal') {

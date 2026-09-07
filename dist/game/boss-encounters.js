@@ -59,14 +59,16 @@ export class BossEncounterSystem {
             }
         }
         if (!target)
-            return;
+            return { hit: false, nodeId: null, destroyed: false, allDestroyed: false };
         target.hp = Math.max(0, target.hp - Math.max(1, strength));
         if (target.hp > 0)
-            return;
+            return { hit: true, nodeId: target.id, destroyed: false, allDestroyed: false };
         target.alive = false;
         this.destroyedNodes += 1;
-        if (this.archetype === 'inferno' && this.nodes.every((node) => !node.alive))
+        const allDestroyed = this.nodes.every((node) => !node.alive);
+        if (this.archetype === 'inferno' && allDestroyed)
             this.vulnerabilityTimer = 6;
+        return { hit: true, nodeId: target.id, destroyed: true, allDestroyed };
     }
     get modifiers() {
         if (!this.activeBossId || !this.archetype)

@@ -588,11 +588,12 @@ export class EnemyManager {
     if (!enemy.alive || amount <= 0) return false;
     const hpRatioBeforeDamage = enemy.hp / Math.max(1, enemy.maxHp);
     let remaining = amount;
+    let guardBroken=false;
     if ((enemy.guardHp ?? 0) > 0) {
       const guardBefore=enemy.guardHp ?? 0;
       const blocked = Math.min(enemy.guardHp ?? 0, remaining * 0.72);
       enemy.guardHp = Math.max(0, (enemy.guardHp ?? 0) - blocked);
-      const guardBroken=guardBefore>0&&(enemy.guardHp ?? 0)<=0;
+      guardBroken=guardBefore>0&&(enemy.guardHp ?? 0)<=0;
       if(blocked>0&&enemy.type==='shieldbearer'){this.queueSpecialistReactionVfx(enemy,'shieldbearer',enemy.pos,undefined,guardBroken?0.66:0.44);enemy.specialistLocomotionSignature=advanceSpecialistLocomotionSignatureState(enemy.specialistLocomotionSignature,'shieldbearer','brace',0);}
       remaining -= blocked;
     }
@@ -614,8 +615,10 @@ export class EnemyManager {
     enemy.hitImpactTier=impactTier; enemy.hitDirectionX=hitVector.x; enemy.hitDirectionY=hitVector.y;
     if(enemy.type==='boss'&&impactTier !== 'normal')enemy.bossHeavyHitStagger=advanceBossHeavyHitStaggerState(enemy.bossHeavyHitStagger,{tier:impactTier,directionX:hitVector.x,directionY:hitVector.y},0);
     this.feedback?.addHit(enemy.pos, amount, impactTier, enemy.type, source);
-    if (enemy.type === 'boss' && impactTier !== 'normal') this.feedback?.addImpact(enemy.pos, 'bossHit');
+    if(guardBroken)this.feedback?.addActionResult?.(enemy.pos,'guardBreak',source);
+    if (enemy.type === 'boss' && impactTier !== 'normal') { this.feedback?.addImpact(enemy.pos, 'bossHit'); this.feedback?.addActionResult?.(enemy.pos,'bossStagger',source); }
     if (!killed) return false;
+    this.feedback?.addActionResult?.(enemy.pos,'enemyKill',source);
     enemy.alive = false;
     const mythicLastLawReward = enemy.type === 'boss' && enemy.isMythic ? 1.12 : 1;
     this.deaths.push({

@@ -1,7 +1,8 @@
 import { distance, type Vec2 } from '../core/math.js';
 import type { BossArchetype, BossVariantTier } from './boss-patterns.js';
 
-export interface MagicTargetSink { hitMagic(pos: Vec2, strength: number): void; }
+export interface MagicHitResult { hit:boolean; nodeId:number|null; destroyed:boolean; allDestroyed:boolean; }
+export interface MagicTargetSink { hitMagic(pos: Vec2, strength: number): MagicHitResult; }
 
 export interface BossEncounterNode {
   id: number;
@@ -72,7 +73,7 @@ export class BossEncounterSystem implements MagicTargetSink {
 
   update(dt: number): void { this.vulnerabilityTimer = Math.max(0, this.vulnerabilityTimer - Math.max(0, dt)); }
 
-  hitMagic(pos: Vec2, strength: number): void {
+  hitMagic(pos: Vec2, strength: number): MagicHitResult {
     let target: BossEncounterNode | null = null;
     let best = Number.POSITIVE_INFINITY;
     for (const node of this.nodes) {
@@ -80,12 +81,14 @@ export class BossEncounterSystem implements MagicTargetSink {
       const d = distance(pos, node.pos);
       if (d <= node.radius + 82 && d < best) { target = node; best = d; }
     }
-    if (!target) return;
+    if (!target) return {hit:false,nodeId:null,destroyed:false,allDestroyed:false};
     target.hp = Math.max(0, target.hp - Math.max(1, strength));
-    if (target.hp > 0) return;
+    if (target.hp > 0) return {hit:true,nodeId:target.id,destroyed:false,allDestroyed:false};
     target.alive = false;
     this.destroyedNodes += 1;
-    if (this.archetype === 'inferno' && this.nodes.every((node) => !node.alive)) this.vulnerabilityTimer = 6;
+    const allDestroyed=this.nodes.every((node) => !node.alive);
+    if (this.archetype === 'inferno' && allDestroyed) this.vulnerabilityTimer = 6;
+    return {hit:true,nodeId:target.id,destroyed:true,allDestroyed};
   }
 
   get modifiers(): BossEncounterModifiers {

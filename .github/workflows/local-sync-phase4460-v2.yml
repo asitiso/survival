@@ -1,0 +1,49 @@
+name: Local Sync Phase 4460 v2
+
+on:
+  push:
+    branches:
+      - sync/phase4353-4370-local-final
+    paths:
+      - .sync/phase4460-v2.ready
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reassemble and verify local patch payload
+        run: |
+          set -euo pipefail
+          cat .sync/phase4443-4460.patch.gz.b64.part00 \
+              .sync/phase4443-4460.patch.gz.b64.part01 \
+              .sync/phase4443-4460.patch.gz.b64.part02 \
+              .sync/phase4443-4460.patch.gz.b64.part03 \
+              .sync/phase4443-4460.patch.gz.b64.part04 \
+              .sync/phase4443-4460.patch.gz.b64.part05 \
+              .sync/phase4443-4460.patch.gz.b64.part06 \
+              .sync/phase4443-4460.patch.gz.b64.part07 \
+              .sync/phase4443-4460.patch.gz.b64.part08 > /tmp/phase4443-4460.patch.gz.b64
+          test "$(wc -c < /tmp/phase4443-4460.patch.gz.b64)" -eq 10340
+          echo "ede68a142c53459ce7c218b4ebd6b922c4f83c410c6ee0c377ed8318ea7f7861  /tmp/phase4443-4460.patch.gz.b64" | sha256sum -c -
+          base64 -d /tmp/phase4443-4460.patch.gz.b64 | gzip -d > /tmp/phase4443-4460.patch
+
+      - name: Recreate verified local tree and push result
+        run: |
+          set -euo pipefail
+          git config user.name asitiso
+          git config user.email asitiso.woo@gmail.com
+          git fetch origin work/phase4425-4442-slow-source-identity
+          git switch -C work/phase4443-4460-effective-damage-readability origin/work/phase4425-4442-slow-source-identity
+          git apply --index /tmp/phase4443-4460.patch
+          TREE=$(git write-tree)
+          test "$TREE" = "4a873beb565755306271fffa150d39487eaac137"
+          git diff --cached --check
+          git commit -m "feat: align Phase 4443-4460 effective damage readability"
+          git push origin HEAD:work/phase4443-4460-effective-damage-readability

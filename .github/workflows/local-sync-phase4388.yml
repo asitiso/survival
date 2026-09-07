@@ -1,0 +1,40 @@
+name: Local Sync Phase 4388
+on:
+  push:
+    branches:
+      - sync/phase4353-4370-local-final
+    paths:
+      - .sync/phase4388.ready
+permissions:
+  contents: write
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Decode verified local patches
+        run: |
+          base64 -d .sync/phase4353-4370.patch.gz.b64 | gzip -d > /tmp/phase4353-4370.patch
+          base64 -d .sync/phase4371-4388.patch.gz.b64 | gzip -d > /tmp/phase4371-4388.patch
+      - name: Recreate verified local trees and push results
+        run: |
+          set -euo pipefail
+          git config user.name asitiso
+          git config user.email asitiso.woo@gmail.com
+          git fetch origin work/phase4353-4370-cast-impact-readability
+          git switch -C work/phase4353-4370-cast-impact-readability origin/work/phase4353-4370-cast-impact-readability
+          git apply --index /tmp/phase4353-4370.patch
+          TREE_A=$(git write-tree)
+          test "$TREE_A" = "5146e3f8f9a3a5b2750bfed0b9db2e9e07c32700"
+          git diff --cached --check
+          git commit -m "feat: finalize Phase 4353-4370 action result readability"
+          git push origin HEAD:work/phase4353-4370-cast-impact-readability
+          git switch -C work/phase4371-4388-damage-result-arbitration
+          git apply --index /tmp/phase4371-4388.patch
+          TREE_B=$(git write-tree)
+          test "$TREE_B" = "36f0e8702eecfbef012ee83c4aa4fd7162ba0b3c"
+          git diff --cached --check
+          git commit -m "feat: arbitrate Phase 4371-4388 damage result readability"
+          git push origin HEAD:work/phase4371-4388-damage-result-arbitration

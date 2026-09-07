@@ -1,0 +1,145 @@
+name: Phase 4359 Apply Integration
+on:
+  push:
+    branches:
+      - work/phase4353-4370-cast-impact-readability
+    paths:
+      - .phase4359-apply
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/phase4353-4370-cast-impact-readability
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Apply Phase 4359-4364 integration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p=Path(path); s=p.read_text()
+              if old not in s:
+                  raise SystemExit(f'missing pattern in {path}: {old[:100]!r}')
+              s=s.replace(old,new,1); p.write_text(s)
+
+          # Boss encounter: expose whether magic merely contacted or actually destroyed a weakpoint.
+          replace_once('src/game/boss-encounters.ts',
+          "export interface MagicTargetSink { hitMagic(pos: Vec2, strength: number): void; }",
+          "export interface MagicHitResult { hit:boolean; nodeId:number|null; destroyed:boolean; allDestroyed:boolean; }\nexport interface MagicTargetSink { hitMagic(pos: Vec2, strength: number): MagicHitResult; }")
+          replace_once('src/game/boss-encounters.ts',
+          """  hitMagic(pos: Vec2, strength: number): void {
+            let target: BossEncounterNode | null = null;
+            let best = Number.POSITIVE_INFINITY;
+            for (const node of this.nodes) {
+              if (!node.alive) continue;
+              const d = distance(pos, node.pos);
+              if (d <= node.radius + 82 && d < best) { target = node; best = d; }
+            }
+            if (!target) return;
+            target.hp = Math.max(0, target.hp - Math.max(1, strength));
+            if (target.hp > 0) return;
+            target.alive = false;
+            this.destroyedNodes += 1;
+            if (this.archetype === 'inferno' && this.nodes.every((node) => !node.alive)) this.vulnerabilityTimer = 6;
+          }""",
+          """  hitMagic(pos: Vec2, strength: number): MagicHitResult {
+            let target: BossEncounterNode | null = null;
+            let best = Number.POSITIVE_INFINITY;
+            for (const node of this.nodes) {
+              if (!node.alive) continue;
+              const d = distance(pos, node.pos);
+              if (d <= node.radius + 82 && d < best) { target = node; best = d; }
+            }
+            if (!target) return {hit:false,nodeId:null,destroyed:false,allDestroyed:false};
+            target.hp = Math.max(0, target.hp - Math.max(1, strength));
+            if (target.hp > 0) return {hit:true,nodeId:target.id,destroyed:false,allDestroyed:false};
+            target.alive = false;
+            this.destroyedNodes += 1;
+            const allDestroyed=this.nodes.every((node) => !node.alive);
+            if (this.archetype === 'inferno' && allDestroyed) this.vulnerabilityTimer = 6;
+            return {hit:true,nodeId:target.id,destroyed:true,allDestroyed};
+          }""")
+
+          # Combat feedback: keep resolved result cues separate from existing hit/kill/impact rendering until Train 3.
+          replace_once('src/game/combat-feedback.ts',
+          "import { directionalHitVfxProfile, directionalHitVector, hitApproachProfile, directionalImpactRecoilProfile } from './visual-presence.js';",
+          "import { directionalHitVfxProfile, directionalHitVector, hitApproachProfile, directionalImpactRecoilProfile } from './visual-presence.js';\nimport { actionResultMinimumGap, type ActionResultKind } from './action-result-readability.js';")
+          replace_once('src/game/combat-feedback.ts',
+          "interface ImpactCue { kind: 'impact'; pos: Vec2; ttl: number; maxTtl: number; impactKind: ImpactKind; }\ntype Cue = HitCue | KillCue | ImpactCue;",
+          "interface ImpactCue { kind: 'impact'; pos: Vec2; ttl: number; maxTtl: number; impactKind: ImpactKind; }\ninterface ResultCue { kind:'result'; pos:Vec2; ttl:number; maxTtl:number; resultKind:ActionResultKind; source?:Vec2; }\ntype Cue = HitCue | KillCue | ImpactCue;")
+          replace_once('src/game/combat-feedback.ts',
+          "  addImpact(pos: Vec2, kind: ImpactKind): void;\n}",
+          "  addImpact(pos: Vec2, kind: ImpactKind): void;\n  addActionResult?(pos:Vec2, kind:ActionResultKind, source?:Vec2):void;\n}")
+          replace_once('src/game/combat-feedback.ts',
+          "  private directionalRecoilMaxTtl = 0;\n\n  get activeCount(): number { return this.cues.length; }",
+          "  private directionalRecoilMaxTtl = 0;\n  private resultCues:ResultCue[]=[];\n  private resultCooldowns=new Map<ActionResultKind,number>();\n\n  get activeCount(): number { return this.cues.length+this.resultCues.length; }")
+          replace_once('src/game/combat-feedback.ts',
+          "  reset(): void { this.cues = []; this.shake = 0; this.shakePhase = 0; this.impactVisualCooldown = 0; this.cameraPressureOffset=0; this.cameraPressureTtl=0; this.cameraPressureMaxTtl=0; this.directionalRecoil={x:0,y:0}; this.directionalRecoilTtl=0; this.directionalRecoilMaxTtl=0; }",
+          "  reset(): void { this.cues = []; this.resultCues=[]; this.resultCooldowns.clear(); this.shake = 0; this.shakePhase = 0; this.impactVisualCooldown = 0; this.cameraPressureOffset=0; this.cameraPressureTtl=0; this.cameraPressureMaxTtl=0; this.directionalRecoil={x:0,y:0}; this.directionalRecoilTtl=0; this.directionalRecoilMaxTtl=0; }")
+          replace_once('src/game/combat-feedback.ts',
+          """  update(dt: number): void {
+            this.shakePhase += dt;""",
+          """  addActionResult(pos:Vec2,kind:ActionResultKind,source?:Vec2):void {
+            if((this.resultCooldowns.get(kind)??0)>0)return;
+            const ttl=kind==='normalHit'?0.16:kind==='weakpointHit'?0.20:0.28;
+            this.resultCues.push({kind:'result',pos:{...pos},resultKind:kind,ttl,maxTtl:ttl,...(source?{source:{...source}}:{})});
+            if(this.resultCues.length>18)this.resultCues.splice(0,this.resultCues.length-18);
+            this.resultCooldowns.set(kind,actionResultMinimumGap(kind));
+          }
+
+          update(dt: number): void {
+            this.shakePhase += dt;""")
+          replace_once('src/game/combat-feedback.ts',
+          "    this.directionalRecoilTtl=Math.max(0,this.directionalRecoilTtl-dt);\n    if(this.directionalRecoilTtl<=0){this.directionalRecoil={x:0,y:0};this.directionalRecoilMaxTtl=0;}\n    for (const cue of this.cues) {",
+          "    this.directionalRecoilTtl=Math.max(0,this.directionalRecoilTtl-dt);\n    if(this.directionalRecoilTtl<=0){this.directionalRecoil={x:0,y:0};this.directionalRecoilMaxTtl=0;}\n    for(const [kind,remaining] of this.resultCooldowns){const next=Math.max(0,remaining-dt);if(next<=0)this.resultCooldowns.delete(kind);else this.resultCooldowns.set(kind,next);}\n    for(const cue of this.resultCues)cue.ttl-=dt;\n    this.resultCues=this.resultCues.filter((cue)=>cue.ttl>0);\n    for (const cue of this.cues) {")
+
+          # Enemy manager: recognize resolved shield break, boss stagger and kill outcomes without changing damage math.
+          replace_once('src/game/enemies.ts',
+          "    let remaining = amount;\n    if ((enemy.guardHp ?? 0) > 0) {",
+          "    let remaining = amount;\n    let guardBroken=false;\n    if ((enemy.guardHp ?? 0) > 0) {")
+          replace_once('src/game/enemies.ts',
+          "      const guardBroken=guardBefore>0&&(enemy.guardHp ?? 0)<=0;",
+          "      guardBroken=guardBefore>0&&(enemy.guardHp ?? 0)<=0;")
+          replace_once('src/game/enemies.ts',
+          "    this.feedback?.addHit(enemy.pos, amount, impactTier, enemy.type, source);\n    if (enemy.type === 'boss' && impactTier !== 'normal') this.feedback?.addImpact(enemy.pos, 'bossHit');\n    if (!killed) return false;",
+          "    this.feedback?.addHit(enemy.pos, amount, impactTier, enemy.type, source);\n    if(guardBroken)this.feedback?.addActionResult?.(enemy.pos,'guardBreak',source);\n    if (enemy.type === 'boss' && impactTier !== 'normal') { this.feedback?.addImpact(enemy.pos, 'bossHit'); this.feedback?.addActionResult?.(enemy.pos,'bossStagger',source); }\n    if (!killed) return false;\n    this.feedback?.addActionResult?.(enemy.pos,'enemyKill',source);")
+
+          # Spell system: translate boss encounter contact/break metadata into result confirmation.
+          replace_once('src/game/spells.ts',
+          "export class SpellSystem {\n  readonly levels: Record<SpellId, number> = {",
+          "export class SpellSystem {\n  private hitMagicTarget(world:SpellWorld,pos:Vec2,strength:number,source?:Vec2):void {\n    const result=world.magicTargets?.hitMagic(pos,strength);\n    if(!result?.hit)return;\n    world.feedback?.addActionResult?.(pos,result.destroyed?'weakpointBreak':'weakpointHit',source??world.hero.pos);\n  }\n\n  readonly levels: Record<SpellId, number> = {")
+          replacements={
+            "world.magicTargets?.hitMagic(impactPos, tuning.damage * 0.72);":"this.hitMagicTarget(world,impactPos,tuning.damage * 0.72,hitSource);",
+            "world.magicTargets?.hitMagic(world.hero.pos, tuning.damage);":"this.hitMagicTarget(world,world.hero.pos,tuning.damage,world.hero.pos);",
+            "world.magicTargets?.hitMagic(pos, tuning.damage * 0.8);":"this.hitMagicTarget(world,pos,tuning.damage * 0.8,world.hero.pos);",
+            "world.magicTargets?.hitMagic(p.pos, p.damage * Math.min(0.28, dt * 4));":"this.hitMagicTarget(world,p.pos,p.damage * Math.min(0.28,dt * 4),p.visualLaunchWorldOrigin??world.hero.pos);",
+            "world.magicTargets?.hitMagic(field.pos, field.damage * 0.55);":"this.hitMagicTarget(world,field.pos,field.damage * 0.55,field.pos);",
+            "world.magicTargets?.hitMagic(meteor.pos, meteor.damage * 0.8);":"this.hitMagicTarget(world,meteor.pos,meteor.damage * 0.8,world.hero.pos);",
+            "world.magicTargets?.hitMagic(hole.pos, hole.damage * 0.55);":"this.hitMagicTarget(world,hole.pos,hole.damage * 0.55,hole.pos);",
+          }
+          p=Path('src/game/spells.ts'); s=p.read_text()
+          for old,new in replacements.items():
+              if old not in s: raise SystemExit(f'missing spells pattern: {old}')
+              s=s.replace(old,new,1)
+          p.write_text(s)
+          PY
+      - run: npm ci
+      - run: npm run build
+      - name: Focused Phase 4353-4364 tests
+        run: node --test tests/phase4353-4358-action-result-ownership.test.mjs tests/phase4359-4364-meaningful-impact-confirmation.test.mjs
+      - run: git diff --check
+      - name: Commit integration
+        run: |
+          git config user.name asitiso
+          git config user.email asitiso.woo@gmail.com
+          git add src/game/boss-encounters.ts src/game/combat-feedback.ts src/game/enemies.ts src/game/spells.ts
+          git add -f dist/game/action-result-readability.js dist/game/boss-encounters.js dist/game/combat-feedback.js dist/game/enemies.js dist/game/spells.js
+          git commit -m "feat: confirm meaningful combat outcomes"
+          git push origin HEAD:work/phase4353-4370-cast-impact-readability

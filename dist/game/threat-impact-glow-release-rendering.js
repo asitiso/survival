@@ -1,0 +1,4 @@
+const clamp01 = (value) => Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
+const smooth01 = (value) => { const x = clamp01(value); return x * x * (3 - 2 * x); };
+export function glowReleasePresentation(input, reducedMotion = false, reducedFlash = false) { const release = smooth01(input.reacquire), stress = clamp01(input.stress); if (input.protectedGlow)
+    return { release, glowBlurScale: 1, canonicalGlowBlurScale: 1, presentationOnly: true }; const floor = input.critical ? .88 : .72, hold = (1 - release) * ((input.critical ? .055 : .11) + stress * (input.critical ? .055 : .14)), accessibility = (reducedMotion ? .995 : 1) * (reducedFlash ? (input.critical ? .98 : .92) : 1); return { release, glowBlurScale: Math.max(floor, 1 - hold) * accessibility, canonicalGlowBlurScale: 1, presentationOnly: true }; }

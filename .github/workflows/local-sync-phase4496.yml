@@ -1,4 +1,4 @@
-name: Local Sync Phase 4514
+name: Phase 4515 Swift Cadence TDD
 
 on:
   push:
@@ -6,35 +6,21 @@ on:
       - '.sync/phase4496.ready'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  sync:
+  validate:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-      - name: Reassemble and verify local patch payload
-        shell: bash
-        run: |
-          set -euo pipefail
-          cat .sync/phase4497-4514.part00 .sync/phase4497-4514.part01 .sync/phase4497-4514.part02 .sync/phase4497-4514.part03 .sync/phase4497-4514.part04 > /tmp/phase4497-4514.patch.gz.b64
-          test "$(wc -c < /tmp/phase4497-4514.patch.gz.b64 | tr -d ' ')" = "15056"
-          echo "53b2c86f4dc6f3e3e2246536037e88e0fc3d7ebc838d20e0241980f19210d993  /tmp/phase4497-4514.patch.gz.b64" | sha256sum -c -
-          base64 -d /tmp/phase4497-4514.patch.gz.b64 | gzip -d > /tmp/phase4497-4514.patch
-      - name: Recreate verified local tree and push result
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name asitiso
-          git config user.email asitiso.woo@gmail.com
-          git fetch origin work/phase4479-4496-commander-aura-readability
-          git switch -C work/phase4497-4514-frenzied-threat-readability origin/work/phase4479-4496-commander-aura-readability
-          test "$(git rev-parse HEAD)" = "d3acae90bb8c48e2595068d77c42c68bbc094449"
-          git apply --index --binary /tmp/phase4497-4514.patch
-          TREE=$(git write-tree)
-          test "$TREE" = "f620d1aeeb8d936d2a1110407fb1444bf285a0b1"
-          git diff --cached --check
-          git commit -m "feat: improve Phase 4497-4514 frenzied threat readability"
-          git push origin HEAD:work/phase4497-4514-frenzied-threat-readability
+          ref: work/phase4515-4532-swift-cadence-readability
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Phase 4515-4520 focused RED test
+        run: node --test tests/phase4515-4520-swift-cadence-lifecycle.test.mjs
+      - run: git diff --check

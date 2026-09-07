@@ -15,4 +15,5 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - run: node --test tests/phase4335-4340-target-intent-ownership.test.mjs
+      - run: node --test tests/phase4335-4340-target-intent-ownership.test.mjs tests/phase4341-4346-target-switch-readability.test.mjs tests/phase4347-4352-target-intent-budget.test.mjs tests/phase4317-4322-auto-humanization.test.mjs tests/phase4323-4328-manual-forgiveness.test.mjs tests/phase4329-4334-threat-control-matrix.test.mjs
+      - run: git diff --check

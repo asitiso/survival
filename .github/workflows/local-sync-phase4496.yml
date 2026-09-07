@@ -1,4 +1,4 @@
-name: Phase 4532 Exact Regression Capture
+name: Phase 4532 Swift Contract Diagnose
 
 on:
   push:
@@ -15,20 +15,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: work/phase4515-4532-swift-cadence-readability
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - name: Run full suite and print only exact failure blocks
+      - name: Inspect swift response callsites
         shell: bash
         run: |
-          set +e
-          npm test > /tmp/full-test.log 2>&1
-          status=$?
-          echo "TEST_EXIT=$status"
-          echo '--- FAILURES ---'
-          awk '/^not ok /{show=1;count=0} show{print;count++} show&&count>=55{show=0}' /tmp/full-test.log
-          echo '--- SUMMARY ---'
-          tail -30 /tmp/full-test.log
-          exit 0
+          set -euo pipefail
+          echo '--- queue definition ---'
+          grep -n -A18 -B4 "queueEliteAffixResponseVfx" src/game/enemies.ts | head -180 || true
+          echo '--- swift response occurrences ---'
+          grep -n -A8 -B8 "'swift'" src/game/enemies.ts | head -220 || true
+          echo '--- swift ownership occurrences ---'
+          grep -n -A10 -B10 "swiftStrikeOwnershipPresentation" src/game/enemies.ts | head -220 || true

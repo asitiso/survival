@@ -1,6 +1,7 @@
 import { enemyImpactVfxDescriptor } from './enemy-presentation.js';
 import { directionalHitVfxProfile, directionalHitVector, hitApproachProfile, directionalImpactRecoilProfile } from './visual-presence.js';
 import { actionResultMinimumGap, actionResultPresentation } from './action-result-readability.js';
+import { damageNumberPresentation } from './damage-number-readability.js';
 const CAMERA_PRESSURE = {
     meteor: { scaleOffset: 0.024, duration: 0.24 },
     vortex: { scaleOffset: -0.018, duration: 0.30 },
@@ -170,6 +171,7 @@ export class CombatFeedbackSystem {
         this.cues = this.cues.filter((cue) => cue.ttl > 0);
     }
     render(ctx, quality = 'high', resultContext = {}) {
+        let remainingRoutineDamageNumbers = this.cues.reduce((count, cue) => count + (cue.kind === 'hit' && cue.tier === 'normal' ? 1 : 0), 0);
         for (const cue of this.cues) {
             const ratio = Math.max(0, cue.ttl / cue.maxTtl);
             if (cue.kind === 'hit') {
@@ -211,16 +213,43 @@ export class CombatFeedbackSystem {
                     ctx.arc(cue.pos.x, cue.pos.y, Math.max(visual.ringRadius, identity?.ringRadius ?? 0) * (1.15 - ratio * 0.25), 0, Math.PI * 2);
                     ctx.stroke();
                 }
-                ctx.globalAlpha = Math.min(1, ratio * 1.65);
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.font = `${visual.weight} ${visual.fontSize}px system-ui`;
-                ctx.lineWidth = 4;
-                ctx.strokeStyle = 'rgba(4,8,14,.78)';
-                ctx.fillStyle = cue.tier === 'critical' ? '#ffe16d' : cue.tier === 'heavy' ? '#d9efff' : '#f3f7ff';
-                const text = `${Math.max(1, Math.round(cue.amount)).toLocaleString()}${cue.tier === 'critical' ? '!' : ''}`;
-                ctx.strokeText(text, cue.pos.x, cue.pos.y);
-                ctx.fillText(text, cue.pos.x, cue.pos.y);
+                let resultPriorityNearby = 0, resultDistance = Number.POSITIVE_INFINITY;
+                for (const resultCue of this.resultCues) {
+                    const priority = actionResultPresentation({ ...resultContext, kind: resultCue.resultKind, sourceDistance: 0 }).priority;
+                    if (priority < 2)
+                        continue;
+                    const d = Math.hypot(cue.pos.x - resultCue.pos.x, cue.pos.y - resultCue.pos.y);
+                    if (d < resultDistance || (d === resultDistance && priority > resultPriorityNearby)) {
+                        resultDistance = d;
+                        resultPriorityNearby = priority;
+                    }
+                }
+                if (cue.tier === 'normal')
+                    remainingRoutineDamageNumbers -= 1;
+                const clusterIndex = cue.tier === 'normal' ? remainingRoutineDamageNumbers : 0;
+                const damageNumber = damageNumberPresentation({
+                    tier: cue.tier,
+                    clusterIndex,
+                    ...(resultContext.battlefieldStress !== undefined ? { battlefieldStress: resultContext.battlefieldStress } : {}),
+                    ...(resultContext.protectedWarning !== undefined ? { protectedWarning: resultContext.protectedWarning } : {}),
+                    ...(resultContext.safeLaneVisible !== undefined ? { safeLaneVisible: resultContext.safeLaneVisible } : {}),
+                    ...(resultContext.reducedMotion !== undefined ? { reducedMotion: resultContext.reducedMotion } : {}),
+                    ...(resultContext.reducedFlash !== undefined ? { reducedFlash: resultContext.reducedFlash } : {}),
+                    ...(resultPriorityNearby >= 2 ? { resultPriorityNearby, resultDistance } : {})
+                });
+                if (damageNumber.visible) {
+                    ctx.globalAlpha = Math.min(1, ratio * 1.65) * damageNumber.alpha;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.font = `${visual.weight} ${visual.fontSize}px system-ui`;
+                    ctx.lineWidth = 4;
+                    ctx.strokeStyle = 'rgba(4,8,14,.78)';
+                    ctx.fillStyle = cue.tier === 'critical' ? '#ffe16d' : cue.tier === 'heavy' ? '#d9efff' : '#f3f7ff';
+                    const text = `${Math.max(1, Math.round(cue.amount)).toLocaleString()}${cue.tier === 'critical' ? '!' : ''}`;
+                    const textY = cue.pos.y + damageNumber.offsetY;
+                    ctx.strokeText(text, cue.pos.x, textY);
+                    ctx.fillText(text, cue.pos.x, textY);
+                }
                 ctx.restore();
             }
             else if (cue.kind === 'kill') {

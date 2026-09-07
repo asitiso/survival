@@ -1,4 +1,4 @@
-name: Phase 4515-4532 Final Verification Clean
+name: Phase 4533-4538 Primary Ownership RED
 
 on:
   push:
@@ -9,40 +9,18 @@ permissions:
   contents: read
 
 jobs:
-  verify:
+  red:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: work/phase4515-4532-swift-cadence-readability
+          ref: work/phase4533-4550-elite-multiaffix-arbitration
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Initial clean tree
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -z "$(git status --porcelain)"
-      - name: Full regression
-        run: npm test
-      - name: Fresh build
-        run: npm run build
-      - name: Raster verification
-        run: npm run verify:raster
-      - name: Release verification
-        run: npm run verify:release
-      - name: Candidate verification
-        run: npm run verify:candidate
-      - name: Final clean tree
-        shell: bash
-        run: |
-          set -euo pipefail
-          git diff --check
-          status="$(git status --porcelain)"
-          printf '%s' "$status"
-          test -z "$status"
-          echo "HEAD=$(git rev-parse HEAD)"
-          echo "TREE=$(git rev-parse HEAD^{tree})"
+      - run: npm run build
+      - name: Phase 4533-4538 RED
+        run: node --test tests/phase4533-4538-elite-affix-primary-ownership.test.mjs

@@ -10,6 +10,7 @@ import type { FusionId } from './spell-fusions.js';
 import { composeFusionSpellModifiers, type FusionSpellModifiers } from './fusion-integration.js';
 import { chooseSpellTarget } from './auto-targeting.js';
 import { autoWeakpointAimPoint } from './auto-weakpoint-aim.js';
+import { manualWeakpointAssistAimPoint } from './manual-weakpoint-assist.js';
 import type { BossEncounterNode } from './boss-encounters.js';
 import { ultimateChoreographyDescriptor, type UltimateChoreographyDescriptor } from './spell-vfx.js';
 import type { ResidualCombatMotionPolicy } from './combat-cue-priority.js';
@@ -801,7 +802,7 @@ export class SpellSystem {
 
   private targetAimPoint(world:SpellWorld,target:Enemy|null):Vec2|null{
     if(!target)return null;
-    return autoWeakpointAimPoint({autoAim:world.autoAim===true,target,heroPos:world.hero.pos,activeBossId:world.weakpointAim?.activeBossId??null,nodes:world.weakpointAim?.nodes??[],preferredNodeId:world.autoAim===true?(world.preferredAutoWeakpointId??null):null});
+    return world.autoAim===true?autoWeakpointAimPoint({autoAim:true,target,heroPos:world.hero.pos,activeBossId:world.weakpointAim?.activeBossId??null,nodes:world.weakpointAim?.nodes??[],preferredNodeId:world.preferredAutoWeakpointId??null}):manualWeakpointAssistAimPoint({target,heroPos:world.hero.pos,activeBossId:world.weakpointAim?.activeBossId??null,nodes:world.weakpointAim?.nodes??[]});
   }
 
   private updateProjectiles(dt: number, world: SpellWorld): void {

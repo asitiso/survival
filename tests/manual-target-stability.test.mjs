@@ -6,12 +6,12 @@ const enemy=(id,type,x,y,target='hero',alive=true)=>({id,type,pos:{x,y},target,h
 const hero={x:0,y:0};
 const core={x:500,y:0};
 
-test('phase 1183 manual target memory keeps the same same-priority target for 0.75 seconds',()=>{
+test('phase 1183 manual target memory keeps the same same-priority target for 1.15 seconds',()=>{
   const memory=new ManualTargetMemory();
   const first=enemy(1,'grunt',120,0);
   const challenger=enemy(2,'grunt',100,0);
   assert.equal(memory.select([first],hero,core,10)?.id,1);
-  assert.equal(memory.select([first,challenger],hero,core,10.74)?.id,1);
+  assert.equal(memory.select([first,challenger],hero,core,11.14)?.id,1);
 });
 
 test('phase 1199 manual target memory releases a core threat as soon as it leaves the 620 priority range',()=>{
@@ -23,12 +23,12 @@ test('phase 1199 manual target memory releases a core threat as soon as it leave
   assert.equal(memory.select([coreThreat,challenger],hero,core,20.1)?.id,2);
 });
 
-test('phase 1184 memory expires at 0.75 seconds and allows a same-tier nearer target to take over',()=>{
+test('phase 1184 memory expires at 1.15 seconds and allows a same-tier nearer target to take over',()=>{
   const memory=new ManualTargetMemory();
   const first=enemy(1,'grunt',120,0);
   const challenger=enemy(2,'grunt',80,0);
   assert.equal(memory.select([first],hero,core,30)?.id,1);
-  assert.equal(memory.select([first,challenger],hero,core,30.75)?.id,2);
+  assert.equal(memory.select([first,challenger],hero,core,31.15)?.id,2);
 });
 
 test('phase 1191 higher manual priority tiers override remembered lower tiers immediately',()=>{

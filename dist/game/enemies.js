@@ -112,6 +112,13 @@ import { specialistImpactFinishDensityBudgetPresentation } from './specialist-im
 import { bossAnticipationOriginLockPresentation } from './boss-anticipation-origin-lock-rendering.js';
 import { specialistStrikeCueBudgetPresentation } from './specialist-strike-cue-budget-rendering.js';
 import { bossSpecialOriginAnchorPresentation } from './boss-special-origin-anchor-rendering.js';
+export function enemyHealingAccounting(currentHp, maxHp, requestedHeal) {
+    const safeMax = Math.max(0, Number.isFinite(maxHp) ? maxHp : 0);
+    const safeHp = Math.max(0, Math.min(safeMax, Number.isFinite(currentHp) ? currentHp : 0));
+    const requested = Math.max(0, Number.isFinite(requestedHeal) ? requestedHeal : 0);
+    const hpRestored = Math.min(requested, Math.max(0, safeMax - safeHp));
+    return { requestedHeal: requested, hpRestored, overheal: Math.max(0, requested - hpRestored) };
+}
 function isSpecialistEnemyType(type) { return type === 'shieldbearer' || type === 'assassin' || type === 'siegeGolem' || type === 'nullifier'; }
 function pointSegmentProximity(point, a, b, band) { if (!a || !b)
     return 0; const dx = b.x - a.x, dy = b.y - a.y, len2 = dx * dx + dy * dy, safeBand = Math.max(1, band); if (len2 <= .001)
@@ -385,9 +392,13 @@ export class EnemyManager {
             }
             if ((enemy.regenPerSecondRatio ?? 0) > 0 && enemy.hp > 0 && enemy.hp < enemy.maxHp) {
                 const hpBeforeRegen = enemy.hp;
+                const requestedHeal = enemy.maxHp * (enemy.regenPerSecondRatio ?? 0) * dt;
                 enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * (enemy.regenPerSecondRatio ?? 0) * dt);
-                if (enemy.hp > hpBeforeRegen && enemy.eliteAffixes?.includes('regenerating'))
+                const healing = enemyHealingAccounting(hpBeforeRegen, enemy.maxHp, requestedHeal);
+                if (enemy.hp > hpBeforeRegen && enemy.eliteAffixes?.includes('regenerating')) {
                     this.queueEliteAffixResponseVfx(enemy, 'regenerating');
+                    this.feedback?.addHealingResponse?.(enemy.pos, healing, 'regenerating', enemy.pos, enemy.id, enemy.type);
+                }
             }
             if (enemy.type === 'boss')
                 this.updateBossSpecial(enemy, dt, ctx, director.danger, director.enemyBudget, ctx.bossVariantBonus ?? 0);
@@ -1807,7 +1818,11 @@ export class EnemyManager {
                 continue;
             if (distance(shaman.pos, ally.pos) > SPECIALIST_COMBAT_CONTRACT.shamanHealRadius + ally.radius)
                 continue;
+            const hpBeforeHeal = ally.hp;
+            const requestedHeal = Math.max(SPECIALIST_COMBAT_CONTRACT.shamanHealMinimum, ally.maxHp * SPECIALIST_COMBAT_CONTRACT.shamanHealRatio);
             ally.hp = Math.min(ally.maxHp, ally.hp + Math.max(SPECIALIST_COMBAT_CONTRACT.shamanHealMinimum, ally.maxHp * SPECIALIST_COMBAT_CONTRACT.shamanHealRatio));
+            const healing = enemyHealingAccounting(hpBeforeHeal, ally.maxHp, requestedHeal);
+            this.feedback?.addHealingResponse?.(ally.pos, healing, 'shaman', shaman.pos, ally.id, ally.type);
             ally.hitFlash = Math.max(ally.hitFlash, 0.04);
             healedCount += 1;
         }

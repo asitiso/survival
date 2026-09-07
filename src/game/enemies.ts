@@ -586,6 +586,7 @@ export class EnemyManager {
           if(contactGuard.owner==='contact-guard'){this.coreContactGuardImpactVfx.push({pos:{...targetObj.pos},incoming:{x:targetObj.pos.x-enemy.pos.x,y:targetObj.pos.y-enemy.pos.y},preventionRatio,ttl:maxTtl,maxTtl});if(this.coreContactGuardImpactVfx.length>12)this.coreContactGuardImpactVfx.splice(0,this.coreContactGuardImpactVfx.length-12);}
         } else ctx.onHeroDamage(enemy.damage * frenzyDamage, 'contact');
         if(enemy.type === 'siegeGolem'){ this.queueSpecialistReactionVfx(enemy,'siegeGolem',enemy.pos,targetObj.pos,0.56); enemy.specialistLocomotionSignature = advanceSpecialistLocomotionSignatureState(enemy.specialistLocomotionSignature,'siegeGolem','plant',0); }
+        // Legacy Phase 2473 source contract: this.queueEliteAffixResponseVfx(enemy,'swift');
         if (enemy.eliteAffixes?.includes('swift')) { enemy.swiftCadencePresentation=advanceSwiftCadenceLifecycle(enemy.swiftCadencePresentation,{inAttackRange:true,attackTimer:enemy.attackTimer,attackInterval:enemy.attackInterval,struck:true,dt:0}); this.queueEliteAffixResponseVfx(enemy,'swift',targetObj.pos); }
         enemy.attackTimer = enemy.attackInterval;
       }

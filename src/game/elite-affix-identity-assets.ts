@@ -115,6 +115,34 @@ export function swiftCadencePresentation(state: SwiftCadenceLifecycleState | und
   return { alpha, chevronLength, lineWidth, motionScale };
 }
 
+export interface SwiftStrikeOwnershipInput {
+  actualStrike: boolean;
+  targetKind: 'hero' | 'core';
+  distanceToTarget: number;
+  recentlyHit: boolean;
+  battlefieldStress: number;
+  reducedMotion: boolean;
+  reducedFlash: boolean;
+}
+export interface SwiftStrikeOwnershipPresentation {
+  visible: boolean;
+  connectorAlpha: number;
+  chevronScale: number;
+  priorityScale: number;
+  motionScale: number;
+}
+export function swiftStrikeOwnershipPresentation(input: SwiftStrikeOwnershipInput): SwiftStrikeOwnershipPresentation {
+  if (!input.actualStrike) return { visible: false, connectorAlpha: 0, chevronScale: 0, priorityScale: 0, motionScale: 0 };
+  const stress = clamp(Number.isFinite(input.battlefieldStress) ? input.battlefieldStress : 0, 0, 1);
+  const distanceToTarget = Math.max(0, Number.isFinite(input.distanceToTarget) ? input.distanceToTarget : 9999);
+  const coreNear = input.targetKind === 'core' && distanceToTarget <= 120;
+  const priorityScale = coreNear ? 1 : input.recentlyHit ? 0.94 : Math.max(0.68, 1 - stress * 0.22);
+  let connectorAlpha = (coreNear ? 0.66 : 0.56) * priorityScale;
+  if (input.reducedFlash) connectorAlpha *= 0.62;
+  const chevronScale = (coreNear ? 1 : 0.88) * Math.max(0.72, 1 - stress * 0.18);
+  return { visible: true, connectorAlpha, chevronScale, priorityScale, motionScale: input.reducedMotion ? 0 : 1 };
+}
+
 export type FrenziedThresholdPhase = 'inactive' | 'entered' | 'active' | 'released';
 export interface FrenziedThresholdLifecycleState { phase:FrenziedThresholdPhase; active:boolean; transitionTtl:number; }
 export interface FrenziedThresholdPresentation { alpha:number; radiusOffset:number; lineWidth:number; pulse:number; }

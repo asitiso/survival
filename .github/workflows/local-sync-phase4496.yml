@@ -1,4 +1,4 @@
-name: Local Sync Phase 4496
+name: Local Sync Phase 4514
 
 on:
   push:
@@ -19,21 +19,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat .sync/phase4479-4496.part00 .sync/phase4479-4496.part01 .sync/phase4479-4496.part02 > /tmp/phase4479-4496.patch.gz.b64
-          test "$(wc -c < /tmp/phase4479-4496.patch.gz.b64 | tr -d ' ')" = "10428"
-          echo "4193eb296f704b10b3a0ba901ebad52ccb76058b44f73775cd6c4f4cb5b1c566  /tmp/phase4479-4496.patch.gz.b64" | sha256sum -c -
-          base64 -d /tmp/phase4479-4496.patch.gz.b64 | gzip -d > /tmp/phase4479-4496.patch
+          cat .sync/phase4497-4514.part00 .sync/phase4497-4514.part01 .sync/phase4497-4514.part02 .sync/phase4497-4514.part03 .sync/phase4497-4514.part04 > /tmp/phase4497-4514.patch.gz.b64
+          test "$(wc -c < /tmp/phase4497-4514.patch.gz.b64 | tr -d ' ')" = "15056"
+          echo "53b2c86f4dc6f3e3e2246536037e88e0fc3d7ebc838d20e0241980f19210d993  /tmp/phase4497-4514.patch.gz.b64" | sha256sum -c -
+          base64 -d /tmp/phase4497-4514.patch.gz.b64 | gzip -d > /tmp/phase4497-4514.patch
       - name: Recreate verified local tree and push result
         shell: bash
         run: |
           set -euo pipefail
           git config user.name asitiso
           git config user.email asitiso.woo@gmail.com
-          git fetch origin work/phase4461-4478-healing-recovery-readability
-          git switch -C work/phase4479-4496-commander-aura-readability origin/work/phase4461-4478-healing-recovery-readability
-          git apply --index /tmp/phase4479-4496.patch
+          git fetch origin work/phase4479-4496-commander-aura-readability
+          git switch -C work/phase4497-4514-frenzied-threat-readability origin/work/phase4479-4496-commander-aura-readability
+          test "$(git rev-parse HEAD)" = "d3acae90bb8c48e2595068d77c42c68bbc094449"
+          git apply --index --binary /tmp/phase4497-4514.patch
           TREE=$(git write-tree)
-          test "$TREE" = "ff2cbfa3f6c5b7256a5dc53ed9455ad348c95f44"
+          test "$TREE" = "f620d1aeeb8d936d2a1110407fb1444bf285a0b1"
           git diff --cached --check
-          git commit -m "feat: improve Phase 4479-4496 commander aura readability"
-          git push origin HEAD:work/phase4479-4496-commander-aura-readability
+          git commit -m "feat: improve Phase 4497-4514 frenzied threat readability"
+          git push origin HEAD:work/phase4497-4514-frenzied-threat-readability

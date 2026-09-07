@@ -79,6 +79,32 @@ export function healingDamageArbitrationPresentation(input) {
     const displacement = input.reducedMotion ? 10 : 18;
     return { numberVisible, numberAlpha: Math.max(0, Math.min(.78, numberAlpha)), numberOffsetX: recent ? (input.reducedMotion ? 4 : 7) : 0, numberOffsetY: recent ? displacement : 12, returnCueAlpha: recent ? (input.reducedFlash ? .10 : .18) : 0 };
 }
+export function frenziedAttackPresentation(input) {
+    const stress = Math.max(0, Math.min(1, input.battlefieldStress ?? 0));
+    const priority = !!input.priorityTarget || input.targetChannel === 'core';
+    const capacity = Math.max(1, Math.round(4 - stress * 3));
+    const visible = priority || Math.max(0, input.clusterIndex ?? 0) < capacity;
+    let alpha = (input.targetChannel === 'core' ? .52 : .46) * (1 - stress * (priority ? .16 : .42));
+    if (priority)
+        alpha *= 1.12;
+    if (input.resolvedResultNearby)
+        alpha *= .38;
+    if (input.defenseBreakNearby)
+        alpha *= .54;
+    if (input.criticalNearby)
+        alpha *= .52;
+    if (input.healingReturnNearby)
+        alpha *= .46;
+    if (input.protectedWarning)
+        alpha *= .45;
+    if (input.safeLaneVisible)
+        alpha *= .55;
+    if (input.reducedFlash)
+        alpha *= .62;
+    if (!visible)
+        alpha *= .14;
+    return { visible, alpha: Math.max(.006, Math.min(.62, alpha)), length: input.targetChannel === 'core' ? 46 : 42, lineWidth: 2.1, pulse: input.reducedMotion ? 0 : 2.6, chevronSize: 8 };
+}
 export function commanderAuraPresentation(input) {
     const stress = Math.max(0, Math.min(1, input.battlefieldStress ?? 0));
     const priority = !!input.priorityTarget, capacity = Math.max(1, Math.round(4 - stress * 3));
@@ -161,11 +187,13 @@ export class CombatFeedbackSystem {
     defenseResponseCues = [];
     healingResponseCues = [];
     commanderAuraCues = [];
+    frenziedAttackCues = [];
     resultCooldowns = new Map();
     get activeCount() { return this.cues.length + this.resultCues.length + this.defenseResponseCues.length + this.healingResponseCues.length; }
     get defenseResponseCount() { return this.defenseResponseCues.length; }
     get healingResponseCount() { return this.healingResponseCues.length; }
     get commanderAuraCount() { return this.commanderAuraCues.length; }
+    get frenziedAttackCount() { return this.frenziedAttackCues.length; }
     get shakeIntensity() { return this.shake; }
     get cameraScaleOffset() {
         if (this.cameraPressureTtl <= 0 || this.cameraPressureMaxTtl <= 0)
@@ -188,7 +216,7 @@ export class CombatFeedbackSystem {
         const recoilRatio = this.directionalRecoilTtl > 0 && this.directionalRecoilMaxTtl > 0 ? Math.max(0, Math.min(1, this.directionalRecoilTtl / this.directionalRecoilMaxTtl)) : 0;
         return { x: shakeOffset.x + this.directionalRecoil.x * recoilRatio, y: shakeOffset.y + this.directionalRecoil.y * recoilRatio };
     }
-    reset() { this.cues = []; this.resultCues = []; this.defenseResponseCues = []; this.healingResponseCues = []; this.commanderAuraCues = []; this.resultCooldowns.clear(); this.shake = 0; this.shakePhase = 0; this.impactVisualCooldown = 0; this.cameraPressureOffset = 0; this.cameraPressureTtl = 0; this.cameraPressureMaxTtl = 0; this.directionalRecoil = { x: 0, y: 0 }; this.directionalRecoilTtl = 0; this.directionalRecoilMaxTtl = 0; }
+    reset() { this.cues = []; this.resultCues = []; this.defenseResponseCues = []; this.healingResponseCues = []; this.commanderAuraCues = []; this.frenziedAttackCues = []; this.resultCooldowns.clear(); this.shake = 0; this.shakePhase = 0; this.impactVisualCooldown = 0; this.cameraPressureOffset = 0; this.cameraPressureTtl = 0; this.cameraPressureMaxTtl = 0; this.directionalRecoil = { x: 0, y: 0 }; this.directionalRecoilTtl = 0; this.directionalRecoilMaxTtl = 0; }
     addHit(pos, amount, tier = 'normal', enemyType, source, targetId) {
         const resolved = typeof tier === 'boolean' ? (tier ? 'critical' : 'normal') : tier;
         this.cues.push({ kind: 'hit', pos: { ...pos }, anchorPos: { ...pos }, amount, ttl: 0.46, maxTtl: 0.46, tier: resolved, ...(enemyType ? { enemyType } : {}), ...(source ? { source: { ...source } } : {}), ...(targetId !== undefined ? { targetId } : {}) });
@@ -236,6 +264,23 @@ export class CombatFeedbackSystem {
         this.cues.push({ kind: 'impact', pos: { ...pos }, ttl, maxTtl: ttl, impactKind: kind });
         this.impactVisualCooldown = kind === 'final' || kind === 'ultimate' ? 0.07 : 0.045;
         this.trim();
+    }
+    addFrenziedAttackResponse(source, target, enemyId, targetChannel, targetType) {
+        const maxTtl = .24;
+        const existing = this.frenziedAttackCues.find((cue) => cue.enemyId === enemyId && cue.targetChannel === targetChannel);
+        if (existing) {
+            existing.source = { ...source };
+            existing.target = { ...target };
+            existing.targetType = targetType;
+            existing.ttl = maxTtl;
+            existing.maxTtl = maxTtl;
+            return;
+        }
+        this.frenziedAttackCues.push({ source: { ...source }, target: { ...target }, enemyId, targetChannel, targetType, ttl: maxTtl, maxTtl });
+        while (this.frenziedAttackCues.length > 16) {
+            const routineIndex = this.frenziedAttackCues.findIndex((cue) => cue.targetChannel !== 'core' && Math.hypot(cue.target.x - cue.source.x, cue.target.y - cue.source.y) > 120);
+            this.frenziedAttackCues.splice(routineIndex >= 0 ? routineIndex : 0, 1);
+        }
     }
     addCommanderAuraResponse(source, target, ownerId, targetId, targetType, targetChannel) {
         const existing = this.commanderAuraCues.find((cue) => cue.ownerId === ownerId && cue.targetId === targetId);
@@ -327,6 +372,9 @@ export class CombatFeedbackSystem {
         for (const cue of this.commanderAuraCues)
             cue.ttl -= dt;
         this.commanderAuraCues = this.commanderAuraCues.filter((cue) => cue.ttl > 0);
+        for (const cue of this.frenziedAttackCues)
+            cue.ttl -= dt;
+        this.frenziedAttackCues = this.frenziedAttackCues.filter((cue) => cue.ttl > 0);
         for (const cue of this.cues) {
             cue.ttl -= dt;
             if (cue.kind === 'hit')
@@ -335,6 +383,38 @@ export class CombatFeedbackSystem {
         this.cues = this.cues.filter((cue) => cue.ttl > 0);
     }
     render(ctx, quality = 'high', resultContext = {}) {
+        let routineFrenziedIndex = 0;
+        for (const cue of this.frenziedAttackCues) {
+            const ratio = Math.max(0, Math.min(1, cue.ttl / Math.max(.001, cue.maxTtl))), targetDistance = Math.hypot(cue.target.x - cue.source.x, cue.target.y - cue.source.y);
+            const recentlyHit = this.cues.some((candidate) => candidate.kind === 'hit' && candidate.targetId === cue.enemyId && candidate.ttl > 0);
+            const priorityTarget = cue.targetChannel === 'core' || targetDistance <= 120 || recentlyHit;
+            const resolvedResultNearby = this.resultCues.some((candidate) => Math.hypot(candidate.pos.x - cue.source.x, candidate.pos.y - cue.source.y) <= 42 && actionResultPresentation({ ...resultContext, kind: candidate.resultKind, sourceDistance: 0 }).priority >= 2);
+            const defenseBreakNearby = this.defenseResponseCues.some((candidate) => (candidate.responseKind === 'guardBreak' || candidate.responseKind === 'shieldBreak') && Math.hypot(candidate.pos.x - cue.source.x, candidate.pos.y - cue.source.y) <= 42);
+            const criticalNearby = this.cues.some((candidate) => candidate.kind === 'hit' && candidate.tier === 'critical' && candidate.targetId === cue.enemyId && candidate.ttl > 0);
+            const healingReturnNearby = this.healingResponseCues.some((candidate) => candidate.targetId === cue.enemyId && candidate.ttl > 0);
+            const clusterIndex = priorityTarget ? 0 : routineFrenziedIndex++;
+            const visual = frenziedAttackPresentation({ targetChannel: cue.targetChannel, priorityTarget, clusterIndex, resolvedResultNearby, defenseBreakNearby, criticalNearby, healingReturnNearby, ...(resultContext.battlefieldStress !== undefined ? { battlefieldStress: resultContext.battlefieldStress } : {}), ...(resultContext.protectedWarning !== undefined ? { protectedWarning: resultContext.protectedWarning } : {}), ...(resultContext.safeLaneVisible !== undefined ? { safeLaneVisible: resultContext.safeLaneVisible } : {}), ...(resultContext.reducedMotion !== undefined ? { reducedMotion: resultContext.reducedMotion } : {}), ...(resultContext.reducedFlash !== undefined ? { reducedFlash: resultContext.reducedFlash } : {}) });
+            if (!visual.visible)
+                continue;
+            const dx = cue.target.x - cue.source.x, dy = cue.target.y - cue.source.y, d = Math.hypot(dx, dy), ux = d > 1 ? dx / d : 1, uy = d > 1 ? dy / d : 0, px = -uy, py = ux;
+            const pulse = Math.sin((1 - ratio) * Math.PI) * visual.pulse, endX = cue.source.x + ux * (visual.length + pulse), endY = cue.source.y + uy * (visual.length + pulse), size = visual.chevronSize;
+            ctx.save();
+            ctx.globalAlpha = ratio * visual.alpha;
+            ctx.strokeStyle = '#ff7868';
+            ctx.lineWidth = visual.lineWidth;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(cue.source.x + ux * 8, cue.source.y + uy * 8);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(endX, endY);
+            ctx.lineTo(endX - ux * size + px * size * .62, endY - uy * size + py * size * .62);
+            ctx.moveTo(endX, endY);
+            ctx.lineTo(endX - ux * size - px * size * .62, endY - uy * size - py * size * .62);
+            ctx.stroke();
+            ctx.restore();
+        }
         const commanderOwnersDrawn = new Set();
         let routineCommanderIndex = 0;
         for (const cue of this.commanderAuraCues) {

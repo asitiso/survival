@@ -18,7 +18,7 @@ import type { BossDifficultyCurveProfile } from './boss-difficulty-curve.js';
 import type { DamageReasonSource } from './damage-reason-feedback.js';
 import { enemySpritePresentation, enemySpriteRect, isEnemySpriteType } from './enemy-sprite-assets.js';
 import { bossSpritePresentation, bossSpriteRect } from './boss-sprite-assets.js';
-import { eliteAffixIdentityEmphasis, eliteAffixIdentityIcon, eliteAffixIdentityRowLayout } from './elite-affix-identity-assets.js';
+import { advanceFrenziedThresholdLifecycle, eliteAffixIdentityEmphasis, eliteAffixIdentityIcon, eliteAffixIdentityRowLayout, frenziedThresholdDensityPresentation, frenziedThresholdPresentation, type FrenziedThresholdLifecycleState } from './elite-affix-identity-assets.js';
 import { isSpecialistIntentType, specialistIntentEmphasis, specialistIntentIcon, specialistIntentOnBodyLayout } from './specialist-intent-identity-assets.js';
 import type { ResidualCombatMotionPolicy } from './combat-cue-priority.js';
 import type { PresentationQuality } from './presentation-budget.js';
@@ -179,6 +179,7 @@ export interface Enemy extends EnemyStats {
   commandAuraPreviousOwnerId?: number | undefined;
   commandAuraPresentationTtl?: number | undefined;
   commandAuraHandoffTtl?: number | undefined;
+  frenziedPresentation?: FrenziedThresholdLifecycleState | undefined;
   manaShield: number;
   maxManaShield: number;
   isApex?: boolean | undefined;
@@ -505,6 +506,7 @@ export class EnemyManager {
         const healing=enemyHealingAccounting(hpBeforeRegen,enemy.maxHp,requestedHeal);
         if (enemy.hp > hpBeforeRegen && enemy.eliteAffixes?.includes('regenerating')) { this.queueEliteAffixResponseVfx(enemy,'regenerating'); this.feedback?.addHealingResponse?.(enemy.pos,healing,'regenerating',enemy.pos,enemy.id,enemy.type); }
       }
+      if(enemy.eliteAffixes?.includes('frenzied')) enemy.frenziedPresentation=advanceFrenziedThresholdLifecycle(enemy.frenziedPresentation,enemy.hp/Math.max(1,enemy.maxHp),dt);
       if (enemy.type === 'boss') this.updateBossSpecial(enemy, dt, ctx, director.danger, director.enemyBudget, ctx.bossVariantBonus ?? 0);
 
       const targetObj = enemy.target === 'core' ? ctx.core : ctx.hero;
@@ -571,6 +573,7 @@ export class EnemyManager {
         didAttackThisFrame = true;
         if(isSpecialistEnemyType(enemy.type)&&enemy.type!=='nullifier'){const dir=normalize({x:targetObj.pos.x-enemy.pos.x,y:targetObj.pos.y-enemy.pos.y});const strike=specialistStrikeOriginCoherencePresentation({type:enemy.type,radius:enemy.radius,facingX:dir.x,facingY:dir.y,pullback:0,lunge:1,resolve:0,silhouetteForward:enemy.radius*.42,silhouetteLateral:0},ctx.reducedMotion??false);const maxTtl=.18;this.specialistStrikeOriginVfx.push({pos:{...enemy.pos},origin:{x:enemy.pos.x+strike.originOffsetX,y:enemy.pos.y+strike.originOffsetY},target:{...targetObj.pos},recoveryFacing:{x:enemy.renderMotion?.facingX??dir.x,y:enemy.renderMotion?.facingY??dir.y},enemyId:enemy.id,type:enemy.type,ttl:maxTtl,maxTtl});if(this.specialistStrikeOriginVfx.length>24)this.specialistStrikeOriginVfx.splice(0,this.specialistStrikeOriginVfx.length-24);}
         const frenzyDamage = enemy.hp / Math.max(1, enemy.maxHp) <= 0.42 ? (enemy.lowHpDamageMultiplier ?? 1) : 1;
+        if(frenzyDamage>1&&enemy.eliteAffixes?.includes('frenzied'))this.feedback?.addFrenziedAttackResponse?.(enemy.pos,targetObj.pos,enemy.id,enemy.target,enemy.type);
         // Legacy source continuity: if (enemy.target === 'core') ctx.onCoreDamage(...)
         if (enemy.target === 'core') {
           const appliedResult=ctx.onCoreDamage(enemy.damage * frenzyDamage,'contact',enemy.pos);
@@ -634,6 +637,7 @@ export class EnemyManager {
     const defenseResponse:DefenseResponseAccounting={incoming:amount,guardBlocked,shieldAbsorbed,hpIncoming:remaining,hpApplied:appliedHpDamage,mitigation:remaining-appliedHpDamage,multiplier:damageTakenMultiplier*bossEncounterMultiplier,guardBroken,shieldBroken:shieldBeforeDamage>0&&(enemy.manaShield ?? 0)<=0,armored:enemy.eliteAffixes?.includes('armored')??false,bossMultiplier:bossEncounterMultiplier};
     this.feedback?.addDefenseResponse?.(enemy.pos,defenseResponse,source);
     if (remaining > 0 && enemy.eliteAffixes?.includes('armored')) this.queueEliteAffixResponseVfx(enemy,'armored');
+    if(enemy.eliteAffixes?.includes('frenzied')) enemy.frenziedPresentation=advanceFrenziedThresholdLifecycle(enemy.frenziedPresentation,enemy.hp/Math.max(1,enemy.maxHp),0);
     if (hpRatioBeforeDamage > 0.42 && enemy.hp / Math.max(1, enemy.maxHp) <= 0.42 && enemy.eliteAffixes?.includes('frenzied')) this.queueEliteAffixResponseVfx(enemy,'frenzied');
     enemy.hitFlash = 0.10;
     const killed = enemy.hp <= 0;
@@ -880,6 +884,9 @@ export class EnemyManager {
     const activeSpecialists=this.enemies.filter((enemy)=>isSpecialistEnemyType(enemy.type));
     const activeSpecialistCount=activeSpecialists.length;
     const specialistAnticipationRank=new Map(activeSpecialists.map((enemy,index)=>[enemy,Math.max(0,activeSpecialists.length-1-index)]));
+    const activeFrenzied=this.enemies.filter((enemy)=>enemy.eliteAffixes?.includes('frenzied')&&enemy.frenziedPresentation?.phase!=='inactive');
+    const frenziedPriority=[...activeFrenzied].sort((a,b)=>{const score=(enemy:Enemy)=>{const target=enemy.target==='core'?corePos:heroPos;const d=target?distance(enemy.pos,target):9999;return (enemy.target==='core'?4:0)+(d<=120?4:0)+(enemy.hitFlash>0?2:0)+(enemy.frenziedPresentation?.phase==='entered'?1:0);};return score(b)-score(a);});
+    const frenziedPriorityRank=new Map(frenziedPriority.map((enemy,index)=>[enemy,index]));
     for (const enemy of this.enemies) {
       ctx.save();
       ctx.translate(enemy.pos.x, enemy.pos.y);
@@ -1246,6 +1253,10 @@ export class EnemyManager {
             ctx.drawImage(eliteAffixLifecycleVfxAtlasImage, activeSprite.sx, activeSprite.sy, activeSprite.sw, activeSprite.sh, -size / 2, -size / 2, size, size);
             ctx.restore();
           }
+        }
+        if(enemy.eliteAffixes.includes('frenzied')){
+          const frenzy=frenziedThresholdPresentation(enemy.frenziedPresentation,reducedMotion,reducedFlash),frenzyPriority=enemy.target==='core'||targetDistance<=120||enemy.hitFlash>0,frenzyDensity=frenziedThresholdDensityPresentation(enemy.frenziedPresentation,{activeCount:activeFrenzied.length,indexFromPriority:frenziedPriorityRank.get(enemy)??activeFrenzied.length,priorityTarget:frenzyPriority,battlefieldStress:Math.max(0,Math.min(1,hazardPressure)),reducedMotion,reducedFlash});
+          if(frenzy.alpha>0&&frenzyDensity.visible){const hpRatio=enemy.hp/Math.max(1,enemy.maxHp),pulse=Math.sin((1-hpRatio)*Math.PI*4)*frenzy.pulse*frenzyDensity.pulseScale;ctx.save();ctx.globalAlpha=frenzy.alpha*frenzyDensity.alphaScale;ctx.strokeStyle='#ff7a68';ctx.lineWidth=frenzy.lineWidth;ctx.beginPath();ctx.arc(0,0,enemy.radius+frenzy.radiusOffset+pulse,0,Math.PI*2);ctx.stroke();ctx.restore();}
         }
         const layout = eliteAffixIdentityRowLayout(enemy.eliteAffixes.length, enemy.radius, enemy.pos);
         if (eliteAffixAtlasReady && eliteAffixAtlasImage) {

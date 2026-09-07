@@ -48,16 +48,28 @@ export function actionResultMinimumGap(kind:ActionResultKind):number{
 
 export function actionResultPresentation(input:ActionResultPresentationInput):ActionResultPresentation{
   const profile=PROFILES[input.kind];
+  const stress=Math.max(0,Math.min(1,input.battlefieldStress??0));
+  const densityAlphaScale=1-stress*.44;
+  const densityStrokeScale=1-stress*.24;
+  const warningScale=input.protectedWarning?.48:1;
+  const safeLaneScale=input.safeLaneVisible?.62:1;
+  const flashScale=input.reducedFlash?.72:1;
+  const resultScale=densityAlphaScale*warningScale*safeLaneScale*flashScale;
+  const isResolved=profile.priority>=2;
+  const minimumAlpha=isResolved?.055:.025;
   const distance=Number.isFinite(input.sourceDistance)?Math.max(0,input.sourceDistance??0):0;
   const connectorDistanceScale=distance<=44?0:Math.min(1,(distance-44)/120);
+  const connectorOwnershipScale=densityAlphaScale*warningScale*safeLaneScale*(input.reducedFlash?.78:1);
+  const rayDensityScale=1-stress*.35;
+  const rayFlashScale=input.reducedFlash?.45:1;
   return{
     visible:true,
     priority:profile.priority,
-    alpha:profile.alpha,
-    radius:profile.radius,
-    lineWidth:profile.lineWidth,
-    rayCount:profile.rayCount,
-    connectorAlpha:profile.connectorAlpha*connectorDistanceScale,
-    pulseAmplitude:profile.pulseAmplitude,
+    alpha:Math.max(minimumAlpha,profile.alpha*resultScale),
+    radius:isResolved?Math.max(18,profile.radius):profile.radius,
+    lineWidth:Math.max(.72,profile.lineWidth*densityStrokeScale),
+    rayCount:Math.max(0,Math.floor(profile.rayCount*rayDensityScale*rayFlashScale)),
+    connectorAlpha:profile.connectorAlpha*connectorDistanceScale*connectorOwnershipScale,
+    pulseAmplitude:input.reducedMotion?0:profile.pulseAmplitude*(1-stress*.32)*(input.reducedFlash?.58:1),
   };
 }

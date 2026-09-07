@@ -1,6 +1,6 @@
 import { enemyImpactVfxDescriptor } from './enemy-presentation.js';
 import { directionalHitVfxProfile, directionalHitVector, hitApproachProfile, directionalImpactRecoilProfile } from './visual-presence.js';
-import { actionResultMinimumGap } from './action-result-readability.js';
+import { actionResultMinimumGap, actionResultPresentation } from './action-result-readability.js';
 const CAMERA_PRESSURE = {
     meteor: { scaleOffset: 0.024, duration: 0.24 },
     vortex: { scaleOffset: -0.018, duration: 0.30 },
@@ -54,6 +54,7 @@ export function combatImpactVisual(tier) {
     return { fontSize: 17, rayCount: 0, ringRadius: 16, weight: 800 };
 }
 const IMPACT_SHAKE = { awakened: 2.4, final: 6.2, ultimate: 7.4, bossHit: 9.2, eliteKill: 4.8 };
+const RESULT_COLOR = { normalHit: '#eef5ff', weakpointHit: '#9fe8ff', guardBreak: '#b8ddff', weakpointBreak: '#ffe49a', bossStagger: '#ffd06e', enemyKill: '#fff0b8' };
 export class CombatFeedbackSystem {
     cues = [];
     shake = 0;
@@ -168,7 +169,7 @@ export class CombatFeedbackSystem {
         }
         this.cues = this.cues.filter((cue) => cue.ttl > 0);
     }
-    render(ctx, quality = 'high') {
+    render(ctx, quality = 'high', resultContext = {}) {
         for (const cue of this.cues) {
             const ratio = Math.max(0, cue.ttl / cue.maxTtl);
             if (cue.kind === 'hit') {
@@ -247,6 +248,47 @@ export class CombatFeedbackSystem {
                 ctx.stroke();
                 ctx.restore();
             }
+        }
+        for (const cue of this.resultCues) {
+            const ratio = Math.max(0, Math.min(1, cue.ttl / Math.max(.001, cue.maxTtl)));
+            const sourceDistance = cue.source ? Math.hypot(cue.pos.x - cue.source.x, cue.pos.y - cue.source.y) : 0;
+            const visual = actionResultPresentation({ ...resultContext, kind: cue.resultKind, sourceDistance });
+            if (!visual.visible)
+                continue;
+            const color = RESULT_COLOR[cue.resultKind];
+            ctx.save();
+            ctx.strokeStyle = color;
+            ctx.lineCap = 'round';
+            if (cue.source && visual.connectorAlpha > 0 && sourceDistance > 1) {
+                const dx = cue.pos.x - cue.source.x, dy = cue.pos.y - cue.source.y, inv = 1 / sourceDistance, ux = dx * inv, uy = dy * inv;
+                const connectorLength = Math.min(96, Math.max(18, sourceDistance - visual.radius));
+                ctx.globalAlpha = ratio * visual.connectorAlpha;
+                ctx.lineWidth = Math.max(.7, visual.lineWidth * .58);
+                ctx.beginPath();
+                ctx.moveTo(cue.pos.x - ux * connectorLength, cue.pos.y - uy * connectorLength);
+                ctx.lineTo(cue.pos.x - ux * Math.max(4, visual.radius * .62), cue.pos.y - uy * Math.max(4, visual.radius * .62));
+                ctx.stroke();
+            }
+            const progress = 1 - ratio;
+            const pulse = visual.pulseAmplitude > 0 ? Math.sin(progress * Math.PI) * visual.pulseAmplitude : 0;
+            const radius = visual.radius + progress * 3 + pulse;
+            ctx.globalAlpha = ratio * visual.alpha;
+            ctx.lineWidth = visual.lineWidth;
+            ctx.beginPath();
+            ctx.arc(cue.pos.x, cue.pos.y, radius, 0, Math.PI * 2);
+            ctx.stroke();
+            if (visual.rayCount > 0) {
+                ctx.globalAlpha = ratio * visual.alpha * .76;
+                ctx.lineWidth = Math.max(.72, visual.lineWidth * .72);
+                for (let i = 0; i < visual.rayCount; i++) {
+                    const a = Math.PI * 2 * i / visual.rayCount, inner = radius + 3, outer = radius + 7 + progress * 5;
+                    ctx.beginPath();
+                    ctx.moveTo(cue.pos.x + Math.cos(a) * inner, cue.pos.y + Math.sin(a) * inner);
+                    ctx.lineTo(cue.pos.x + Math.cos(a) * outer, cue.pos.y + Math.sin(a) * outer);
+                    ctx.stroke();
+                }
+            }
+            ctx.restore();
         }
     }
     addShake(value) { this.shake = Math.min(16, Math.max(this.shake, value)); }

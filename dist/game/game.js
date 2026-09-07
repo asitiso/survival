@@ -3680,7 +3680,10 @@ export class Game {
         this.drawEnemyStatusCues(ctx, secondaryMotion);
         this.drawPriorityThreats(ctx, secondaryMotion);
         this.presentation.renderDecorative(ctx, this.presentationSettings.reducedMotion);
-        this.feedback.render(ctx, this.presentation.quality);
+        const actionResultLiveEnemyCount = this.enemies.enemies.reduce((count, enemy) => count + (enemy.alive ? 1 : 0), 0);
+        const actionResultBattlefieldStress = Math.max(0, Math.min(1, (actionResultLiveEnemyCount + this.bossArena.hazards.length * 2 - 8) / 22));
+        const actionResultProtectedWarning = Boolean((this.bossPhaseCue && this.bossPhaseCueTimer > 0) || this.dangerState.heroCritical || this.dangerState.coreCritical);
+        this.feedback.render(ctx, this.presentation.quality, { battlefieldStress: actionResultBattlefieldStress, protectedWarning: actionResultProtectedWarning, safeLaneVisible: Boolean(this.currentMythicSafeLanePresentation), reducedMotion: this.presentationSettings.reducedMotion, reducedFlash: this.presentationSettings.reducedFlash });
         this.presentation.renderScreenEffects(ctx, this.presentationSettings.reducedFlash, this.presentationSettings.reducedMotion);
         this.pickups.render(ctx, this.battlefieldInteractionVfxAtlasImage, this.battlefieldInteractionVfxAtlasReady, this.pickupFlowVfxAtlasImage, this.pickupFlowVfxAtlasReady, this.presentationSettings.reducedFlash);
         this.drawCore(ctx, secondaryMotion);

@@ -67,6 +67,7 @@ interface ResultCue { kind:'result'; pos:Vec2; ttl:number; maxTtl:number; result
 interface DefenseResponseCue { pos:Vec2; ttl:number; maxTtl:number; responseKind:DefenseResponseKind; source?:Vec2; }
 interface HealingResponseCue { pos:Vec2; ttl:number; maxTtl:number; response:HealingResponseAccounting; sourceKind:HealingResponseSource; source?:Vec2; targetId?:number; targetType?:EnemyType; }
 interface CommanderAuraCue { source:Vec2; target:Vec2; ownerId:number; targetId:number; targetType:EnemyType; targetChannel:'hero'|'core'; ttl:number; maxTtl:number; }
+interface FrenziedAttackCue { source:Vec2; target:Vec2; enemyId:number; targetChannel:'hero'|'core'; targetType:EnemyType; ttl:number; maxTtl:number; }
 type Cue = HitCue | KillCue | ImpactCue;
 
 export function impactTierForDamage(amount: number, maxHp: number): DamageImpactTier {
@@ -113,6 +114,25 @@ export function healingDamageArbitrationPresentation(input:HealingDamageArbitrat
   const displacement=input.reducedMotion?10:18;
   return {numberVisible,numberAlpha:Math.max(0,Math.min(.78,numberAlpha)),numberOffsetX:recent?(input.reducedMotion?4:7):0,numberOffsetY:recent?displacement:12,returnCueAlpha:recent?(input.reducedFlash?.10:.18):0};
 }
+export interface FrenziedAttackPresentationInput { targetChannel:'hero'|'core'; priorityTarget?:boolean; clusterIndex?:number; battlefieldStress?:number; resolvedResultNearby?:boolean; defenseBreakNearby?:boolean; criticalNearby?:boolean; healingReturnNearby?:boolean; protectedWarning?:boolean; safeLaneVisible?:boolean; reducedMotion?:boolean; reducedFlash?:boolean; }
+export interface FrenziedAttackPresentation { visible:boolean; alpha:number; length:number; lineWidth:number; pulse:number; chevronSize:number; }
+export function frenziedAttackPresentation(input:FrenziedAttackPresentationInput):FrenziedAttackPresentation {
+  const stress=Math.max(0,Math.min(1,input.battlefieldStress??0));
+  const priority=!!input.priorityTarget||input.targetChannel==='core';
+  const capacity=Math.max(1,Math.round(4-stress*3));
+  const visible=priority||Math.max(0,input.clusterIndex??0)<capacity;
+  let alpha=(input.targetChannel==='core'?.52:.46)*(1-stress*(priority?.16:.42));
+  if(priority)alpha*=1.12;
+  if(input.resolvedResultNearby)alpha*=.38;
+  if(input.defenseBreakNearby)alpha*=.54;
+  if(input.criticalNearby)alpha*=.52;
+  if(input.healingReturnNearby)alpha*=.46;
+  if(input.protectedWarning)alpha*=.45;
+  if(input.safeLaneVisible)alpha*=.55;
+  if(input.reducedFlash)alpha*=.62;
+  if(!visible)alpha*=.14;
+  return {visible,alpha:Math.max(.006,Math.min(.62,alpha)),length:input.targetChannel==='core'?46:42,lineWidth:2.1,pulse:input.reducedMotion?0:2.6,chevronSize:8};
+}
 export interface CommanderAuraPresentationInput { battlefieldStress?:number; priorityTarget?:boolean; protectedWarning?:boolean; safeLaneVisible?:boolean; reducedFlash?:boolean; reducedMotion?:boolean; clusterIndex?:number; resolvedResultNearby?:boolean; defenseBreakNearby?:boolean; criticalNearby?:boolean; healingReturnNearby?:boolean; }
 export interface CommanderAuraPresentation { boundaryAlpha:number; connectorAlpha:number; chevronAlpha:number; connectorVisible:boolean; boundaryRadius:number; lineWidth:number; pulse:number; }
 export function commanderAuraPresentation(input:CommanderAuraPresentationInput):CommanderAuraPresentation {
@@ -156,6 +176,7 @@ export interface CombatFeedbackSink {
   addDefenseResponse?(pos:Vec2, response:DefenseResponseAccounting, source?:Vec2):void;
   addHealingResponse?(pos:Vec2, response:HealingResponseAccounting, sourceKind:HealingResponseSource, source?:Vec2, targetId?:number, targetType?:EnemyType):void;
   addCommanderAuraResponse?(source:Vec2,target:Vec2,ownerId:number,targetId:number,targetType:EnemyType,targetChannel:'hero'|'core'):void;
+  addFrenziedAttackResponse?(source:Vec2,target:Vec2,enemyId:number,targetChannel:'hero'|'core',targetType:EnemyType):void;
 }
 
 const IMPACT_SHAKE: Record<ImpactKind, number> = { awakened: 2.4, final: 6.2, ultimate: 7.4, bossHit: 9.2, eliteKill: 4.8 };
@@ -177,12 +198,14 @@ export class CombatFeedbackSystem implements CombatFeedbackSink {
   private defenseResponseCues:DefenseResponseCue[]=[];
   private healingResponseCues:HealingResponseCue[]=[];
   private commanderAuraCues:CommanderAuraCue[]=[];
+  private frenziedAttackCues:FrenziedAttackCue[]=[];
   private resultCooldowns=new Map<ActionResultKind,number>();
 
   get activeCount(): number { return this.cues.length+this.resultCues.length+this.defenseResponseCues.length+this.healingResponseCues.length; }
   get defenseResponseCount():number{return this.defenseResponseCues.length;}
   get healingResponseCount():number{return this.healingResponseCues.length;}
   get commanderAuraCount():number{return this.commanderAuraCues.length;}
+  get frenziedAttackCount():number{return this.frenziedAttackCues.length;}
   get shakeIntensity(): number { return this.shake; }
   get cameraScaleOffset(): number {
     if(this.cameraPressureTtl<=0 || this.cameraPressureMaxTtl<=0)return 0;
@@ -201,7 +224,7 @@ export class CombatFeedbackSystem implements CombatFeedbackSink {
     return {x:shakeOffset.x+this.directionalRecoil.x*recoilRatio,y:shakeOffset.y+this.directionalRecoil.y*recoilRatio};
   }
 
-  reset(): void { this.cues = []; this.resultCues=[]; this.defenseResponseCues=[]; this.healingResponseCues=[]; this.commanderAuraCues=[]; this.resultCooldowns.clear(); this.shake = 0; this.shakePhase = 0; this.impactVisualCooldown = 0; this.cameraPressureOffset=0; this.cameraPressureTtl=0; this.cameraPressureMaxTtl=0; this.directionalRecoil={x:0,y:0}; this.directionalRecoilTtl=0; this.directionalRecoilMaxTtl=0; }
+  reset(): void { this.cues = []; this.resultCues=[]; this.defenseResponseCues=[]; this.healingResponseCues=[]; this.commanderAuraCues=[]; this.frenziedAttackCues=[]; this.resultCooldowns.clear(); this.shake = 0; this.shakePhase = 0; this.impactVisualCooldown = 0; this.cameraPressureOffset=0; this.cameraPressureTtl=0; this.cameraPressureMaxTtl=0; this.directionalRecoil={x:0,y:0}; this.directionalRecoilTtl=0; this.directionalRecoilMaxTtl=0; }
 
   addHit(pos: Vec2, amount: number, tier: boolean | DamageImpactTier = 'normal', enemyType?:EnemyType, source?:Vec2, targetId?:number): void {
     const resolved: DamageImpactTier = typeof tier === 'boolean' ? (tier ? 'critical' : 'normal') : tier;
@@ -244,6 +267,14 @@ export class CombatFeedbackSystem implements CombatFeedbackSink {
     this.trim();
   }
 
+
+  addFrenziedAttackResponse(source:Vec2,target:Vec2,enemyId:number,targetChannel:'hero'|'core',targetType:EnemyType):void {
+    const maxTtl=.24;
+    const existing=this.frenziedAttackCues.find((cue)=>cue.enemyId===enemyId&&cue.targetChannel===targetChannel);
+    if(existing){existing.source={...source};existing.target={...target};existing.targetType=targetType;existing.ttl=maxTtl;existing.maxTtl=maxTtl;return;}
+    this.frenziedAttackCues.push({source:{...source},target:{...target},enemyId,targetChannel,targetType,ttl:maxTtl,maxTtl});
+    while(this.frenziedAttackCues.length>16){const routineIndex=this.frenziedAttackCues.findIndex((cue)=>cue.targetChannel!=='core'&&Math.hypot(cue.target.x-cue.source.x,cue.target.y-cue.source.y)>120);this.frenziedAttackCues.splice(routineIndex>=0?routineIndex:0,1);}
+  }
 
   addCommanderAuraResponse(source:Vec2,target:Vec2,ownerId:number,targetId:number,targetType:EnemyType,targetChannel:'hero'|'core'):void {
     const existing=this.commanderAuraCues.find((cue)=>cue.ownerId===ownerId&&cue.targetId===targetId);
@@ -302,6 +333,8 @@ export class CombatFeedbackSystem implements CombatFeedbackSink {
     this.healingResponseCues=this.healingResponseCues.filter((cue)=>cue.ttl>0);
     for(const cue of this.commanderAuraCues)cue.ttl-=dt;
     this.commanderAuraCues=this.commanderAuraCues.filter((cue)=>cue.ttl>0);
+    for(const cue of this.frenziedAttackCues)cue.ttl-=dt;
+    this.frenziedAttackCues=this.frenziedAttackCues.filter((cue)=>cue.ttl>0);
     for (const cue of this.cues) {
       cue.ttl -= dt;
       if (cue.kind === 'hit') cue.pos.y -= dt * (cue.tier === 'critical' ? 82 : cue.tier === 'heavy' ? 68 : 56);
@@ -310,6 +343,22 @@ export class CombatFeedbackSystem implements CombatFeedbackSink {
   }
 
   render(ctx: CanvasRenderingContext2D, quality:PresentationQuality='high', resultContext:ActionResultRenderContext={}): void {
+    let routineFrenziedIndex=0;
+    for(const cue of this.frenziedAttackCues){
+      const ratio=Math.max(0,Math.min(1,cue.ttl/Math.max(.001,cue.maxTtl))),targetDistance=Math.hypot(cue.target.x-cue.source.x,cue.target.y-cue.source.y);
+      const recentlyHit=this.cues.some((candidate)=>candidate.kind==='hit'&&candidate.targetId===cue.enemyId&&candidate.ttl>0);
+      const priorityTarget=cue.targetChannel==='core'||targetDistance<=120||recentlyHit;
+      const resolvedResultNearby=this.resultCues.some((candidate)=>Math.hypot(candidate.pos.x-cue.source.x,candidate.pos.y-cue.source.y)<=42&&actionResultPresentation({...resultContext,kind:candidate.resultKind,sourceDistance:0}).priority>=2);
+      const defenseBreakNearby=this.defenseResponseCues.some((candidate)=>(candidate.responseKind==='guardBreak'||candidate.responseKind==='shieldBreak')&&Math.hypot(candidate.pos.x-cue.source.x,candidate.pos.y-cue.source.y)<=42);
+      const criticalNearby=this.cues.some((candidate)=>candidate.kind==='hit'&&candidate.tier==='critical'&&candidate.targetId===cue.enemyId&&candidate.ttl>0);
+      const healingReturnNearby=this.healingResponseCues.some((candidate)=>candidate.targetId===cue.enemyId&&candidate.ttl>0);
+      const clusterIndex=priorityTarget?0:routineFrenziedIndex++;
+      const visual=frenziedAttackPresentation({targetChannel:cue.targetChannel,priorityTarget,clusterIndex,resolvedResultNearby,defenseBreakNearby,criticalNearby,healingReturnNearby,...(resultContext.battlefieldStress!==undefined?{battlefieldStress:resultContext.battlefieldStress}:{}),...(resultContext.protectedWarning!==undefined?{protectedWarning:resultContext.protectedWarning}:{}),...(resultContext.safeLaneVisible!==undefined?{safeLaneVisible:resultContext.safeLaneVisible}:{}),...(resultContext.reducedMotion!==undefined?{reducedMotion:resultContext.reducedMotion}:{}),...(resultContext.reducedFlash!==undefined?{reducedFlash:resultContext.reducedFlash}:{})});
+      if(!visual.visible)continue;
+      const dx=cue.target.x-cue.source.x,dy=cue.target.y-cue.source.y,d=Math.hypot(dx,dy),ux=d>1?dx/d:1,uy=d>1?dy/d:0,px=-uy,py=ux;
+      const pulse=Math.sin((1-ratio)*Math.PI)*visual.pulse,endX=cue.source.x+ux*(visual.length+pulse),endY=cue.source.y+uy*(visual.length+pulse),size=visual.chevronSize;
+      ctx.save();ctx.globalAlpha=ratio*visual.alpha;ctx.strokeStyle='#ff7868';ctx.lineWidth=visual.lineWidth;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(cue.source.x+ux*8,cue.source.y+uy*8);ctx.lineTo(endX,endY);ctx.stroke();ctx.beginPath();ctx.moveTo(endX,endY);ctx.lineTo(endX-ux*size+px*size*.62,endY-uy*size+py*size*.62);ctx.moveTo(endX,endY);ctx.lineTo(endX-ux*size-px*size*.62,endY-uy*size-py*size*.62);ctx.stroke();ctx.restore();
+    }
     const commanderOwnersDrawn=new Set<number>();
     let routineCommanderIndex=0;
     for(const cue of this.commanderAuraCues){

@@ -81,6 +81,51 @@ export function eliteAffixIdentityEmphasis(id: EliteAffixId, hpRatio: number, ma
   return 0;
 }
 
+
+export type FrenziedThresholdPhase = 'inactive' | 'entered' | 'active' | 'released';
+export interface FrenziedThresholdLifecycleState { phase:FrenziedThresholdPhase; active:boolean; transitionTtl:number; }
+export interface FrenziedThresholdPresentation { alpha:number; radiusOffset:number; lineWidth:number; pulse:number; }
+export interface FrenziedThresholdDensityInput { activeCount:number; indexFromPriority:number; priorityTarget?:boolean; battlefieldStress?:number; reducedMotion?:boolean; reducedFlash?:boolean; }
+export interface FrenziedThresholdDensityPresentation { visible:boolean; alphaScale:number; pulseScale:number; }
+export function frenziedThresholdDensityPresentation(state:FrenziedThresholdLifecycleState|undefined,input:FrenziedThresholdDensityInput):FrenziedThresholdDensityPresentation {
+  if(!state||state.phase==='inactive')return {visible:false,alphaScale:0,pulseScale:0};
+  const stress=Math.max(0,Math.min(1,input.battlefieldStress??0));
+  const priority=!!input.priorityTarget;
+  const capacity=Math.max(1,Math.round(4-stress*3));
+  const visible=priority||Math.max(0,input.indexFromPriority)<capacity||state.phase==='entered';
+  let alphaScale=priority?Math.max(.72,1-stress*.18):visible?Math.max(.42,1-stress*.48):.18;
+  if(state.phase==='released')alphaScale*=.64;
+  if(input.reducedFlash)alphaScale*=.72;
+  return {visible,alphaScale,pulseScale:input.reducedMotion?0:(visible?1:.22)};
+}
+
+export function advanceFrenziedThresholdLifecycle(previous:FrenziedThresholdLifecycleState|undefined,hpRatio:number,dt:number):FrenziedThresholdLifecycleState {
+  const active=Number.isFinite(hpRatio)&&hpRatio<=0.42;
+  const step=Math.max(0,Number.isFinite(dt)?dt:0);
+  if(active){
+    if(!previous?.active)return {phase:'entered',active:true,transitionTtl:.10};
+    if(previous.phase==='entered'){
+      const transitionTtl=Math.max(0,previous.transitionTtl-step);
+      return transitionTtl>0?{phase:'entered',active:true,transitionTtl}:{phase:'active',active:true,transitionTtl:0};
+    }
+    return {phase:'active',active:true,transitionTtl:0};
+  }
+  if(previous?.active)return {phase:'released',active:false,transitionTtl:.16};
+  if(previous?.phase==='released'){
+    const transitionTtl=Math.max(0,previous.transitionTtl-step);
+    return transitionTtl>0?{phase:'released',active:false,transitionTtl}:{phase:'inactive',active:false,transitionTtl:0};
+  }
+  return {phase:'inactive',active:false,transitionTtl:0};
+}
+
+export function frenziedThresholdPresentation(state:FrenziedThresholdLifecycleState|undefined,reducedMotion=false,reducedFlash=false):FrenziedThresholdPresentation {
+  if(!state||state.phase==='inactive')return {alpha:0,radiusOffset:8,lineWidth:0,pulse:0};
+  let alpha=state.phase==='entered'?.58:state.phase==='active'?.34:.24;
+  if(state.phase==='released')alpha*=Math.max(.2,Math.min(1,state.transitionTtl/.16));
+  if(reducedFlash)alpha*=.62;
+  return {alpha,radiusOffset:state.phase==='entered'?13:10,lineWidth:state.phase==='entered'?2.2:1.6,pulse:reducedMotion?0:(state.phase==='entered'?3.2:state.phase==='active'?1.8:.8)};
+}
+
 export interface EliteAffixIdentityAtlasAudit {
   itemCount: number;
   coverage: number;

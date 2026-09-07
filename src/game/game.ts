@@ -293,6 +293,9 @@ import { ObjectiveRuntime, objectiveRewardFor, type ObjectiveReward } from './ob
 import { chooseObjectiveAnchor } from './objective-rules.js';
 import { chooseSpellTarget } from './auto-targeting.js';
 import { AutoCombatBrain } from './auto-combat-brain.js';
+import { autoWeakpointAimPoint } from './auto-weakpoint-aim.js';
+import { manualWeakpointAssistAimPoint } from './manual-weakpoint-assist.js';
+import { targetIntentCuePresentation } from './target-intent-cue.js';
 import { FusionRuntime } from './fusion-runtime.js';
 import { fusionDefinition, type FusionId } from './spell-fusions.js';
 import { fusionProcForCast } from './fusion-integration.js';
@@ -4150,7 +4153,36 @@ export class Game {
     ctx.restore();
   }
 
+  private drawTargetIntentCue(ctx:CanvasRenderingContext2D):void{
+  const mode=this.autoCastNormal?'auto':'manual';
+  const committedTargetId=mode==='auto'?this.autoCombatBrain.currentTargetId():this.manualTargetMemory.currentTargetId();
+  const target=committedTargetId===null?null:this.enemies.enemies.find((enemy)=>enemy.alive&&enemy.id===committedTargetId)??null;
+  if(!target)return;
+  let weakpointAim:Vec2|null=null;
+  if(target.type==='boss'){
+    weakpointAim=mode==='auto'
+      ?autoWeakpointAimPoint({autoAim:true,target,heroPos:this.hero.pos,activeBossId:this.bossEncounter.activeBossId,nodes:this.bossEncounter.nodes,preferredNodeId:this.autoCombatBrain.currentWeakpointId()})
+      :manualWeakpointAssistAimPoint({target,heroPos:this.hero.pos,activeBossId:this.bossEncounter.activeBossId,nodes:this.bossEncounter.nodes});
+  }
+  const liveEnemyCount=this.enemies.enemies.reduce((count,enemy)=>count+(enemy.alive?1:0),0);
+  const battlefieldStress=Math.max(0,Math.min(1,(liveEnemyCount+this.bossArena.hazards.length*2-8)/22));
+  const protectedWarning=Boolean((this.bossPhaseCue&&this.bossPhaseCueTimer>0)||this.dangerState.heroCritical||this.dangerState.coreCritical);
+  const cue=targetIntentCuePresentation({mode,committedTargetId,targetAlive:target.alive,targetRadius:target.radius,weakpointAvailable:Boolean(weakpointAim&&distance(weakpointAim,target.pos)>1),battlefieldStress,protectedWarning,safeLaneVisible:Boolean(this.currentMythicSafeLanePresentation),reducedMotion:this.presentationSettings.reducedMotion,reducedFlash:this.presentationSettings.reducedFlash});
+  if(!cue.visible)return;
+  const pulse=cue.pulseAmplitude>0?Math.sin(this.elapsed*5.1+target.id)*cue.pulseAmplitude:0;
+  const radius=cue.radius+pulse;
+  ctx.save();
+  ctx.globalAlpha=cue.alpha;
+  ctx.strokeStyle=mode==='auto'?'#8fdcff':'#ffe39a';
+  ctx.lineWidth=cue.lineWidth;
+  ctx.lineCap='round';
+  for(let i=0;i<4;i++){const center=i*Math.PI*.5;ctx.beginPath();ctx.arc(target.pos.x,target.pos.y,radius,center-cue.segmentArc*.5,center+cue.segmentArc*.5);ctx.stroke();}
+  if(cue.showWeakpointDirection&&weakpointAim){ctx.globalAlpha=cue.weakpointAlpha;ctx.lineWidth=Math.max(1,cue.lineWidth*.82);ctx.beginPath();ctx.moveTo(target.pos.x,target.pos.y);ctx.lineTo(weakpointAim.x,weakpointAim.y);ctx.stroke();ctx.beginPath();ctx.arc(weakpointAim.x,weakpointAim.y,2.5,0,Math.PI*2);ctx.stroke();}
+  ctx.restore();
+}
+
   private drawDangerTelegraphs(ctx: CanvasRenderingContext2D): void {
+    this.drawTargetIntentCue(ctx);
     const cues = sortTelegraphsByPriority(this.enemies.enemies.map((enemy) => enemyThreatTelegraph(enemy))).slice(0, 24);
     ctx.save();
     for (const cue of cues) {

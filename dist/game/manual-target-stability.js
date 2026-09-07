@@ -1,6 +1,6 @@
 import { distance } from '../core/math.js';
 import { chooseSpellTarget } from './auto-targeting.js';
-export const MANUAL_TARGET_MEMORY_SECONDS = 0.75;
+export const MANUAL_TARGET_MEMORY_SECONDS = 1.15;
 export const MANUAL_TARGET_RETENTION_RANGE = 720;
 function manualPriorityTier(enemy, heroPos) {
     const d = distance(heroPos, enemy.pos);

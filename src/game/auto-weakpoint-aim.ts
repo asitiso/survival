@@ -20,7 +20,10 @@ export function autoWeakpointAimPoint<T extends Pick<SpellTargetCandidate,'id'|'
   const maxDistance=input.maxAimDistance??760;
   const live=input.nodes.filter((node)=>node.alive&&node.hp>0&&distance(input.heroPos,node.pos)<=maxDistance);
   if(live.length===0)return{...target.pos};
-  const primary=(input.preferredNodeId===undefined||input.preferredNodeId===null?null:live.find((node)=>node.id===input.preferredNodeId)??null)??[...live].sort((a,b)=>{
+  const preferred=input.preferredNodeId===undefined||input.preferredNodeId===null
+    ?undefined
+    :live.find((node)=>node.id===input.preferredNodeId);
+  const primary=preferred??[...live].sort((a,b)=>{
     const ar=a.hp/Math.max(1,a.maxHp),br=b.hp/Math.max(1,b.maxHp);
     if(Math.abs(ar-br)>.001)return ar-br;
     const ad=distance(input.heroPos,a.pos),bd=distance(input.heroPos,b.pos);

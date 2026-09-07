@@ -23,8 +23,8 @@ export function projectBalanceAt(seconds, threat) {
     const threatMods = threatLevelModifiers(safeThreat);
     const estimatedLevel = estimatedLevelAt(time);
     const timePressure = 1 + Math.min(0.22, time / 9000);
-    const spawnPressure = clamp(threatMods.spawnPressureMultiplier * timePressure, 1, 1.6);
-    const elitePressure = clamp((1 / threatMods.eliteIntervalMultiplier) * (1 + Math.min(0.32, time / 7200)), 1, 2.2);
+    const spawnPressure = clamp(threatMods.spawnPressureMultiplier * timePressure, 0.72, 1.6);
+    const elitePressure = clamp((1 / threatMods.eliteIntervalMultiplier) * (1 + Math.min(0.32, time / 7200)), 0.72, 2.2);
     const bossVariantPressure = clamp(Math.floor(time / 900) + threatMods.bossVariantBonus, 0, 4);
     const goldPerMinute = Math.round(clamp(72 + director.danger * 24 + Math.sqrt(time) * 3.7, 40, 2500));
     return {

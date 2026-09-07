@@ -7164,7 +7164,7 @@ export class Game {
             ctx.globalAlpha = hazard.telegraph > 0 ? hazardBaseAlpha * hazardTelegraphDepth.telegraphEdgeAlphaScale * hazardDepthRelease.telegraphEdgeAlphaScale * hazardStackOrder.edgeAlphaScale * hazardUnifiedStack.bossTelegraphEdgeAlphaScale * hazardSafeLaneSeparation.telegraphEdgeAlphaScale * hazardSpatialSeparationBudget.bossTelegraphEdgeAlphaScale : hazardFillAlpha;
             ctx.fillStyle = color;
             ctx.strokeStyle = color;
-            ctx.lineWidth = (hazard.telegraph > 0 ? 4 : 2) * hazardReadabilityContrast.strokeWidthScale * (hazard.telegraph > 0 ? 1 : hazardFinalSettle.strokeWidthScale);
+            ctx.lineWidth = (hazard.telegraph > 0 ? 4 : 2) * hazardReadabilityContrast.strokeWidthScale * (hazard.telegraph > 0 ? 1 : hazardFinalSettle.strokeWidthScale * hazardReadabilityContrastBudget.secondaryStrokeWidthScale);
             const shape = hazard.geometryShape;
             if (shape === 'corridor' || shape === 'cross') {
                 ctx.translate(hazard.pos.x, hazard.pos.y);

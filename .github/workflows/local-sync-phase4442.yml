@@ -1,0 +1,31 @@
+name: Local Sync Phase 4442
+on:
+  push:
+    branches:
+      - sync/phase4353-4370-local-final
+    paths:
+      - .sync/phase4442.trigger
+permissions:
+  contents: write
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Decode verified local patch
+        run: base64 -d .sync/phase4425-4442.patch.gz.b64 | gzip -d > /tmp/phase4425-4442.patch
+      - name: Recreate verified local tree and push result
+        run: |
+          set -euo pipefail
+          git config user.name asitiso
+          git config user.email asitiso.woo@gmail.com
+          git fetch origin work/phase4407-4424-freeze-slow-lifecycle
+          git switch -C work/phase4425-4442-slow-source-identity origin/work/phase4407-4424-freeze-slow-lifecycle
+          git apply --index /tmp/phase4425-4442.patch
+          TREE=$(git write-tree)
+          test "$TREE" = "72ecd518268c244a8fccfdb52acabfba59503e55"
+          git diff --cached --check
+          git commit -m "feat: add Phase 4425-4442 slow source identity semantics"
+          git push origin HEAD:work/phase4425-4442-slow-source-identity

@@ -20,6 +20,17 @@ export function freezeStatusPresentation(input) {
         pulseAmplitude: visible && band !== 'fading' ? (band === 'strong' ? .10 : .055) : 0,
     };
 }
+const SOURCE_STYLE = {
+    frost: { renderMode: 'freezeAtlas', alphaScale: 1, sizeScale: 1, lineWidth: 2.5, segmentCount: 0, groundOffsetRatio: 0, color: '#9fe8ff' },
+    gravity: { renderMode: 'gravityOrbit', alphaScale: .86, sizeScale: .94, lineWidth: 2.2, segmentCount: 4, groundOffsetRatio: 0, color: '#b9a4ff' },
+    terrain: { renderMode: 'terrainGround', alphaScale: .70, sizeScale: .92, lineWidth: 2.0, segmentCount: 2, groundOffsetRatio: .58, color: '#8dd8c5' },
+    impact: { renderMode: 'impactResistance', alphaScale: .54, sizeScale: .84, lineWidth: 1.8, segmentCount: 2, groundOffsetRatio: 0, color: '#ffd39a' },
+    generic: { renderMode: 'genericResistance', alphaScale: .46, sizeScale: .80, lineWidth: 1.5, segmentCount: 2, groundOffsetRatio: 0, color: '#c9d5df' },
+};
+export function slowSourceCuePresentation(input) {
+    const status = freezeStatusPresentation(input), style = SOURCE_STYLE[input.source];
+    return { source: input.source, renderMode: style.renderMode, useFreezeAtlas: input.source === 'frost', visible: status.visible, alpha: status.alpha * style.alphaScale, sizeScale: status.sizeScale * style.sizeScale, baseSize: status.baseSize, pulseAmplitude: status.pulseAmplitude * (input.source === 'frost' ? 1 : .55), lineWidth: style.lineWidth, segmentCount: style.segmentCount, groundOffsetRatio: style.groundOffsetRatio, color: style.color };
+}
 const CLASS_PRIORITY = { regular: 0, specialist: 3, elite: 4, boss: 5 };
 export function freezeCrowdBudget(entries, context = {}) {
     const stress = clamp01(context.battlefieldStress ?? 0);
@@ -50,7 +61,7 @@ export function freezeCrowdBudget(entries, context = {}) {
     };
 }
 export function createFreezeStatusLifecycleState() {
-    return { visible: false, alpha: 0, sizeScale: .72, pulseScale: 0 };
+    return { visible: false, alpha: 0, sizeScale: .72, pulseScale: 0, source: 'frost', sourceBlend: 1 };
 }
 function moveToward(current, target, maxDelta) {
     if (current < target)
@@ -68,7 +79,11 @@ export function advanceFreezeStatusLifecycle(previous, input, dt, reducedMotion 
     const alpha = moveToward(clamp01(previous.alpha), targetAlpha, safeDt * alphaRate);
     const sizeScale = moveToward(Math.max(.55, Math.min(1.2, previous.sizeScale)), targetSize, safeDt * sizeRate);
     const visible = input.active || alpha > .01;
-    return { visible, alpha: visible ? alpha : 0, sizeScale, pulseScale: visible && !reducedMotion ? 1 : 0 };
+    const source = input.source ?? previous.source;
+    const sourceChanged = source !== previous.source;
+    const sourceBlendStart = sourceChanged ? Math.min(.38, clamp01(previous.sourceBlend)) : clamp01(previous.sourceBlend);
+    const sourceBlend = moveToward(sourceBlendStart, 1, safeDt * (reducedMotion ? 7 : 4.5));
+    return { visible, alpha: visible ? alpha : 0, sizeScale, pulseScale: visible && !reducedMotion ? 1 : 0, source, sourceBlend };
 }
 export function freezeStatusEdgePresentation(input) {
     const margin = Math.max(0, input.margin ?? 12), half = Math.max(1, input.size / 2);
@@ -76,3 +91,4 @@ export function freezeStatusEdgePresentation(input) {
     const sizeScale = Math.max(.55, Math.min(1, clearance / half));
     return { sizeScale, offsetX: 0, offsetY: 0 };
 }
+export function slowDeathUsesFreezeShatter(source) { return source === undefined || source === 'frost'; }

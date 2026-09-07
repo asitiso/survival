@@ -359,8 +359,10 @@ export class EnemyManager {
                 enemy.spawnGroundMaterialize = advanceEnemyPortalGroundMaterializeState(enemy.spawnGroundMaterialize, null, dt, ctx.reducedMotion ?? false);
             if (enemy.slowTimer > 0)
                 enemy.slowTimer -= dt;
-            else
+            else {
                 enemy.slowFactor = 1;
+                delete enemy.slowSource;
+            }
             if (isSpecialistEnemyType(enemy.type))
                 enemy.specialistLocomotionSignature = advanceSpecialistLocomotionSignatureState(enemy.specialistLocomotionSignature, enemy.type, null, dt);
             if (enemy.type === 'assassin') {
@@ -570,13 +572,17 @@ export class EnemyManager {
             x: enemy.pos.x, y: enemy.pos.y, xp: Math.round(enemy.xp * mythicLastLawReward), gold: Math.round(enemy.gold * mythicLastLawReward), type: enemy.type,
             ...(enemy.type === 'boss' && enemy.bossArchetype ? { bossArchetype: enemy.bossArchetype } : {}),
             wasSlowed: enemy.slowTimer > 0 || enemy.slowFactor < 0.99,
+            ...(enemy.slowSource ? { slowSource: enemy.slowSource } : {}),
             visualSource,
             ...(enemy.type !== 'boss' ? { deathPose: { radius: enemy.radius, facingX: enemy.renderMotion?.facingX ?? 1, facingY: enemy.renderMotion?.facingY ?? 0, motionBlend: enemy.renderMotion?.motionBlend ?? 0, turn: enemy.renderMotion?.turn ?? 0, impactX: enemy.hitDirectionX ?? fallbackDirection.x, impactY: enemy.hitDirectionY ?? fallbackDirection.y, tier: impactTier } } : {}),
         });
         return true;
     }
-    applySlow(enemy, factor, duration) {
-        enemy.slowFactor = Math.min(enemy.slowFactor, Math.max(0.25, factor));
+    applySlow(enemy, factor, duration, source = 'generic') {
+        const appliedFactor = Math.max(0.25, factor);
+        if (appliedFactor < enemy.slowFactor - 0.0001 || !enemy.slowSource)
+            enemy.slowSource = source;
+        enemy.slowFactor = Math.min(enemy.slowFactor, appliedFactor);
         enemy.slowTimer = Math.max(enemy.slowTimer, duration);
     }
     pushAway(enemy, origin, distanceAmount) {

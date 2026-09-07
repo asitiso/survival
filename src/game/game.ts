@@ -187,7 +187,7 @@ import { coreGuardPressureVectorOrientationPresentation } from './core-guard-pre
 import { advanceCoreGuardPressureVectorHysteresis, createCoreGuardPressureVectorHysteresisState, type CoreGuardPressureVectorHysteresisState } from './core-guard-pressure-vector-hysteresis-rendering.js';
 import { advanceCoreGuardDamageSourceHysteresis, createCoreGuardDamageSourceHysteresisState, type CoreGuardDamageSourceHysteresisState } from './core-guard-damage-source-hysteresis-rendering.js';
 import { FREEZE_CONTROL_VFX_ATLAS, freezeControlVfxClassForEnemyType, freezeControlVfxSprite, type FreezeControlVfxClass } from './freeze-control-vfx-assets.js';
-import { advanceFreezeStatusLifecycle, createFreezeStatusLifecycleState, freezeCrowdBudget, freezeStatusEdgePresentation, freezeStatusPresentation, type FreezeStatusLifecycleState } from './freeze-status-readability.js';
+import { advanceFreezeStatusLifecycle, createFreezeStatusLifecycleState, freezeCrowdBudget, freezeStatusEdgePresentation, freezeStatusPresentation, slowSourceCuePresentation, slowDeathUsesFreezeShatter, type FreezeStatusLifecycleState } from './freeze-status-readability.js';
 import { REGULAR_ENEMY_ACTION_VFX_ATLAS } from './regular-enemy-action-vfx-assets.js';
 import { ELITE_AFFIX_LIFECYCLE_VFX_ATLAS } from './elite-affix-lifecycle-vfx-assets.js';
 import { ENEMY_TARGET_PRESSURE_VFX_ATLAS } from './enemy-target-pressure-vfx-assets.js';
@@ -2771,6 +2771,8 @@ export class Game {
     this.rewardRateWindowStartGold = this.goldEarned;
   }
 
+  private queueSlowedDeathFreezeShatter(death:EnemyDeathEvent):void { if(death.wasSlowed)this.queueFreezeShatterVfx(death.type,death.x,death.y); }
+
   private processEnemyDeaths(): void {
     for (let wave = 0; wave < 6; wave++) {
       const deaths = this.enemies.drainDeaths();
@@ -2779,7 +2781,7 @@ export class Game {
         this.hero.kills += 1;
         this.frameEndlessEvents.push({ type: 'enemy_killed', elite: death.type === 'elite' || death.type === 'boss' });
         this.advanceHeroMeter(0, heroMeterKillSignals(this.hero.profileId, death));
-        if(death.wasSlowed)this.queueFreezeShatterVfx(death.type,death.x,death.y);
+        if(slowDeathUsesFreezeShatter(death.slowSource))this.queueSlowedDeathFreezeShatter(death);
         if (this.hero.profileId === 'seria' && death.wasSlowed && this.heroMeter.activeTimer > 0) this.triggerSeriaShatter(death);
         const eventMods = fieldEventModifiers(this.fieldEvents.active);
         const catastropheMods = catastropheModifiers(this.catastrophe);
@@ -2963,6 +2965,7 @@ export class Game {
     this.queueFinalFormWorldVfx(formId, link ? 'flow' : 'signature', this.hero.pos.x, this.hero.pos.y, radius);
     const pushDistance = pattern.pushDistance * (link?.pushMultiplier ?? 1);
     const slowDuration = pattern.slowDuration + (link?.slowDurationBonus ?? 0);
+    const slowSource=this.hero.profileId==='seria'?'frost' as const:'generic' as const;
     const baseDamage = 72 * this.hero.spellPower * this.hero.equipmentSpellPower * pattern.damageMultiplier * (link?.damageMultiplier ?? 1);
     const living = this.enemies.enemies.filter((enemy) => enemy.alive);
     if (pattern.kind === 'chain') {
@@ -2972,14 +2975,14 @@ export class Game {
         .slice(0, pattern.chainTargets + (link?.chainBonus ?? 0));
       for (const enemy of targets) {
         if(this.enemies.damage(enemy, baseDamage))this.enemies.markLastDeathVisualSource('finalForm');
-        if (slowDuration > 0) this.enemies.applySlow(enemy, pattern.slowFactor, slowDuration);
+        if (slowDuration > 0) this.enemies.applySlow(enemy, pattern.slowFactor, slowDuration, slowSource);
       }
     } else {
       for (const enemy of living) {
         if (distance(enemy.pos, this.hero.pos) > radius + enemy.radius) continue;
         if(this.enemies.damage(enemy, baseDamage))this.enemies.markLastDeathVisualSource('finalForm');
         if (pushDistance > 0) this.enemies.pushAway(enemy, this.hero.pos, pushDistance);
-        if (slowDuration > 0) this.enemies.applySlow(enemy, pattern.slowFactor, slowDuration);
+        if (slowDuration > 0) this.enemies.applySlow(enemy, pattern.slowFactor, slowDuration, slowSource);
       }
     }
     if (pattern.coreHealPercent > 0) this.core.hp = Math.min(this.core.maxHp, this.core.hp + this.core.maxHp * pattern.coreHealPercent);
@@ -3676,7 +3679,7 @@ export class Game {
     for (const enemy of this.enemies.enemies) {
       if (!enemy.alive || distance(enemy.pos, origin) > meter.shatterRadius + enemy.radius) continue;
       this.enemies.damage(enemy, damage, origin,'freeze');
-      this.enemies.applySlow(enemy, 0.38, 1.4);
+      this.enemies.applySlow(enemy, 0.38, 1.4, 'frost');
     }
     this.feedback.addImpact(origin, 'final');
   }
@@ -3924,8 +3927,9 @@ export class Game {
       const previous=this.freezeStatusLifecycleByEnemy.get(enemy.id);
       if(enemy.slowTimer<=0&&!previous)continue;
       const enemyClass=freezeControlVfxClassForEnemyType(enemy.type);
-      const presentation=freezeStatusPresentation({slowFactor:enemy.slowFactor,slowTimer:enemy.slowTimer,enemyClass,reducedFlash:this.presentationSettings.reducedFlash});
-      const lifecycle=advanceFreezeStatusLifecycle(previous??createFreezeStatusLifecycleState(),{active:presentation.visible,targetAlpha:presentation.alpha,targetSizeScale:presentation.visible?presentation.sizeScale:.72},safeDt,this.presentationSettings.reducedMotion);
+      const source=enemy.slowSource??'frost';
+      const presentation=slowSourceCuePresentation({source,slowFactor:enemy.slowFactor,slowTimer:enemy.slowTimer,enemyClass,reducedFlash:this.presentationSettings.reducedFlash});
+      const lifecycle=advanceFreezeStatusLifecycle(previous??createFreezeStatusLifecycleState(),{active:presentation.visible,targetAlpha:presentation.alpha,targetSizeScale:presentation.visible?presentation.sizeScale:.72,source},safeDt,this.presentationSettings.reducedMotion);
       if(lifecycle.visible)this.freezeStatusLifecycleByEnemy.set(enemy.id,lifecycle);else this.freezeStatusLifecycleByEnemy.delete(enemy.id);
     }
     for(const enemyId of [...this.freezeStatusLifecycleByEnemy.keys()])if(!liveFreezeEnemyIds.has(enemyId))this.freezeStatusLifecycleByEnemy.delete(enemyId);
@@ -4172,21 +4176,33 @@ export class Game {
       const crowdEntry=crowdById.get(enemy.id); if(!crowdEntry)continue;
       const amplitude=enemy.id===primaryFrozenEnemyId?motion.freezeStatusMotionAmplitude:0;
       const enemyClass=freezeControlVfxClassForEnemyType(enemy.type);
-      const presentation=freezeStatusPresentation({slowFactor:enemy.slowFactor,slowTimer:enemy.slowTimer,enemyClass,reducedFlash:this.presentationSettings.reducedFlash});
-      const lifecycle=this.freezeStatusLifecycleByEnemy.get(enemy.id)??advanceFreezeStatusLifecycle(createFreezeStatusLifecycleState(),{active:presentation.visible,targetAlpha:presentation.alpha,targetSizeScale:presentation.visible?presentation.sizeScale:.72},1/60,this.presentationSettings.reducedMotion);
+      const requestedSource=enemy.slowSource??'frost';
+      const initialPresentation=slowSourceCuePresentation({source:requestedSource,slowFactor:enemy.slowFactor,slowTimer:enemy.slowTimer,enemyClass,reducedFlash:this.presentationSettings.reducedFlash});
+      const lifecycle=this.freezeStatusLifecycleByEnemy.get(enemy.id)??advanceFreezeStatusLifecycle(createFreezeStatusLifecycleState(),{active:initialPresentation.visible,targetAlpha:initialPresentation.alpha,targetSizeScale:initialPresentation.visible?initialPresentation.sizeScale:.72,source:requestedSource},1/60,this.presentationSettings.reducedMotion);
       if(!lifecycle.visible)continue;
+      const source=lifecycle.source;
+      const presentation=slowSourceCuePresentation({source,slowFactor:enemy.slowFactor,slowTimer:enemy.slowTimer,enemyClass,reducedFlash:this.presentationSettings.reducedFlash});
       const pulse=Math.sin(this.elapsed*5+enemy.id)*amplitude*presentation.pulseAmplitude*crowdEntry.pulseScale*lifecycle.pulseScale;
-      if(this.freezeControlVfxAtlasReady&&this.freezeControlVfxAtlasImage){
+      const rawSize=Math.max(presentation.baseSize,enemy.radius*(enemyClass==='boss'?2.5:3.15))*lifecycle.sizeScale*crowdEntry.sizeScale;
+      const edge=freezeStatusEdgePresentation({x:enemy.pos.x,y:enemy.pos.y,size:rawSize,viewportWidth:LOGICAL_WIDTH,viewportHeight:LOGICAL_HEIGHT});
+      const size=rawSize*edge.sizeScale;
+      ctx.globalAlpha=Math.max(0,Math.min(1,(lifecycle.alpha*crowdEntry.alphaScale+pulse)*(.72+.28*lifecycle.sourceBlend)));
+      ctx.strokeStyle=presentation.color;ctx.lineWidth=presentation.lineWidth;
+      if(source==='frost'&&presentation.useFreezeAtlas&&this.freezeControlVfxAtlasReady&&this.freezeControlVfxAtlasImage){
         const sprite=freezeControlVfxSprite(enemyClass,'active');
-        const rawSize=Math.max(presentation.baseSize,enemy.radius*(enemyClass==='boss'?2.5:3.15))*lifecycle.sizeScale*crowdEntry.sizeScale;
-        const edge=freezeStatusEdgePresentation({x:enemy.pos.x,y:enemy.pos.y,size:rawSize,viewportWidth:LOGICAL_WIDTH,viewportHeight:LOGICAL_HEIGHT});
-        const size=rawSize*edge.sizeScale;
-        ctx.globalAlpha=Math.max(0,Math.min(1,lifecycle.alpha*crowdEntry.alphaScale+pulse));
         ctx.drawImage(this.freezeControlVfxAtlasImage,sprite.sx,sprite.sy,sprite.sw,sprite.sh,enemy.pos.x-size/2+edge.offsetX,enemy.pos.y-size/2+edge.offsetY,size,size);
-      }else{
-        ctx.globalAlpha=Math.max(0,Math.min(1,lifecycle.alpha*crowdEntry.alphaScale+pulse));
+      }else if(source==='frost'){
         ctx.strokeStyle = frost.color; ctx.lineWidth = 2.5;
         ctx.beginPath(); ctx.arc(enemy.pos.x, enemy.pos.y, enemy.radius + 6, 0, Math.PI * 2); ctx.stroke();
+      }else if(presentation.renderMode==='gravityOrbit'){
+        const r=Math.max(enemy.radius+7,size*.32);
+        for(let i=0;i<presentation.segmentCount;i++){const a=this.elapsed*1.9+i*Math.PI*2/presentation.segmentCount;ctx.beginPath();ctx.arc(enemy.pos.x,enemy.pos.y,r,a,a+.48);ctx.stroke();const x=enemy.pos.x+Math.cos(a)*r,y=enemy.pos.y+Math.sin(a)*r;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(enemy.pos.x+(x-enemy.pos.x)*.72,enemy.pos.y+(y-enemy.pos.y)*.72);ctx.stroke();}
+      }else if(presentation.renderMode==='terrainGround'){
+        const y=enemy.pos.y+enemy.radius*presentation.groundOffsetRatio;ctx.beginPath();ctx.ellipse(enemy.pos.x,y,Math.max(enemy.radius+8,size*.30),Math.max(5,enemy.radius*.34),0,0,Math.PI*2);ctx.stroke();
+      }else if(presentation.renderMode==='impactResistance'){
+        const r=enemy.radius+7;for(const side of [-1,1]){const center=side<0?Math.PI:0;ctx.beginPath();ctx.arc(enemy.pos.x,enemy.pos.y,r,center-.48,center+.48);ctx.stroke();}
+      }else if(presentation.renderMode==='genericResistance'){
+        ctx.beginPath();ctx.arc(enemy.pos.x,enemy.pos.y,enemy.radius+5,Math.PI*.18,Math.PI*.82);ctx.stroke();ctx.beginPath();ctx.arc(enemy.pos.x,enemy.pos.y,enemy.radius+5,Math.PI*1.18,Math.PI*1.82);ctx.stroke();
       }
     }
     ctx.restore();
@@ -5608,6 +5624,7 @@ export class Game {
         const finisher = finalFormEvadeFinisher(finalFormId, arenaDodgeFinisherProfile());
         const finisherSignature = finalFormId ? finalFormFinisherSignature(finalFormId) : null;
         const damage = 68 * this.hero.spellPower * this.hero.equipmentSpellPower * finisher.damageMultiplier;
+        const finisherSlowSource=this.hero.profileId==='seria'?'frost' as const:'impact' as const;
         const outside: Array<{ enemy:Enemy; distance:number }> = [];
         for (const enemy of this.enemies.enemies) {
           if (!enemy.alive) continue;
@@ -5615,7 +5632,7 @@ export class Game {
           if (enemyDistance <= finisher.radius + enemy.radius) {
             this.enemies.damage(enemy, damage);
             this.enemies.pushAway(enemy, this.hero.pos, finisher.pushDistance);
-            this.enemies.applySlow(enemy, finisher.slowFactor, finisher.slowDuration);
+            this.enemies.applySlow(enemy, finisher.slowFactor, finisher.slowDuration, finisherSlowSource);
           } else if (finisher.chainTargets > 0 && enemyDistance <= finisher.radius * 1.65 + enemy.radius) {
             outside.push({ enemy, distance:enemyDistance });
           }
@@ -5624,7 +5641,7 @@ export class Game {
           outside.sort((a,b)=>a.distance-b.distance);
           for (const { enemy } of outside.slice(0,finisher.chainTargets)) {
             this.enemies.damage(enemy, damage * .55);
-            this.enemies.applySlow(enemy, Math.max(.68,finisher.slowFactor), Math.max(.5,finisher.slowDuration*.65));
+            this.enemies.applySlow(enemy, Math.max(.68,finisher.slowFactor), Math.max(.5,finisher.slowDuration*.65), finisherSlowSource);
           }
         }
         if (finisher.coreHealPercent > 0) this.core.hp = Math.min(this.core.maxHp, this.core.hp + this.core.maxHp * finisher.coreHealPercent);

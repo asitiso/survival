@@ -124,6 +124,7 @@ import { bossSpecialOriginAnchorPresentation } from './boss-special-origin-ancho
 export type EnemyType = 'grunt' | 'hound' | 'brute' | 'archer' | 'bomber' | 'shaman' | 'shieldbearer' | 'assassin' | 'siegeGolem' | 'nullifier' | 'golden' | 'elite' | 'boss';
 export type EnemyTarget = 'hero' | 'core';
 export type EnemyDeathVisualSource='normal'|'explosion'|'freeze'|'ultimate'|'finalForm'|'fusion';
+export type SlowSource='frost'|'gravity'|'terrain'|'impact'|'generic';
 
 function isSpecialistEnemyType(type:EnemyType):type is SpecialistEnemyType { return type === 'shieldbearer' || type === 'assassin' || type === 'siegeGolem' || type === 'nullifier'; }
 function pointSegmentProximity(point:Vec2,a:Vec2|null,b:Vec2|null,band:number):number { if(!a||!b)return 0;const dx=b.x-a.x,dy=b.y-a.y,len2=dx*dx+dy*dy,safeBand=Math.max(1,band);if(len2<=.001)return Math.max(0,1-distance(point,a)/safeBand);const t=Math.max(0,Math.min(1,((point.x-a.x)*dx+(point.y-a.y)*dy)/len2)),nearest={x:a.x+dx*t,y:a.y+dy*t};return Math.max(0,1-distance(point,nearest)/safeBand); }
@@ -149,6 +150,7 @@ export interface Enemy extends EnemyStats {
   attackTimer: number;
   slowFactor: number;
   slowTimer: number;
+  slowSource?: SlowSource | undefined;
   alive: boolean;
   hitFlash: number;
   hitImpactTier?: DamageImpactTier | undefined;
@@ -211,6 +213,7 @@ export interface EnemyDeathEvent {
   type: EnemyType;
   bossArchetype?: BossArchetype | undefined;
   wasSlowed?: boolean | undefined;
+  slowSource?: SlowSource | undefined;
   visualSource?:EnemyDeathVisualSource | undefined;
   deathPose?:EnemyDeathPose | undefined;
 }
@@ -466,7 +469,7 @@ export class EnemyManager {
       enemy.bossSpecialOriginHandoff=advanceBossSpecialOriginHandoffState(enemy.bossSpecialOriginHandoff,null,dt,enemy.radius,false);
       if(enemy.spawnGroundMaterialize)enemy.spawnGroundMaterialize=advanceEnemyPortalGroundMaterializeState(enemy.spawnGroundMaterialize,null,dt,ctx.reducedMotion??false);
       if (enemy.slowTimer > 0) enemy.slowTimer -= dt;
-      else enemy.slowFactor = 1;
+      else { enemy.slowFactor = 1; delete enemy.slowSource; }
       if (isSpecialistEnemyType(enemy.type)) enemy.specialistLocomotionSignature = advanceSpecialistLocomotionSignatureState(enemy.specialistLocomotionSignature, enemy.type, null, dt);
       if (enemy.type === 'assassin') {
         enemy.specialistTimer = (enemy.specialistTimer ?? SPECIALIST_COMBAT_CONTRACT.assassinBlinkResetSeconds) - dt;
@@ -626,14 +629,17 @@ export class EnemyManager {
       x: enemy.pos.x, y: enemy.pos.y, xp: Math.round(enemy.xp * mythicLastLawReward), gold: Math.round(enemy.gold * mythicLastLawReward), type: enemy.type,
       ...(enemy.type === 'boss' && enemy.bossArchetype ? { bossArchetype: enemy.bossArchetype } : {}),
       wasSlowed: enemy.slowTimer > 0 || enemy.slowFactor < 0.99,
+      ...(enemy.slowSource ? { slowSource: enemy.slowSource } : {}),
       visualSource,
       ...(enemy.type!=='boss'?{deathPose:{radius:enemy.radius,facingX:enemy.renderMotion?.facingX??1,facingY:enemy.renderMotion?.facingY??0,motionBlend:enemy.renderMotion?.motionBlend??0,turn:enemy.renderMotion?.turn??0,impactX:enemy.hitDirectionX??fallbackDirection.x,impactY:enemy.hitDirectionY??fallbackDirection.y,tier:impactTier}}:{}),
     });
     return true;
   }
 
-  applySlow(enemy: Enemy, factor: number, duration: number): void {
-    enemy.slowFactor = Math.min(enemy.slowFactor, Math.max(0.25, factor));
+  applySlow(enemy: Enemy, factor: number, duration: number, source:SlowSource='generic'): void {
+    const appliedFactor=Math.max(0.25, factor);
+    if(appliedFactor < enemy.slowFactor - 0.0001 || !enemy.slowSource) enemy.slowSource=source;
+    enemy.slowFactor = Math.min(enemy.slowFactor, appliedFactor);
     enemy.slowTimer = Math.max(enemy.slowTimer, duration);
   }
 

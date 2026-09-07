@@ -1,3 +1,4 @@
+import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from './config.js';
 import { enemyImpactVfxDescriptor } from './enemy-presentation.js';
 import { directionalHitVfxProfile, directionalHitVector, hitApproachProfile, directionalImpactRecoilProfile } from './visual-presence.js';
 import { actionResultMinimumGap, actionResultPresentation } from './action-result-readability.js';
@@ -93,9 +94,9 @@ export class CombatFeedbackSystem {
         return { x: shakeOffset.x + this.directionalRecoil.x * recoilRatio, y: shakeOffset.y + this.directionalRecoil.y * recoilRatio };
     }
     reset() { this.cues = []; this.resultCues = []; this.resultCooldowns.clear(); this.shake = 0; this.shakePhase = 0; this.impactVisualCooldown = 0; this.cameraPressureOffset = 0; this.cameraPressureTtl = 0; this.cameraPressureMaxTtl = 0; this.directionalRecoil = { x: 0, y: 0 }; this.directionalRecoilTtl = 0; this.directionalRecoilMaxTtl = 0; }
-    addHit(pos, amount, tier = 'normal', enemyType, source) {
+    addHit(pos, amount, tier = 'normal', enemyType, source, targetId) {
         const resolved = typeof tier === 'boolean' ? (tier ? 'critical' : 'normal') : tier;
-        this.cues.push({ kind: 'hit', pos: { ...pos }, amount, ttl: 0.46, maxTtl: 0.46, tier: resolved, ...(enemyType ? { enemyType } : {}), ...(source ? { source: { ...source } } : {}) });
+        this.cues.push({ kind: 'hit', pos: { ...pos }, anchorPos: { ...pos }, amount, ttl: 0.46, maxTtl: 0.46, tier: resolved, ...(enemyType ? { enemyType } : {}), ...(source ? { source: { ...source } } : {}), ...(targetId !== undefined ? { targetId } : {}) });
         if (source && resolved !== 'normal') {
             const recoil = directionalImpactRecoilProfile(source, pos, resolved, 'medium');
             if (recoil.magnitude >= Math.hypot(this.directionalRecoil.x, this.directionalRecoil.y)) {
@@ -105,6 +106,17 @@ export class CombatFeedbackSystem {
             }
         }
         this.trim();
+    }
+    tagLatestHitTarget(targetId) {
+        if (!Number.isFinite(targetId))
+            return;
+        for (let index = this.cues.length - 1; index >= 0; index--) {
+            const cue = this.cues[index];
+            if (cue?.kind !== 'hit')
+                continue;
+            cue.targetId = targetId;
+            return;
+        }
     }
     addKill(pos, boss = false) {
         this.cues.push({ kind: 'kill', pos: { ...pos }, ttl: boss ? 0.95 : 0.62, maxTtl: boss ? 0.95 : 0.62, boss });
@@ -172,7 +184,8 @@ export class CombatFeedbackSystem {
     }
     render(ctx, quality = 'high', resultContext = {}) {
         let remainingRoutineDamageNumbers = this.cues.reduce((count, cue) => count + (cue.kind === 'hit' && cue.tier === 'normal' ? 1 : 0), 0);
-        for (const cue of this.cues) {
+        for (let cueIndex = 0; cueIndex < this.cues.length; cueIndex++) {
+            const cue = this.cues[cueIndex];
             const ratio = Math.max(0, cue.ttl / cue.maxTtl);
             if (cue.kind === 'hit') {
                 const visual = combatImpactVisual(cue.tier);
@@ -214,6 +227,7 @@ export class CombatFeedbackSystem {
                     ctx.stroke();
                 }
                 let resultPriorityNearby = 0, resultDistance = Number.POSITIVE_INFINITY;
+                let nearestResultCue;
                 for (const resultCue of this.resultCues) {
                     const priority = actionResultPresentation({ ...resultContext, kind: resultCue.resultKind, sourceDistance: 0 }).priority;
                     if (priority < 2)
@@ -222,12 +236,40 @@ export class CombatFeedbackSystem {
                     if (d < resultDistance || (d === resultDistance && priority > resultPriorityNearby)) {
                         resultDistance = d;
                         resultPriorityNearby = priority;
+                        nearestResultCue = resultCue;
                     }
                 }
                 if (cue.tier === 'normal')
                     remainingRoutineDamageNumbers -= 1;
                 const clusterIndex = cue.tier === 'normal' ? remainingRoutineDamageNumbers : 0;
+                const nearbyCriticalReserved = cue.tier !== 'critical' && this.cues.some((other, otherIndex) => {
+                    if (otherIndex === cueIndex || other.kind !== 'hit' || other.tier !== 'critical')
+                        return false;
+                    const sameTarget = cue.targetId !== undefined && other.targetId !== undefined
+                        ? cue.targetId === other.targetId
+                        : Math.hypot(cue.anchorPos.x - other.anchorPos.x, cue.anchorPos.y - other.anchorPos.y) <= 18;
+                    return !sameTarget && Math.hypot(cue.anchorPos.x - other.anchorPos.x, cue.anchorPos.y - other.anchorPos.y) <= 34;
+                });
+                let sameTargetIndex = 0, denseNeighborIndex = nearbyCriticalReserved ? 1 : 0;
+                for (let previousIndex = 0; previousIndex < cueIndex; previousIndex++) {
+                    const previous = this.cues[previousIndex];
+                    if (!previous || previous.kind !== 'hit')
+                        continue;
+                    const sameTarget = cue.targetId !== undefined && previous.targetId !== undefined
+                        ? cue.targetId === previous.targetId
+                        : Math.hypot(cue.anchorPos.x - previous.anchorPos.x, cue.anchorPos.y - previous.anchorPos.y) <= 18;
+                    if (sameTarget) {
+                        sameTargetIndex += 1;
+                        continue;
+                    }
+                    const anchorDistance = Math.hypot(cue.anchorPos.x - previous.anchorPos.x, cue.anchorPos.y - previous.anchorPos.y);
+                    if (anchorDistance <= 34 && previous.tier !== 'critical')
+                        denseNeighborIndex += 1;
+                }
                 const damageNumber = damageNumberPresentation({
+                    sameTargetIndex,
+                    denseNeighborIndex,
+                    anchorX: cue.pos.x, anchorY: cue.pos.y, viewportWidth: LOGICAL_WIDTH, viewportHeight: LOGICAL_HEIGHT,
                     tier: cue.tier,
                     clusterIndex,
                     ...(resultContext.battlefieldStress !== undefined ? { battlefieldStress: resultContext.battlefieldStress } : {}),
@@ -235,7 +277,12 @@ export class CombatFeedbackSystem {
                     ...(resultContext.safeLaneVisible !== undefined ? { safeLaneVisible: resultContext.safeLaneVisible } : {}),
                     ...(resultContext.reducedMotion !== undefined ? { reducedMotion: resultContext.reducedMotion } : {}),
                     ...(resultContext.reducedFlash !== undefined ? { reducedFlash: resultContext.reducedFlash } : {}),
-                    ...(resultPriorityNearby >= 2 ? { resultPriorityNearby, resultDistance } : {})
+                    ...(resultPriorityNearby >= 2 ? { resultPriorityNearby, resultDistance } : {}),
+                    ...(nearestResultCue ? { resultVectorX: cue.pos.x - nearestResultCue.pos.x, resultVectorY: cue.pos.y - nearestResultCue.pos.y } : {}),
+                    ...((cue.source ?? nearestResultCue?.source) ? {
+                        sourceVectorX: cue.pos.x - (cue.source ?? nearestResultCue.source).x,
+                        sourceVectorY: cue.pos.y - (cue.source ?? nearestResultCue.source).y,
+                    } : {})
                 });
                 if (damageNumber.visible) {
                     ctx.globalAlpha = Math.min(1, ratio * 1.65) * damageNumber.alpha;
@@ -247,8 +294,9 @@ export class CombatFeedbackSystem {
                     ctx.fillStyle = cue.tier === 'critical' ? '#ffe16d' : cue.tier === 'heavy' ? '#d9efff' : '#f3f7ff';
                     const text = `${Math.max(1, Math.round(cue.amount)).toLocaleString()}${cue.tier === 'critical' ? '!' : ''}`;
                     const textY = cue.pos.y + damageNumber.offsetY;
-                    ctx.strokeText(text, cue.pos.x, textY);
-                    ctx.fillText(text, cue.pos.x, textY);
+                    const textX = cue.pos.x + damageNumber.offsetX;
+                    ctx.strokeText(text, textX, textY);
+                    ctx.fillText(text, textX, textY);
                 }
                 ctx.restore();
             }

@@ -615,6 +615,7 @@ export class EnemyManager {
     enemy.hitImpactTier=impactTier; enemy.hitDirectionX=hitVector.x; enemy.hitDirectionY=hitVector.y;
     if(enemy.type==='boss'&&impactTier !== 'normal')enemy.bossHeavyHitStagger=advanceBossHeavyHitStaggerState(enemy.bossHeavyHitStagger,{tier:impactTier,directionX:hitVector.x,directionY:hitVector.y},0);
     this.feedback?.addHit(enemy.pos, amount, impactTier, enemy.type, source);
+    this.feedback?.tagLatestHitTarget?.(enemy.id);
     if(guardBroken)this.feedback?.addActionResult?.(enemy.pos,'guardBreak',source);
     if (enemy.type === 'boss' && impactTier !== 'normal') { this.feedback?.addImpact(enemy.pos, 'bossHit'); this.feedback?.addActionResult?.(enemy.pos,'bossStagger',source); }
     if (!killed) return false;

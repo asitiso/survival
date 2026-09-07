@@ -1,4 +1,4 @@
-name: Phase 4515 Swift Cadence TDD
+name: Phase 4521 Swift Strike TDD
 
 on:
   push:
@@ -21,6 +21,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - name: Phase 4515-4520 focused RED test
-        run: node --test tests/phase4515-4520-swift-cadence-lifecycle.test.mjs
+      - name: Phase 4521-4526 focused RED test
+        run: node --test tests/phase4521-4526-swift-strike-ownership.test.mjs
       - run: git diff --check

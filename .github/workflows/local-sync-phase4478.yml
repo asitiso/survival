@@ -1,0 +1,39 @@
+name: Local Sync Phase 4478
+
+on:
+  push:
+    branches:
+      - sync/phase4353-4370-local-final
+    paths:
+      - .sync/phase4478.ready
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reassemble and verify local patch payload
+        run: |
+          set -euo pipefail
+          cat .sync/phase4461-4478.part00 .sync/phase4461-4478.part01 .sync/phase4461-4478.part02 .sync/phase4461-4478.part03 > /tmp/phase4461-4478.patch.gz.b64
+          test "$(wc -c < /tmp/phase4461-4478.patch.gz.b64)" -eq 12852
+          echo "32d602146310174024a72cea496d0990e8038043a172fba252d2d547b9c2bbee  /tmp/phase4461-4478.patch.gz.b64" | sha256sum -c -
+          base64 -d /tmp/phase4461-4478.patch.gz.b64 | gzip -d > /tmp/phase4461-4478.patch
+      - name: Recreate verified local tree and push result
+        run: |
+          set -euo pipefail
+          git config user.name asitiso
+          git config user.email asitiso.woo@gmail.com
+          git fetch origin work/phase4443-4460-effective-damage-readability
+          git switch -C work/phase4461-4478-healing-recovery-readability origin/work/phase4443-4460-effective-damage-readability
+          git apply --index /tmp/phase4461-4478.patch
+          TREE=$(git write-tree)
+          test "$TREE" = "53d3a11757f5b19a01c51be2c2eba39414dcbb48"
+          git diff --cached --check
+          git commit -m "feat: improve Phase 4461-4478 enemy healing recovery readability"
+          git push origin HEAD:work/phase4461-4478-healing-recovery-readability

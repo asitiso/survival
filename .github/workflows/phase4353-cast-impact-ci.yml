@@ -14,6 +14,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - name: Phase 4353 focused tests
-        run: node --test tests/phase4353-4358-action-result-ownership.test.mjs
+      - name: Phase 4353-4364 focused tests
+        run: node --test tests/phase4353-4358-action-result-ownership.test.mjs tests/phase4359-4364-meaningful-impact-confirmation.test.mjs
       - run: git diff --check

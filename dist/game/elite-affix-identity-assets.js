@@ -56,6 +56,52 @@ export function eliteAffixIdentityEmphasis(id, hpRatio, manaShieldRatio) {
         return 1;
     return 0;
 }
+export function advanceSwiftCadenceLifecycle(previous, input) {
+    const step = Math.max(0, Number.isFinite(input.dt) ? input.dt : 0);
+    const interval = Math.max(0.001, Number.isFinite(input.attackInterval) ? input.attackInterval : 1);
+    const timer = Math.max(0, Number.isFinite(input.attackTimer) ? input.attackTimer : interval);
+    if (input.struck)
+        return { phase: 'strike', active: true, transitionTtl: 0.10 };
+    if (previous?.phase === 'strike') {
+        const transitionTtl = Math.max(0, previous.transitionTtl - step);
+        if (transitionTtl > 0)
+            return { phase: 'strike', active: true, transitionTtl };
+        return { phase: 'recovery', active: true, transitionTtl: 0.14 };
+    }
+    if (previous?.phase === 'recovery') {
+        const transitionTtl = Math.max(0, previous.transitionTtl - step);
+        if (transitionTtl > 0)
+            return { phase: 'recovery', active: true, transitionTtl };
+    }
+    const readyThreshold = Math.min(0.18, interval * 0.30);
+    if (input.inAttackRange && timer <= readyThreshold)
+        return { phase: 'ready', active: true, transitionTtl: 0 };
+    return { phase: 'approach', active: false, transitionTtl: 0 };
+}
+export function swiftCadencePresentation(state, reducedMotion = false, reducedFlash = false) {
+    if (!state)
+        return { alpha: 0, chevronLength: 0, lineWidth: 0, motionScale: 0 };
+    let alpha = state.phase === 'strike' ? 0.64 : state.phase === 'ready' ? 0.34 : state.phase === 'recovery' ? 0.24 : 0.18;
+    if (reducedFlash)
+        alpha *= 0.62;
+    const chevronLength = state.phase === 'strike' ? 18 : state.phase === 'ready' ? 13 : state.phase === 'recovery' ? 9 : 7;
+    const lineWidth = state.phase === 'strike' ? 2.4 : state.phase === 'ready' ? 2 : 1.5;
+    const motionScale = reducedMotion ? 0 : state.phase === 'strike' ? 1 : state.phase === 'ready' ? 0.65 : state.phase === 'recovery' ? 0.35 : 0.45;
+    return { alpha, chevronLength, lineWidth, motionScale };
+}
+export function swiftStrikeOwnershipPresentation(input) {
+    if (!input.actualStrike)
+        return { visible: false, connectorAlpha: 0, chevronScale: 0, priorityScale: 0, motionScale: 0 };
+    const stress = clamp(Number.isFinite(input.battlefieldStress) ? input.battlefieldStress : 0, 0, 1);
+    const distanceToTarget = Math.max(0, Number.isFinite(input.distanceToTarget) ? input.distanceToTarget : 9999);
+    const coreNear = input.targetKind === 'core' && distanceToTarget <= 120;
+    const priorityScale = coreNear ? 1 : input.recentlyHit ? 0.94 : Math.max(0.68, 1 - stress * 0.22);
+    let connectorAlpha = (coreNear ? 0.66 : 0.56) * priorityScale;
+    if (input.reducedFlash)
+        connectorAlpha *= 0.62;
+    const chevronScale = (coreNear ? 1 : 0.88) * Math.max(0.72, 1 - stress * 0.18);
+    return { visible: true, connectorAlpha, chevronScale, priorityScale, motionScale: input.reducedMotion ? 0 : 1 };
+}
 export function frenziedThresholdDensityPresentation(state, input) {
     if (!state || state.phase === 'inactive')
         return { visible: false, alphaScale: 0, pulseScale: 0 };

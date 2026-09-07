@@ -18,7 +18,7 @@ import type { BossDifficultyCurveProfile } from './boss-difficulty-curve.js';
 import type { DamageReasonSource } from './damage-reason-feedback.js';
 import { enemySpritePresentation, enemySpriteRect, isEnemySpriteType } from './enemy-sprite-assets.js';
 import { bossSpritePresentation, bossSpriteRect } from './boss-sprite-assets.js';
-import { advanceFrenziedThresholdLifecycle, eliteAffixIdentityEmphasis, eliteAffixIdentityIcon, eliteAffixIdentityRowLayout, frenziedThresholdDensityPresentation, frenziedThresholdPresentation, type FrenziedThresholdLifecycleState } from './elite-affix-identity-assets.js';
+import { advanceFrenziedThresholdLifecycle, advanceSwiftCadenceLifecycle, eliteAffixIdentityEmphasis, eliteAffixIdentityIcon, eliteAffixIdentityRowLayout, frenziedThresholdDensityPresentation, frenziedThresholdPresentation, swiftStrikeOwnershipPresentation, type FrenziedThresholdLifecycleState, type SwiftCadenceLifecycleState } from './elite-affix-identity-assets.js';
 import { isSpecialistIntentType, specialistIntentEmphasis, specialistIntentIcon, specialistIntentOnBodyLayout } from './specialist-intent-identity-assets.js';
 import type { ResidualCombatMotionPolicy } from './combat-cue-priority.js';
 import type { PresentationQuality } from './presentation-budget.js';
@@ -180,6 +180,7 @@ export interface Enemy extends EnemyStats {
   commandAuraPresentationTtl?: number | undefined;
   commandAuraHandoffTtl?: number | undefined;
   frenziedPresentation?: FrenziedThresholdLifecycleState | undefined;
+  swiftCadencePresentation?: SwiftCadenceLifecycleState | undefined;
   manaShield: number;
   maxManaShield: number;
   isApex?: boolean | undefined;
@@ -326,7 +327,7 @@ export class EnemyManager {
   private projectileImpactLabelAnchorHold: ProjectileImpactLabelAnchorHoldEntry[] = [];
   private projectileImpactIdentityCoherence: ProjectileImpactSharedIdentityEntry[] = [];
   private regularEnemyActionVfx: Array<{pos:Vec2;kind:RegularEnemyActionVfxKind;ttl:number;maxTtl:number}> = [];
-  private eliteAffixResponseVfx: Array<{pos:Vec2;enemyId:number;affixId:EliteAffixId;ttl:number;maxTtl:number}> = [];
+  private eliteAffixResponseVfx: Array<{pos:Vec2;enemyId:number;affixId:EliteAffixId;targetPos?:Vec2;targetKind?:EnemyTarget;ttl:number;maxTtl:number}> = [];
   private specialistReactionVfx: Array<{pos:Vec2;targetPos?:Vec2;enemyId:number;type:SpecialistEnemyType;ttl:number;maxTtl:number}> = [];
   private specialistStrikeOriginVfx: Array<{pos:Vec2;origin:Vec2;target:Vec2;recoveryFacing:Vec2;enemyId:number;type:SpecialistEnemyType;ttl:number;maxTtl:number}> = [];
   private nullifierHeroInside = new Set<number>();
@@ -513,6 +514,7 @@ export class EnemyManager {
       const toTarget = { x: targetObj.pos.x - enemy.pos.x, y: targetObj.pos.y - enemy.pos.y };
       const dist = Math.hypot(toTarget.x, toTarget.y);
       const contact = enemy.radius + targetObj.radius + 5;
+      if(enemy.eliteAffixes?.includes('swift')) enemy.swiftCadencePresentation=advanceSwiftCadenceLifecycle(enemy.swiftCadencePresentation,{inAttackRange:dist<=contact,attackTimer:enemy.attackTimer,attackInterval:enemy.attackInterval,struck:false,dt});
       if(enemy.type==='nullifier'){const inside=distance(enemy.pos,ctx.hero.pos)<=SPECIALIST_COMBAT_CONTRACT.nullifierEffectRadius+enemy.radius;const wasInside=this.nullifierHeroInside.has(enemy.id);if(inside&&!wasInside){this.nullifierHeroInside.add(enemy.id);this.queueSpecialistReactionVfx(enemy,'nullifier',enemy.pos,ctx.hero.pos,0.64);}else if(!inside&&wasInside)this.nullifierHeroInside.delete(enemy.id);}
 
       if (enemy.type === 'golden') {
@@ -584,7 +586,7 @@ export class EnemyManager {
           if(contactGuard.owner==='contact-guard'){this.coreContactGuardImpactVfx.push({pos:{...targetObj.pos},incoming:{x:targetObj.pos.x-enemy.pos.x,y:targetObj.pos.y-enemy.pos.y},preventionRatio,ttl:maxTtl,maxTtl});if(this.coreContactGuardImpactVfx.length>12)this.coreContactGuardImpactVfx.splice(0,this.coreContactGuardImpactVfx.length-12);}
         } else ctx.onHeroDamage(enemy.damage * frenzyDamage, 'contact');
         if(enemy.type === 'siegeGolem'){ this.queueSpecialistReactionVfx(enemy,'siegeGolem',enemy.pos,targetObj.pos,0.56); enemy.specialistLocomotionSignature = advanceSpecialistLocomotionSignatureState(enemy.specialistLocomotionSignature,'siegeGolem','plant',0); }
-        if (enemy.eliteAffixes?.includes('swift')) this.queueEliteAffixResponseVfx(enemy,'swift');
+        if (enemy.eliteAffixes?.includes('swift')) { enemy.swiftCadencePresentation=advanceSwiftCadenceLifecycle(enemy.swiftCadencePresentation,{inAttackRange:true,attackTimer:enemy.attackTimer,attackInterval:enemy.attackInterval,struck:true,dt:0}); this.queueEliteAffixResponseVfx(enemy,'swift',targetObj.pos); }
         enemy.attackTimer = enemy.attackInterval;
       }
       commitRenderMotion();
@@ -1314,6 +1316,7 @@ export class EnemyManager {
         ctx.save(); ctx.globalAlpha = Math.min(reducedFlash ? 0.48 : 0.88, t);
         ctx.drawImage(eliteAffixLifecycleVfxAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, cue.pos.x - size / 2, cue.pos.y - size / 2, size, size);
         ctx.restore();
+        if(cue.affixId==='swift'&&cue.targetPos&&cue.targetKind){const sourceEnemy=this.enemies.find((candidate)=>candidate.id===cue.enemyId);const ownership=swiftStrikeOwnershipPresentation({actualStrike:true,targetKind:cue.targetKind,distanceToTarget:distance(cue.pos,cue.targetPos),recentlyHit:(sourceEnemy?.hitFlash??0)>0,battlefieldStress:Math.max(0,Math.min(1,hazardPressure)),reducedMotion,reducedFlash});if(ownership.visible){const dx=cue.targetPos.x-cue.pos.x,dy=cue.targetPos.y-cue.pos.y,mag=Math.hypot(dx,dy)||1,nx=dx/mag,ny=dy/mag,travel=Math.min(72,Math.max(30,mag*.55)),endX=cue.pos.x+nx*travel,endY=cue.pos.y+ny*travel,perpX=-ny,perpY=nx,wing=6*ownership.chevronScale;ctx.save();ctx.globalAlpha=ownership.connectorAlpha*t;ctx.strokeStyle='#9edfff';ctx.lineWidth=2*ownership.priorityScale;ctx.beginPath();ctx.moveTo(cue.pos.x+nx*10,cue.pos.y+ny*10);ctx.lineTo(endX,endY);ctx.stroke();ctx.beginPath();ctx.moveTo(endX,endY);ctx.lineTo(endX-nx*7+perpX*wing,endY-ny*7+perpY*wing);ctx.moveTo(endX,endY);ctx.lineTo(endX-nx*7-perpX*wing,endY-ny*7-perpY*wing);ctx.stroke();ctx.restore();}}
       }
     }
     if(specialistReactionLifecycleVfxAtlasReady&&specialistReactionLifecycleVfxAtlasImage){
@@ -1633,11 +1636,11 @@ export class EnemyManager {
     if (this.regularEnemyActionVfx.length > 28) this.regularEnemyActionVfx.splice(0,this.regularEnemyActionVfx.length-28);
   }
 
-  private queueEliteAffixResponseVfx(enemy:Enemy,affixId:EliteAffixId):void {
+  private queueEliteAffixResponseVfx(enemy:Enemy,affixId:EliteAffixId,targetPos?:Vec2):void {
     const existing=this.eliteAffixResponseVfx.find((cue)=>cue.enemyId===enemy.id&&cue.affixId===affixId&&cue.ttl>0.12);
     if(existing)return;
     const maxTtl=0.42;
-    this.eliteAffixResponseVfx.push({pos:{...enemy.pos},enemyId:enemy.id,affixId,ttl:maxTtl,maxTtl});
+    this.eliteAffixResponseVfx.push({pos:{...enemy.pos},enemyId:enemy.id,affixId,...(targetPos?{targetPos:{...targetPos},targetKind:enemy.target}:{}),ttl:maxTtl,maxTtl});
     if (this.eliteAffixResponseVfx.length > 32) this.eliteAffixResponseVfx.splice(0,this.eliteAffixResponseVfx.length-32);
   }
 

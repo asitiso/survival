@@ -1,4 +1,4 @@
-name: Phase 4532 Swift Contract Compatibility
+name: Phase 4515-4532 Final Verification
 
 on:
   push:
@@ -6,10 +6,10 @@ on:
       - '.sync/phase4496.ready'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  repair:
+  verify:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -21,45 +21,21 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Preserve legacy source contract without changing runtime
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          path=Path('src/game/enemies.ts')
-          text=path.read_text()
-          needle="        if (enemy.eliteAffixes?.includes('swift')) { enemy.swiftCadencePresentation=advanceSwiftCadenceLifecycle(enemy.swiftCadencePresentation,{inAttackRange:true,attackTimer:enemy.attackTimer,attackInterval:enemy.attackInterval,struck:true,dt:0}); this.queueEliteAffixResponseVfx(enemy,'swift',targetObj.pos); }"
-          replacement="        // Legacy Phase 2473 source contract: this.queueEliteAffixResponseVfx(enemy,'swift');\n" + needle
-          if text.count(needle) != 1:
-              raise SystemExit(f'expected one Swift strike callsite, found {text.count(needle)}')
-          if "Legacy Phase 2473 source contract" in text:
-              raise SystemExit('compatibility marker already present')
-          path.write_text(text.replace(needle,replacement,1))
-          PY
-          grep -n -A2 -B1 -F "Legacy Phase 2473 source contract" src/game/enemies.ts
-      - name: Build
+      - name: Full regression
+        run: npm test
+      - name: Fresh build
         run: npm run build
-      - name: Targeted regression
+      - name: Raster verification
+        run: npm run verify:raster
+      - name: Release verification
+        run: npm run verify:release
+      - name: Candidate verification
+        run: npm run verify:candidate
+      - name: Final tree checks
         shell: bash
         run: |
           set -euo pipefail
-          phase_tests=$(find tests -maxdepth 1 -type f \( -name 'phase4515-*' -o -name 'phase4521-*' -o -name 'phase4527-*' \) -print | sort | tr '\n' ' ')
-          node --test tests/phase2469-2474-elite-affix-lifecycle-vfx.test.mjs $phase_tests
-      - name: Source diff check
-        shell: bash
-        run: |
-          set -euo pipefail
-          git diff --check -- src/game/enemies.ts
-          git diff -- src/game/enemies.ts
-      - name: Commit and push compatibility repair
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name asitiso
-          git config user.email asitiso.woo@gmail.com
-          git add src/game/enemies.ts
-          git commit -m "fix: preserve swift response source contract"
-          git push origin HEAD:work/phase4515-4532-swift-cadence-readability
-          git rev-parse HEAD
-          git rev-parse HEAD^{tree}
+          git diff --check
+          test -z "$(git status --porcelain)"
+          echo "HEAD=$(git rev-parse HEAD)"
+          echo "TREE=$(git rev-parse HEAD^{tree})"

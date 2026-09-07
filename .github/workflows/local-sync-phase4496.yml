@@ -1,0 +1,39 @@
+name: Local Sync Phase 4496
+
+on:
+  push:
+    paths:
+      - '.sync/phase4496.ready'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reassemble and verify local patch payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .sync/phase4479-4496.part00 .sync/phase4479-4496.part01 .sync/phase4479-4496.part02 > /tmp/phase4479-4496.patch.gz.b64
+          test "$(wc -c < /tmp/phase4479-4496.patch.gz.b64 | tr -d ' ')" = "10428"
+          echo "4193eb296f704b10b3a0ba901ebad52ccb76058b44f73775cd6c4f4cb5b1c566  /tmp/phase4479-4496.patch.gz.b64" | sha256sum -c -
+          base64 -d /tmp/phase4479-4496.patch.gz.b64 | gzip -d > /tmp/phase4479-4496.patch
+      - name: Recreate verified local tree and push result
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name asitiso
+          git config user.email asitiso.woo@gmail.com
+          git fetch origin work/phase4461-4478-healing-recovery-readability
+          git switch -C work/phase4479-4496-commander-aura-readability origin/work/phase4461-4478-healing-recovery-readability
+          git apply --index /tmp/phase4479-4496.patch
+          TREE=$(git write-tree)
+          test "$TREE" = "ff2cbfa3f6c5b7256a5dc53ed9455ad348c95f44"
+          git diff --cached --check
+          git commit -m "feat: improve Phase 4479-4496 commander aura readability"
+          git push origin HEAD:work/phase4479-4496-commander-aura-readability

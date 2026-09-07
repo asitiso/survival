@@ -38,3 +38,10 @@ test('dense budget integration leaves primary scale canonical',()=>{
   assert.ok(dense.secondaryScale<.6);
   assert.ok(dense.safeLaneScale>=1);
 });
+
+test('dense budget explicitly reserves room when a safe lane is visible',()=>{
+  const withoutLane=denseEdgeBudgetPresentation({criticalCount:2,crowd:.8,bossActive:true,safeLaneVisible:false});
+  const withLane=denseEdgeBudgetPresentation({criticalCount:2,crowd:.8,bossActive:true,safeLaneVisible:true});
+  assert.ok(withLane.secondaryContourScale<withoutLane.secondaryContourScale);
+  assert.equal(withLane.safeLaneContourScale,1);
+});

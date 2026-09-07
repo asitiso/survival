@@ -55,3 +55,10 @@ test('dense secondary material yields without lowering primary budget',()=>{
   assert.ok(high.secondaryScale<low.secondaryScale);
   assert.ok(high.safeLaneScale>=1);
 });
+
+test('visible safe lane reserves contour budget from non-canonical secondary edges',()=>{
+  const withoutLane=contourOwnershipBudgetPresentation({criticalCount:2,crowd:.8,bossActive:true,safeLaneVisible:false});
+  const withLane=contourOwnershipBudgetPresentation({criticalCount:2,crowd:.8,bossActive:true,safeLaneVisible:true});
+  assert.ok(withLane.secondaryContourScale<withoutLane.secondaryContourScale);
+  assert.equal(withLane.safeLaneContourScale,1);
+});

@@ -236,6 +236,7 @@ export interface SpellWorld {
   fusions?: readonly FusionId[];
   autoAim?: boolean;
   preferredAutoTargetId?: number | null;
+  preferredAutoWeakpointId?: number | null;
   preferredManualTargetId?: number | null;
   weakpointAim?: { activeBossId:number|null; nodes:readonly BossEncounterNode[] } | undefined;
   visualBodyOffset?: Vec2 | undefined;
@@ -800,7 +801,7 @@ export class SpellSystem {
 
   private targetAimPoint(world:SpellWorld,target:Enemy|null):Vec2|null{
     if(!target)return null;
-    return autoWeakpointAimPoint({autoAim:world.autoAim===true,target,heroPos:world.hero.pos,activeBossId:world.weakpointAim?.activeBossId??null,nodes:world.weakpointAim?.nodes??[]});
+    return autoWeakpointAimPoint({autoAim:world.autoAim===true,target,heroPos:world.hero.pos,activeBossId:world.weakpointAim?.activeBossId??null,nodes:world.weakpointAim?.nodes??[],preferredNodeId:world.autoAim===true?(world.preferredAutoWeakpointId??null):null});
   }
 
   private updateProjectiles(dt: number, world: SpellWorld): void {

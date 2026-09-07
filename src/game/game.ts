@@ -292,6 +292,7 @@ import { BattlefieldObjectiveDirector, objectiveDefinition } from './battlefield
 import { ObjectiveRuntime, objectiveRewardFor, type ObjectiveReward } from './objective-runtime.js';
 import { chooseObjectiveAnchor } from './objective-rules.js';
 import { chooseSpellTarget } from './auto-targeting.js';
+import { AutoCombatBrain } from './auto-combat-brain.js';
 import { FusionRuntime } from './fusion-runtime.js';
 import { fusionDefinition, type FusionId } from './spell-fusions.js';
 import { fusionProcForCast } from './fusion-integration.js';
@@ -447,6 +448,7 @@ export class Game {
   goldEarned = 0;
   autoCastNormal = false;
   private autoTargetId: number | null = null;
+  private readonly autoCombatBrain = new AutoCombatBrain();
   private bossActionAssistCue: BossActionAssistCue | null = null;
   private bossActionAssistCueSince = 0;
   private bossActionAssistBossId: number | null = null;
@@ -2247,6 +2249,7 @@ export class Game {
     this.goldEarned = 0;
     this.autoCastNormal = openingAutoReadyProfile().initialAutoEnabled;
     this.autoTargetId = null;
+    this.autoCombatBrain.reset();
     this.enemies.reset();
     this.spells.reset();
     this.enemyDeathImageBursts = [];
@@ -2572,6 +2575,7 @@ export class Game {
     if (this.input.consumePressed('auto')) {
       this.autoCastNormal = !this.autoCastNormal;
       this.manualTargetMemory.clear();
+      this.autoCombatBrain.reset();
     }
     if (this.input.consumePressed('shop') && this.shopTokens > 0) {
       this.openShop();
@@ -2637,18 +2641,26 @@ export class Game {
       ascensionMutatorMods.eliteHealthMultiplier,
     );
 
-    if (this.autoCastNormal) this.autoTargetId = chooseSpellTarget(this.enemies.enemies, this.hero.pos, this.core.pos, true, this.autoTargetId)?.id ?? null;
+    if (this.autoCastNormal) this.autoTargetId = this.autoCombatBrain.selectTarget(this.enemies.enemies, this.hero.pos, this.core.pos, this.elapsed)?.id ?? null;
     else this.autoTargetId = null;
-    const spellWorld: SpellWorld = { hero: this.hero, core: this.core, enemies: this.enemies, terrain: this.terrain, feedback: this.feedback, magicTargets: this.bossEncounter, weakpointAim:this.bossEncounter, fusions: this.fusionRuntime.equipped, preferredAutoTargetId:this.autoTargetId, preferredManualTargetId:null, visualBodyOffset:this.heroLastRenderedBodyOffset, visualActionFacing:this.heroLastRenderedActionFacing, visualActionPoseStrength:this.heroLastRenderedActionPoseStrength, visualActionOwner:this.heroLastRenderedActionOwner, reducedMotion:this.presentationSettings.reducedMotion, reducedFlash:this.presentationSettings.reducedFlash };
+    const autoWeakpointId=this.autoCastNormal?this.autoCombatBrain.selectWeakpoint(this.bossEncounter.activeBossId,this.bossEncounter.nodes,this.hero.pos,this.elapsed):null;
+    const spellWorld: SpellWorld = { hero: this.hero, core: this.core, enemies: this.enemies, terrain: this.terrain, feedback: this.feedback, magicTargets: this.bossEncounter, weakpointAim:this.bossEncounter, fusions: this.fusionRuntime.equipped, preferredAutoTargetId:this.autoTargetId, preferredAutoWeakpointId:autoWeakpointId, preferredManualTargetId:null, visualBodyOffset:this.heroLastRenderedBodyOffset, visualActionFacing:this.heroLastRenderedActionFacing, visualActionPoseStrength:this.heroLastRenderedActionPoseStrength, visualActionOwner:this.heroLastRenderedActionOwner, reducedMotion:this.presentationSettings.reducedMotion, reducedFlash:this.presentationSettings.reducedFlash };
     this.flushBufferedManualCasts(spellWorld);
     for (const action of COMBAT_CAST_ACTIONS) {
       if (this.input.consumePressed(action)) this.handleManualCastPress(action, spellWorld);
     }
-    for (const action of ['spell1', 'spell2', 'spell3', 'spell4'] as const) {
+    const normalSpellActions=['spell1','spell2','spell3','spell4'] as const;
+    const readyAutoActions=this.autoCastNormal?normalSpellActions.filter((action)=>this.spells.cooldownRemaining(action)<=0):[];
+    const autoCastAction=this.autoCastNormal?this.autoCombatBrain.chooseAutoCastAction(readyAutoActions,this.elapsed):null;
+    for (const action of normalSpellActions) {
       const held = this.input.isHeld(action);
-      const { autoTriggered } = openingAutoCastIntent(this.autoCastNormal, held);
+      const intent = openingAutoCastIntent(this.autoCastNormal, held);
+      const autoTriggered = intent.autoTriggered && autoCastAction===action;
       if (held && !autoTriggered && this.spells.cooldownRemaining(action) <= 0) this.prepareManualTarget(spellWorld);
-      if ((autoTriggered || held) && this.spells.tryCast(action, { ...spellWorld, autoAim:autoTriggered })) this.handleSuccessfulCast(action, autoTriggered ? 'auto' : 'manual');
+      if ((autoTriggered || held) && this.spells.tryCast(action, { ...spellWorld, autoAim:autoTriggered })) {
+        this.handleSuccessfulCast(action, autoTriggered ? 'auto' : 'manual');
+        if(autoTriggered)this.autoCombatBrain.recordAutoCast(action,this.elapsed);
+      }
     }
     this.spells.update(dt, spellWorld);
     this.syncBossWeakpointBreakFeedback();

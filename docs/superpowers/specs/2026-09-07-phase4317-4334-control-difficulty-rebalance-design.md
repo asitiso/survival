@@ -12,18 +12,18 @@ Rebalance AUTO so it performs like a slightly-above-average human rather than an
 - Existing spell targeting score function remains authoritative; AUTO humanization controls review cadence, switch commitment, cast pacing, and weakpoint precision above it.
 
 ## Phase 4317-4322 — AUTO Brain Humanization
-Introduce a small runtime `AutoCombatBrain` state machine. Target reviews happen at 0.14s cadence (~7.1 Hz) instead of every render frame. A candidate must remain preferred before a target switch commits: 0.22s normal, 0.12s for an urgent core threat. Dead/out-of-range targets may be replaced immediately.
+Introduce a small runtime `AutoCombatBrain` state machine. Target reviews happen at 0.14s cadence (~7.1 Hz) instead of every render frame. A candidate must remain preferred before a target switch commits: 0.18s normal, 0.10s for an urgent core threat. Dead/out-of-range targets may be replaced immediately.
 
 AUTO regular spell casts use a 0.14s minimum inter-cast gap and per-action readiness staggering so all four normal spells cannot fire on the same frame. Manual held/pressed inputs remain immediate and bypass this AUTO pacing.
 
-Boss weakpoint selection is also runtime-held. A newly preferable weakpoint must persist for 0.24s before AUTO changes node. AUTO aims toward the selected node with an 82% blend from boss center rather than exact node-center coordinates. This intentionally leaves skilled manual play room to beat AUTO.
+Boss weakpoint selection is also runtime-held. A newly preferable weakpoint must persist for 0.22s before AUTO changes node. AUTO aims toward the selected node with an 79% blend from boss center rather than exact node-center coordinates. This intentionally leaves skilled manual play room to beat AUTO.
 
 Target outcome: material AUTO decisions approximately 6-8 times/sec, non-emergency switches visibly delayed, weakpoint contact no longer perfect, and AUTO throughput approximately 88-92% of idealized frame-perfect behavior.
 
 ## Phase 4323-4328 — Manual Input Forgiveness
 Increase cast intent buffer from 0.20s to 0.32s and manual target memory from 0.75s to 1.15s. Existing priority overrides (core threat, elite/boss) remain intact so longer memory cannot trap the player on a lower-priority target.
 
-Add manual boss weakpoint soft assist: when a manual cast has selected the active boss and live weakpoints exist near the boss body, aim only 38% from boss center toward the preferred weakpoint. This is deliberately weaker than AUTO's 82% blend and never snaps to exact node center. It adds no new input action and does not affect non-boss targets.
+Add manual boss weakpoint soft assist: when a manual cast has selected the active boss and live weakpoints exist near the boss body, aim only 38% from boss center toward the preferred weakpoint. This is deliberately weaker than AUTO's 79% blend and never snaps to exact node center. It adds no new input action and does not affect non-boss targets.
 
 ## Phase 4329-4334 — Threat Curve Rebase
 Replace linear Threat modifiers with an explicit six-tier table:

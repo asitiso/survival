@@ -39,6 +39,24 @@ export interface EliteAffixResponseTargetState {
   targetKind?: EliteAffixResponseTargetKind | undefined;
 }
 
+export interface EliteAffixResponseLifetimeState {
+  ttl: number;
+  maxTtl: number;
+}
+
+export interface EliteAffixResponseDuplicateCandidate {
+  ttl: number;
+  importantEvent?: boolean | undefined;
+}
+
+export interface EliteAffixResponseDuplicateResolution {
+  ownerIndex: number;
+  dropIndexes: number[];
+  importantEvent: boolean;
+}
+
+const DEFAULT_RESPONSE_LIFETIME = 0.42;
+
 function clamp01(value: number, fallback = 0): number {
   const finite = Number.isFinite(value) ? value : fallback;
   return Math.max(0, Math.min(1, finite));
@@ -58,6 +76,10 @@ function finiteTarget(
     targetPos: { x: target.targetPos.x, y: target.targetPos.y },
     targetKind: target.targetKind,
   };
+}
+
+function responseMaxLifetime(maxTtl: number): number {
+  return Number.isFinite(maxTtl) && maxTtl > 0 ? maxTtl : DEFAULT_RESPONSE_LIFETIME;
 }
 
 export function captureEliteAffixResponseLaneSnapshot(
@@ -174,6 +196,41 @@ export function refreshEliteAffixResponseTarget(
   if (!importantEvent) return retained ?? {};
   const refreshed = finiteTarget(candidate);
   return refreshed ?? retained ?? {};
+}
+
+export function refreshEliteAffixResponseLifetime(
+  existing: EliteAffixResponseLifetimeState,
+  importantEvent: boolean,
+): EliteAffixResponseLifetimeState {
+  const maxTtl = responseMaxLifetime(existing.maxTtl);
+  const ttl = Math.max(0, Math.min(maxTtl, Number.isFinite(existing.ttl) ? existing.ttl : 0));
+  return {
+    ttl: importantEvent ? maxTtl : ttl,
+    maxTtl,
+  };
+}
+
+export function eliteAffixResponseLifeRatio(ttl: number, maxTtl: number): number {
+  const safeMaxTtl = responseMaxLifetime(maxTtl);
+  const safeTtl = Number.isFinite(ttl) ? ttl : 0;
+  return clamp01(safeTtl / safeMaxTtl);
+}
+
+export function eliteAffixResponseDuplicateResolution(
+  candidates: readonly EliteAffixResponseDuplicateCandidate[],
+): EliteAffixResponseDuplicateResolution {
+  const activeIndexes: number[] = [];
+  for (let index = 0; index < candidates.length; index += 1) {
+    const ttl = candidates[index]?.ttl;
+    if (typeof ttl === 'number' && Number.isFinite(ttl) && ttl > 0) activeIndexes.push(index);
+  }
+  if (activeIndexes.length === 0) {
+    return { ownerIndex: -1, dropIndexes: [], importantEvent: false };
+  }
+  const ownerIndex = activeIndexes[activeIndexes.length - 1]!;
+  const dropIndexes = activeIndexes.slice(0, -1);
+  const importantEvent = activeIndexes.some((index) => Boolean(candidates[index]?.importantEvent));
+  return { ownerIndex, dropIndexes, importantEvent };
 }
 
 export function eliteAffixResponseCueOrigin(

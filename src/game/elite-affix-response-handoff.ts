@@ -21,7 +21,7 @@ function safeTtl(value: number, fallback: number): number {
   return Math.max(0, Number.isFinite(fallback) ? fallback : 0);
 }
 
-function activeHandoff(state: EliteAffixResponseCrossAffixHandoffState | undefined): state is EliteAffixResponseCrossAffixHandoffState {
+function activeHandoff(state: EliteAffixResponseCrossAffixHandoffState | undefined): boolean {
   return Boolean(
     state &&
     state.fromAffixId &&
@@ -34,7 +34,7 @@ function activeHandoff(state: EliteAffixResponseCrossAffixHandoffState | undefin
 export function eliteAffixResponseCrossAffixRetargetProgress(
   state: EliteAffixResponseCrossAffixHandoffState | undefined,
 ): number {
-  if (!activeHandoff(state)) return 0;
+  if (!state || !activeHandoff(state)) return 0;
   return clamp01(state.progress);
 }
 

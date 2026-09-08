@@ -17,6 +17,7 @@ export interface EliteAffixCueLaneState {
   importantEvent: boolean;
   releaseFromLane?: EliteAffixCueLane;
   settleFloor?: number;
+  transitionDuration?: number;
 }
 
 export interface AdvanceEliteAffixCueLaneInput {
@@ -47,6 +48,7 @@ const IMPORTANT_HOLD_SECONDS = 0.16;
 const IMPORTANT_RELEASE_SECONDS = 0.10;
 const ROUTINE_SETTLE_SECONDS = ROUTINE_HOLD_SECONDS + ROUTINE_RELEASE_SECONDS;
 const ROUTINE_SETTLE_FLOOR = 0.32;
+const OPPOSITE_HANDOFF_SECONDS = 0.10;
 const LANE_PATTERN: readonly EliteAffixCueLane[] = [0, -1, 1, -2, 2];
 
 function clamp01(value: number): number {
@@ -57,12 +59,20 @@ function finiteFloor(value: number, fallback = 0): number {
   return Math.max(0, Math.floor(Number.isFinite(value) ? value : fallback));
 }
 
+function finiteStep(value: number): number {
+  return Math.max(0, Number.isFinite(value) ? value : 0);
+}
+
 function normalizeLane(value: number): EliteAffixCueLane {
   if (value <= -2) return -2;
   if (value === -1) return -1;
   if (value === 1) return 1;
   if (value >= 2) return 2;
   return 0;
+}
+
+function oppositeLaneSides(a: EliteAffixCueLane, b: EliteAffixCueLane): boolean {
+  return a !== 0 && b !== 0 && Math.sign(a) !== Math.sign(b);
 }
 
 export function eliteAffixCueStableStress(battlefieldStress: number): number {
@@ -108,7 +118,7 @@ export function eliteAffixCueDesiredLane(input: EliteAffixCueLaneAllocationInput
 }
 
 function progressLaneState(previous: EliteAffixCueLaneState, dt: number): EliteAffixCueLaneState {
-  const step = Math.max(0, Number.isFinite(dt) ? dt : 0);
+  const step = finiteStep(dt);
   if (step === 0) return previous;
   const holdConsumed = Math.min(previous.holdTtl, step);
   const holdTtl = Math.max(0, previous.holdTtl - holdConsumed);
@@ -118,8 +128,8 @@ function progressLaneState(previous: EliteAffixCueLaneState, dt: number): EliteA
 }
 
 function withoutTransientLaneState(state: EliteAffixCueLaneState): EliteAffixCueLaneState {
-  if (state.releaseFromLane === undefined && state.settleFloor === undefined) return state;
-  const { releaseFromLane: _releaseFromLane, settleFloor: _settleFloor, ...rest } = state;
+  if (state.releaseFromLane === undefined && state.settleFloor === undefined && state.transitionDuration === undefined) return state;
+  const { releaseFromLane: _releaseFromLane, settleFloor: _settleFloor, transitionDuration: _transitionDuration, ...rest } = state;
   return rest;
 }
 
@@ -137,7 +147,18 @@ export function advanceEliteAffixCueLane(
     };
   }
 
-  const progressed = progressLaneState(previous, input.dt);
+  const step = finiteStep(input.dt);
+  const previousGuard = Math.max(0, previous.holdTtl) + Math.max(0, previous.releaseTtl);
+  const progressed = progressLaneState(previous, step);
+
+  if (input.importantEvent && progressed.lane === desiredLane && !progressed.importantEvent) {
+    return {
+      lane: desiredLane,
+      holdTtl: IMPORTANT_HOLD_SECONDS,
+      releaseTtl: IMPORTANT_RELEASE_SECONDS,
+      importantEvent: true,
+    };
+  }
 
   if (!input.importantEvent && progressed.lane === 0 && desiredLane !== 0 && progressed.releaseFromLane === desiredLane) {
     const releaseContinuity = clamp01((progressed.holdTtl + progressed.releaseTtl) / ROUTINE_SETTLE_SECONDS);
@@ -169,6 +190,38 @@ export function advanceEliteAffixCueLane(
   }
 
   if (progressed.holdTtl > 0 || progressed.releaseTtl > 0) return progressed;
+
+  if (progressed.lane === 0 && progressed.releaseFromLane !== undefined && oppositeLaneSides(progressed.releaseFromLane, desiredLane)) {
+    return {
+      lane: desiredLane,
+      holdTtl: ROUTINE_HOLD_SECONDS,
+      releaseTtl: ROUTINE_RELEASE_SECONDS,
+      importantEvent: false,
+      settleFloor: 0,
+    };
+  }
+
+  if (oppositeLaneSides(progressed.lane, desiredLane)) {
+    const elapsedBeyondGuard = Math.max(0, step - previousGuard);
+    if (elapsedBeyondGuard + 1e-9 >= OPPOSITE_HANDOFF_SECONDS) {
+      return {
+        lane: desiredLane,
+        holdTtl: ROUTINE_HOLD_SECONDS,
+        releaseTtl: ROUTINE_RELEASE_SECONDS,
+        importantEvent: false,
+      };
+    }
+    const remainingHandoff = Math.max(0, OPPOSITE_HANDOFF_SECONDS - elapsedBeyondGuard);
+    return {
+      lane: 0,
+      holdTtl: 0,
+      releaseTtl: remainingHandoff,
+      importantEvent: false,
+      releaseFromLane: progressed.lane,
+      transitionDuration: OPPOSITE_HANDOFF_SECONDS,
+    };
+  }
+
   const releaseFromLane = desiredLane === 0 && progressed.lane !== 0 ? progressed.lane : undefined;
   return {
     lane: desiredLane,
@@ -191,22 +244,28 @@ export function eliteAffixCueLanePresentation(
   const priorityScale = input.higherPriorityCue ? (state?.importantEvent ? 0.82 : 0.68) : 1;
   const offset = baseOffset * densityScale * priorityScale;
   const routineTimeRemaining = Math.max(0, (state?.holdTtl ?? 0) + (state?.releaseTtl ?? 0));
-  const routineProgress = clamp01(1 - routineTimeRemaining / ROUTINE_SETTLE_SECONDS);
+  const settleDuration = Math.max(0.0001, state?.transitionDuration ?? ROUTINE_SETTLE_SECONDS);
+  const routineProgress = clamp01(1 - routineTimeRemaining / settleDuration);
   const releasingToCenter = lane === 0 && state?.releaseFromLane !== undefined && state.releaseFromLane !== 0;
   const presentationLane = releasingToCenter ? state.releaseFromLane! : lane;
-  const routineFloor = Math.max(ROUTINE_SETTLE_FLOOR, clamp01(state?.settleFloor ?? ROUTINE_SETTLE_FLOOR));
+  const routineFloor = state?.settleFloor === undefined ? ROUTINE_SETTLE_FLOOR : clamp01(state.settleFloor);
   const settleScale = releasingToCenter
     ? 1 - routineProgress
     : state?.importantEvent
       ? 1
       : routineFloor + (1 - routineFloor) * routineProgress;
   const vector = eliteAffixCueLaneOffsetVector(presentationLane, offset, settleScale);
+  const densityAlpha = state?.importantEvent
+    ? Math.max(0.84, 1 - stress * 0.12)
+    : Math.max(0.58, 1 - stress * 0.34);
+  const priorityAlpha = input.higherPriorityCue ? (state?.importantEvent ? 0.94 : 0.78) : 1;
+  const alphaBudget = densityAlpha * priorityAlpha;
 
   return {
     lane,
     offsetX: vector.x,
     offsetY: vector.y,
     motionScale: input.reducedMotion ? 0 : (input.higherPriorityCue ? 0.45 : Math.max(0.30, 1 - stress * 0.45)),
-    alphaScale: input.reducedFlash ? 0.72 : 1,
+    alphaScale: input.reducedFlash ? Math.min(0.72, alphaBudget) : alphaBudget,
   };
 }

@@ -24,7 +24,7 @@ jobs:
       - name: Build focused target
         run: npm run build
       - name: Phase focused tests
-        run: node --test tests/phase4533-*.test.mjs tests/phase4539-*.test.mjs tests/phase4545-*.test.mjs
+        run: node --test tests/phase4533-*.test.mjs
       - name: Full regression
         run: npm test
       - name: Build

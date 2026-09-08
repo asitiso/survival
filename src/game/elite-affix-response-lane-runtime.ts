@@ -1,12 +1,16 @@
-import type { Vec2 } from '../core/math.js';
+import { distance, type Vec2 } from '../core/math.js';
 import { EnemyManager, type Enemy } from './enemies.js';
 import type { EliteAffixId } from './elite-affixes.js';
-import type { EliteAffixCueEventKind } from './elite-affix-cue-arbitration.js';
+import { eliteAffixCueLayerPresentation, type EliteAffixCueEventKind } from './elite-affix-cue-arbitration.js';
 import { eliteAffixCueLanePresentation } from './elite-affix-cue-lanes.js';
+import { eliteAffixLifecycleVfxSprite } from './elite-affix-lifecycle-vfx-assets.js';
+import { swiftStrikeOwnershipPresentation } from './elite-affix-identity-assets.js';
 import {
   captureEliteAffixResponseLaneSnapshot,
   eliteAffixResponseCueOrigin,
+  eliteAffixResponseRenderPresentation,
   promoteEliteAffixResponseLaneSnapshot,
+  refreshEliteAffixResponseTarget,
   retainEliteAffixResponseLaneSnapshot,
   type EliteAffixResponseLaneSnapshot,
 } from './elite-affix-response-lane.js';
@@ -47,6 +51,10 @@ function finiteStress(value: unknown): number {
   return Math.max(0, Math.min(1, typeof value === 'number' && Number.isFinite(value) ? value : 0));
 }
 
+function finiteTarget(target: Vec2 | undefined): target is Vec2 {
+  return Boolean(target && Number.isFinite(target.x) && Number.isFinite(target.y));
+}
+
 function laneForEnemy(
   enemy: Enemy | undefined,
   battlefieldStress: number,
@@ -72,6 +80,166 @@ function importantFromSource(enemy: Enemy | undefined, cue: RuntimeResponseCue):
   );
 }
 
+function responseLayerFor(
+  cue: RuntimeResponseCue,
+  sourceEnemy: Enemy | undefined,
+  activeAffixElites: Enemy[],
+  priorityRank: Map<Enemy, number>,
+  heroPos: Vec2 | null,
+  corePos: Vec2 | null,
+  battlefieldStress: number,
+  higherPriorityCue: boolean,
+  reducedMotion: boolean,
+  reducedFlash: boolean,
+) {
+  if (!sourceEnemy) {
+    return eliteAffixCueLayerPresentation(undefined, cue.affixId, {
+      activeEliteCount: activeAffixElites.length,
+      indexFromPriority: activeAffixElites.length,
+      priorityTarget: false,
+      activeAttack: false,
+      higherPriorityCue,
+      battlefieldStress,
+      reducedMotion,
+      reducedFlash,
+    });
+  }
+
+  const target = sourceEnemy.target === 'core' ? corePos : heroPos;
+  const distanceToTarget = target ? distance(sourceEnemy.pos, target) : 9999;
+  const activeAttack = sourceEnemy.swiftCadencePresentation?.phase === 'strike' ||
+    (sourceEnemy.attackResolveMotion?.resolve ?? 0) > 0.12 ||
+    (sourceEnemy.attackTimer > 0 && sourceEnemy.attackTimer <= Math.min(0.18, sourceEnemy.attackInterval * 0.3));
+
+  return eliteAffixCueLayerPresentation(sourceEnemy.eliteAffixCueOwnership, cue.affixId, {
+    activeEliteCount: activeAffixElites.length,
+    indexFromPriority: priorityRank.get(sourceEnemy) ?? activeAffixElites.length,
+    priorityTarget: sourceEnemy.target === 'core' || distanceToTarget <= 120 || sourceEnemy.hitFlash > 0,
+    activeAttack,
+    higherPriorityCue,
+    battlefieldStress,
+    reducedMotion,
+    reducedFlash,
+  });
+}
+
+function renderFrozenEliteAffixResponses(
+  ctx: CanvasRenderingContext2D,
+  cues: RuntimeResponseCue[],
+  state: RuntimeEnemyManagerState,
+  args: Parameters<EnemyManager['renderEnemies']>,
+  battlefieldStress: number,
+  higherPriorityCue: boolean,
+  reducedMotion: boolean,
+  reducedFlash: boolean,
+): void {
+  const atlasImage = args[21] as CanvasImageSource | null | undefined;
+  const atlasReady = Boolean(args[22]);
+  if (!atlasReady || !atlasImage) return;
+
+  const heroPos = (args[10] ?? null) as Vec2 | null;
+  const corePos = (args[25] ?? null) as Vec2 | null;
+  const activeAffixElites = state.enemies.filter(
+    (enemy) => enemy.alive && enemy.type === 'elite' && Boolean(enemy.eliteAffixes?.length),
+  );
+  const score = (enemy: Enemy): number => {
+    const target = enemy.target === 'core' ? corePos : heroPos;
+    const distanceToTarget = target ? distance(enemy.pos, target) : 9999;
+    const activeAttack = enemy.swiftCadencePresentation?.phase === 'strike' ||
+      (enemy.attackResolveMotion?.resolve ?? 0) > 0.12 ||
+      (enemy.attackTimer > 0 && enemy.attackTimer <= Math.min(0.18, enemy.attackInterval * 0.3));
+    return (enemy.target === 'core' ? 5 : 0) +
+      (distanceToTarget <= 120 ? 4 : 0) +
+      (enemy.hitFlash > 0 ? 3 : 0) +
+      (activeAttack ? 2 : 0);
+  };
+  const priority = [...activeAffixElites].sort((a, b) => score(b) - score(a) || a.id - b.id);
+  const priorityRank = new Map(priority.map((enemy, index) => [enemy, index]));
+
+  for (const cue of cues) {
+    const sourceEnemy = state.enemies.find((candidate) => candidate.id === cue.enemyId && candidate.alive);
+    const responseLayer = responseLayerFor(
+      cue,
+      sourceEnemy,
+      activeAffixElites,
+      priorityRank,
+      heroPos,
+      corePos,
+      battlefieldStress,
+      higherPriorityCue,
+      reducedMotion,
+      reducedFlash,
+    );
+    const responsePresentation = eliteAffixResponseRenderPresentation(cue.laneSnapshot, {
+      liveVisible: responseLayer.visible,
+      liveResponseAlphaScale: responseLayer.responseAlphaScale,
+      battlefieldStress,
+      higherPriorityCue,
+      reducedMotion,
+      reducedFlash,
+    });
+    if (!responsePresentation.visible) continue;
+
+    const responseCuePos = eliteAffixResponseCueOrigin(cue.responseBasePos ?? cue.pos, cue.laneSnapshot);
+    const sprite = eliteAffixLifecycleVfxSprite(cue.affixId, 'response');
+    const t = Math.max(0, Math.min(1, cue.ttl / Math.max(0.001, cue.maxTtl)));
+    const size = 92 + (1 - t) * 22;
+    ctx.save();
+    ctx.globalAlpha = Math.min(reducedFlash ? 0.48 : 0.88, t) * responsePresentation.alphaScale;
+    ctx.drawImage(
+      atlasImage,
+      sprite.sx,
+      sprite.sy,
+      sprite.sw,
+      sprite.sh,
+      responseCuePos.x - size / 2,
+      responseCuePos.y - size / 2,
+      size,
+      size,
+    );
+    ctx.restore();
+
+    if (cue.affixId !== 'swift' || !finiteTarget(cue.targetPos) || !cue.targetKind) continue;
+    const ownership = swiftStrikeOwnershipPresentation({
+      actualStrike: true,
+      targetKind: cue.targetKind,
+      distanceToTarget: distance(responseCuePos, cue.targetPos),
+      recentlyHit: (sourceEnemy?.hitFlash ?? 0) > 0,
+      battlefieldStress: finiteStress(args.at(-1)),
+      reducedMotion,
+      reducedFlash,
+    });
+    if (!ownership.visible) continue;
+
+    const dx = cue.targetPos.x - responseCuePos.x;
+    const dy = cue.targetPos.y - responseCuePos.y;
+    const magnitude = Math.hypot(dx, dy) || 1;
+    const nx = dx / magnitude;
+    const ny = dy / magnitude;
+    const travel = Math.min(72, Math.max(30, magnitude * 0.55));
+    const endX = responseCuePos.x + nx * travel;
+    const endY = responseCuePos.y + ny * travel;
+    const perpX = -ny;
+    const perpY = nx;
+    const wing = 6 * ownership.chevronScale;
+    ctx.save();
+    ctx.globalAlpha = ownership.connectorAlpha * t * responsePresentation.alphaScale;
+    ctx.strokeStyle = '#9edfff';
+    ctx.lineWidth = 2 * ownership.priorityScale;
+    ctx.beginPath();
+    ctx.moveTo(responseCuePos.x + nx * 10, responseCuePos.y + ny * 10);
+    ctx.lineTo(endX, endY);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(endX, endY);
+    ctx.lineTo(endX - nx * 7 + perpX * wing, endY - ny * 7 + perpY * wing);
+    ctx.moveTo(endX, endY);
+    ctx.lineTo(endX - nx * 7 - perpX * wing, endY - ny * 7 - perpY * wing);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 export function installEliteAffixResponseLaneRuntime(): void {
   if (installed) return;
   installed = true;
@@ -93,8 +261,19 @@ export function installEliteAffixResponseLaneRuntime(): void {
       .reverse()
       .find((candidate) => candidate.enemyId === enemy.id && candidate.affixId === affixId && candidate.ttl > 0);
     if (!cue) return;
+
     cue.responseBasePos ??= { ...cue.pos };
-    cue.importantEvent = Boolean(cue.importantEvent || eventKind !== 'response');
+    const importantEvent = eventKind !== 'response';
+    cue.importantEvent = Boolean(cue.importantEvent || importantEvent);
+    const refreshed = refreshEliteAffixResponseTarget(
+      { targetPos: cue.targetPos, targetKind: cue.targetKind },
+      { targetPos, targetKind: enemy.target },
+      importantEvent,
+    );
+    if (refreshed.targetPos && refreshed.targetKind) {
+      cue.targetPos = { ...refreshed.targetPos };
+      cue.targetKind = refreshed.targetKind;
+    }
   };
 
   prototype.renderEnemies = function renderEnemiesWithFrozenResponseLane(
@@ -108,11 +287,14 @@ export function installEliteAffixResponseLaneRuntime(): void {
     const activeAffixEliteCount = state.enemies.filter(
       (enemy) => enemy.alive && enemy.type === 'elite' && Boolean(enemy.eliteAffixes?.length),
     ).length;
-    const battlefieldStress = Math.max(hazardPressure, Math.min(1, Math.max(0, activeAffixEliteCount - 3) / 5));
+    const battlefieldStress = Math.max(
+      hazardPressure,
+      Math.min(1, Math.max(0, activeAffixEliteCount - 3) / 5),
+    );
     const higherPriorityCue = hazardPressure >= 0.72;
-    const restore: Array<{ cue: RuntimeResponseCue; pos: Vec2 }> = [];
+    const responseCues = state.eliteAffixResponseVfx;
 
-    for (const cue of state.eliteAffixResponseVfx) {
+    for (const cue of responseCues) {
       const sourceEnemy = state.enemies.find((candidate) => candidate.id === cue.enemyId && candidate.alive);
       cue.responseBasePos ??= { ...cue.pos };
       const liveLane = laneForEnemy(sourceEnemy, battlefieldStress, higherPriorityCue, reducedMotion, reducedFlash);
@@ -122,19 +304,26 @@ export function installEliteAffixResponseLaneRuntime(): void {
         : undefined;
       const retained = retainEliteAffixResponseLaneSnapshot(cue.laneSnapshot, candidate);
       cue.laneSnapshot = promoteEliteAffixResponseLaneSnapshot(retained, candidate, importantEvent);
-      const frozenOrigin = eliteAffixResponseCueOrigin(cue.responseBasePos, cue.laneSnapshot);
-      restore.push({ cue, pos: cue.pos });
-      cue.pos = {
-        x: frozenOrigin.x - liveLane.offsetX,
-        y: frozenOrigin.y - liveLane.offsetY,
-      };
     }
 
+    state.eliteAffixResponseVfx = [];
     try {
       originalRender.apply(this, args);
     } finally {
-      for (const entry of restore) entry.cue.pos = entry.pos;
+      state.eliteAffixResponseVfx = responseCues;
     }
+
+    const ctx = args[0] as CanvasRenderingContext2D;
+    renderFrozenEliteAffixResponses(
+      ctx,
+      responseCues,
+      state,
+      args,
+      battlefieldStress,
+      higherPriorityCue,
+      reducedMotion,
+      reducedFlash,
+    );
   };
 }
 

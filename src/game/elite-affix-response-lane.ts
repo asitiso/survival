@@ -22,6 +22,23 @@ export interface EliteAffixResponseLanePresentation {
   alphaScale: number;
 }
 
+export interface EliteAffixResponseRenderPresentationInput extends EliteAffixResponseLanePresentationInput {
+  liveVisible: boolean;
+  liveResponseAlphaScale: number;
+}
+
+export interface EliteAffixResponseRenderPresentation extends EliteAffixResponseLanePresentation {
+  visible: boolean;
+  importantEvent: boolean;
+}
+
+export type EliteAffixResponseTargetKind = 'hero' | 'core';
+
+export interface EliteAffixResponseTargetState {
+  targetPos?: { x: number; y: number } | undefined;
+  targetKind?: EliteAffixResponseTargetKind | undefined;
+}
+
 function clamp01(value: number, fallback = 0): number {
   const finite = Number.isFinite(value) ? value : fallback;
   return Math.max(0, Math.min(1, finite));
@@ -29,6 +46,18 @@ function clamp01(value: number, fallback = 0): number {
 
 function finite(value: number, fallback = 0): number {
   return Number.isFinite(value) ? value : fallback;
+}
+
+function finiteTarget(
+  target: EliteAffixResponseTargetState | undefined,
+): { targetPos: { x: number; y: number }; targetKind: EliteAffixResponseTargetKind } | undefined {
+  if (!target?.targetPos) return undefined;
+  if (!Number.isFinite(target.targetPos.x) || !Number.isFinite(target.targetPos.y)) return undefined;
+  if (target.targetKind !== 'hero' && target.targetKind !== 'core') return undefined;
+  return {
+    targetPos: { x: target.targetPos.x, y: target.targetPos.y },
+    targetKind: target.targetKind,
+  };
 }
 
 export function captureEliteAffixResponseLaneSnapshot(
@@ -114,6 +143,37 @@ export function eliteAffixResponseLanePresentation(
     motionScale: input.reducedMotion ? 0 : clamp01(stable.motionScale),
     alphaScale: input.reducedFlash ? Math.min(0.72, alphaScale) : alphaScale,
   };
+}
+
+export function eliteAffixResponseRenderPresentation(
+  snapshot: EliteAffixResponseLaneSnapshot | undefined,
+  input: EliteAffixResponseRenderPresentationInput,
+): EliteAffixResponseRenderPresentation {
+  const lanePresentation = eliteAffixResponseLanePresentation(snapshot, input);
+  const importantEvent = Boolean(snapshot?.importantEvent);
+  const liveAlpha = clamp01(input.liveResponseAlphaScale, 0);
+  let alphaScale = importantEvent
+    ? lanePresentation.alphaScale
+    : Math.min(lanePresentation.alphaScale, liveAlpha);
+  if (input.reducedFlash) alphaScale = Math.min(0.72, alphaScale);
+
+  return {
+    ...lanePresentation,
+    visible: importantEvent ? true : Boolean(input.liveVisible),
+    importantEvent,
+    alphaScale: clamp01(alphaScale),
+  };
+}
+
+export function refreshEliteAffixResponseTarget(
+  existing: EliteAffixResponseTargetState = {},
+  candidate: EliteAffixResponseTargetState = {},
+  importantEvent: boolean,
+): EliteAffixResponseTargetState {
+  const retained = finiteTarget(existing);
+  if (!importantEvent) return retained ?? {};
+  const refreshed = finiteTarget(candidate);
+  return refreshed ?? retained ?? {};
 }
 
 export function eliteAffixResponseCueOrigin(

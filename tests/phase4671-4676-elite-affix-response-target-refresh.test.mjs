@@ -69,10 +69,11 @@ test('phase 4675 invalid important target coordinates are ignored in favor of th
   assert.deepEqual(refreshed, existing);
 });
 
-test('phase 4676 runtime and renderer wire target refresh plus snapshot-authoritative response presentation', async () => {
+test('phase 4676 runtime suppresses legacy response drawing and renders snapshot-authoritative responses itself', async () => {
   const runtimeSource = await readFile(new URL('../src/game/elite-affix-response-lane-runtime.ts', import.meta.url), 'utf8');
-  const enemySource = await readFile(new URL('../src/game/enemies.ts', import.meta.url), 'utf8');
   assert.match(runtimeSource, /refreshEliteAffixResponseTarget/);
-  assert.match(enemySource, /eliteAffixResponseRenderPresentation/);
-  assert.match(enemySource, /responsePresentation\.alphaScale/);
+  assert.match(runtimeSource, /eliteAffixResponseRenderPresentation/);
+  assert.match(runtimeSource, /renderFrozenEliteAffixResponses/);
+  assert.match(runtimeSource, /state\.eliteAffixResponseVfx\s*=\s*\[\]/);
+  assert.match(runtimeSource, /responsePresentation\.alphaScale/);
 });

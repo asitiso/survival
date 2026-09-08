@@ -77,7 +77,9 @@ export function consumeAttackOutcome(
     && intent.source === lookup.source,
   );
   if (index < 0) return { state: { intents }, outcome: null };
-  const [matched] = intents.splice(index, 1);
+  const matched = intents[index];
+  if (!matched) return { state: { intents }, outcome: null };
+  intents.splice(index, 1);
   return {
     state: { intents },
     outcome: {
@@ -108,6 +110,7 @@ export function consumeRenderedAttackOutcome(
   const matches = renderedAttackIntents.filter((intent) => intent.target === target && intent.source === source);
   if (matches.length !== 1) return null;
   const matched = matches[0];
+  if (!matched) return null;
   renderedAttackIntents = renderedAttackIntents.filter((intent) => intent.key !== matched.key);
   return matched;
 }

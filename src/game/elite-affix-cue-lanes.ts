@@ -74,6 +74,14 @@ export function eliteAffixCueStableStress(battlefieldStress: number): number {
   return 1;
 }
 
+export function eliteAffixCueLaneOffsetVector(lane: EliteAffixCueLane, offset: number, settleScale: number): { x: number; y: number } {
+  const distance = Math.max(0, Number.isFinite(offset) ? offset : 0) * clamp01(settleScale);
+  if (lane === 0 || distance === 0) return { x: 0, y: 0 };
+  const sign = lane < 0 ? -1 : 1;
+  if (Math.abs(lane) === 1) return { x: 0, y: sign * distance };
+  return { x: sign * distance * 0.42, y: sign * distance * 1.42 };
+}
+
 export function eliteAffixCueLaneSlotCount(activeEliteCount: number, battlefieldStress: number): 1 | 3 | 5 {
   const active = Math.max(1, finiteFloor(activeEliteCount, 1));
   if (active <= 1) return 1;
@@ -186,19 +194,18 @@ export function eliteAffixCueLanePresentation(
   const routineProgress = clamp01(1 - routineTimeRemaining / ROUTINE_SETTLE_SECONDS);
   const releasingToCenter = lane === 0 && state?.releaseFromLane !== undefined && state.releaseFromLane !== 0;
   const presentationLane = releasingToCenter ? state.releaseFromLane! : lane;
-  const sign = presentationLane < 0 ? -1 : presentationLane > 0 ? 1 : 0;
-  const magnitude = Math.abs(presentationLane);
   const routineFloor = Math.max(ROUTINE_SETTLE_FLOOR, clamp01(state?.settleFloor ?? ROUTINE_SETTLE_FLOOR));
   const settleScale = releasingToCenter
     ? 1 - routineProgress
     : state?.importantEvent
       ? 1
       : routineFloor + (1 - routineFloor) * routineProgress;
+  const vector = eliteAffixCueLaneOffsetVector(presentationLane, offset, settleScale);
 
   return {
     lane,
-    offsetX: magnitude >= 2 ? sign * offset * 0.18 * settleScale : 0,
-    offsetY: presentationLane * offset * settleScale,
+    offsetX: vector.x,
+    offsetY: vector.y,
     motionScale: input.reducedMotion ? 0 : (input.higherPriorityCue ? 0.45 : Math.max(0.30, 1 - stress * 0.45)),
     alphaScale: input.reducedFlash ? 0.72 : 1,
   };

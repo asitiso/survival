@@ -357,6 +357,7 @@ import { longRunHudFocusPolicy } from './long-run-hud-focus.js';
 import { openingHudFocusPolicy } from './opening-hud-focus.js';
 import { autoTargetIndicator, primaryWeakpointNode, weakpointIndicator } from './auto-target-visibility.js';
 import { advanceDamageReason, recordDamageReason, type DamageReasonState } from './damage-reason-feedback.js';
+import { consumeCoreAttackAttribution, type CoreAttackAttribution } from './core-attack-outcome-attribution.js';
 import { purchaseImpactFeedback } from './purchase-impact-feedback.js';
 import { dangerProjectileCues } from './projectile-threat-visibility.js';
 import { BOSS_RESPONSE_ACK_SECONDS, bossActionAssist, bossResponseActions, type BossActionAssistCue } from './boss-action-assist.js';
@@ -800,7 +801,7 @@ export class Game {
   private spawnPressureVfxAtlasReady = false;
   private survivalResponseVfxAtlasImage: HTMLImageElement | null = null;
   private survivalResponseVfxAtlasReady = false;
-  private survivalResponseVfx: Array<{kind:SurvivalResponseVfxKind;x:number;y:number;ttl:number;maxTtl:number;worldGuardOwned?:boolean;mitigationRatio?:number;worldDamageOwned?:boolean;damageSource?:string;mixedPressure?:boolean;pressureVector?:Vec2}> = [];
+  private survivalResponseVfx: Array<{kind:SurvivalResponseVfxKind;x:number;y:number;ttl:number;maxTtl:number;worldGuardOwned?:boolean;mitigationRatio?:number;worldDamageOwned?:boolean;damageSource?:string;mixedPressure?:boolean;pressureVector?:Vec2;attackerLabel?:string}> = [];
   private survivalResponseLastAt: Partial<Record<SurvivalResponseVfxKind,number>> = {};
   private coreGuardDamageSourceHysteresisState:CoreGuardDamageSourceHysteresisState=createCoreGuardDamageSourceHysteresisState();
   private coreGuardDamageSourceLastAt=-99;
@@ -2718,7 +2719,7 @@ export class Game {
         const applied = amount * this.hero.equipmentCoreDamageTakenMultiplier * this.runCoreDamageTakenMultiplier * fateRewardMultipliers(this.fateRuntime.modifiers).coreDamageTakenMultiplier * catastropheMods.coreDamageMultiplier * contractMods.coreDamageTakenMultiplier * (edricAura ? combatBuild.edricCoreAuraMultiplier : 1);
         this.core.hp = Math.max(0, this.core.hp - applied);
         const prevented=Math.max(0,amount-applied),mitigationRatio=amount>0?Math.max(0,Math.min(1,prevented/amount)):0;
-        if (applied > 0) { this.frameEndlessEvents.push({ type: 'core_damaged', amount: applied }); this.queueSurvivalResponseVfx('coreHit',{mitigationRatio,damageSource:source,...(origin?{pressureVector:{x:this.core.pos.x-origin.x,y:this.core.pos.y-origin.y}}:{})}); }
+        if (applied > 0) { const coreAttackAttribution=consumeCoreAttackAttribution(source); this.frameEndlessEvents.push({ type: 'core_damaged', amount: applied }); this.queueSurvivalResponseVfx('coreHit',{mitigationRatio,damageSource:source,...(coreAttackAttribution?{coreAttackAttribution}:{}),...(origin?{pressureVector:{x:this.core.pos.x-origin.x,y:this.core.pos.y-origin.y}}:{})}); }
         if(prevented>=this.core.maxHp*.002)this.queueSurvivalResponseVfx('coreGuard');
         if (applied > 0 && this.onboarding.signal('core')) this.saveStoredOnboardingState();
         this.advanceHeroMeter(0, { preventedDamageRatio: Math.max(0, amount - applied) / Math.max(1, this.core.maxHp) });
@@ -4432,7 +4433,7 @@ export class Game {
     }
   }
 
-  private queueSurvivalResponseVfx(kind:SurvivalResponseVfxKind,metadata?:{mitigationRatio?:number;damageSource?:string;pressureVector?:Vec2}):void{
+  private queueSurvivalResponseVfx(kind:SurvivalResponseVfxKind,metadata?:{mitigationRatio?:number;damageSource?:string;pressureVector?:Vec2;coreAttackAttribution?:CoreAttackAttribution}):void{
     const cooldown=kind==='coreHit'||kind==='coreGuard'||kind==='heroGuard'?.10:.04,last=this.survivalResponseLastAt[kind]??-99;
     if(this.elapsed-last<cooldown)return;
     this.survivalResponseLastAt[kind]=this.elapsed;
@@ -4440,7 +4441,8 @@ export class Game {
     let damageSource=metadata?.damageSource,mixedPressure=false,pressureVector=metadata?.pressureVector;
     if(kind==='coreHit'&&damageSource){const delta=Math.max(0,this.elapsed-this.coreGuardDamageSourceLastAt);this.coreGuardDamageSourceHysteresisState=advanceCoreGuardDamageSourceHysteresis(this.coreGuardDamageSourceHysteresisState,damageSource,delta);this.coreGuardDamageSourceLastAt=this.elapsed;damageSource=this.coreGuardDamageSourceHysteresisState.sourceClass;mixedPressure=this.coreGuardDamageSourceHysteresisState.mixedPressure;}
     if(kind==='coreHit'&&pressureVector){const delta=Math.max(0,this.elapsed-this.coreGuardPressureVectorLastAt);this.coreGuardPressureVectorHysteresisState=advanceCoreGuardPressureVectorHysteresis(this.coreGuardPressureVectorHysteresisState,pressureVector,delta,this.presentationSettings.reducedMotion);this.coreGuardPressureVectorLastAt=this.elapsed;pressureVector=this.coreGuardPressureVectorHysteresisState.vector??pressureVector;}
-    this.survivalResponseVfx.push({kind,x:target.x,y:target.y,ttl:maxTtl,maxTtl,...(metadata?.mitigationRatio!==undefined?{mitigationRatio:metadata.mitigationRatio}:{}),...(damageSource?{damageSource}:{}),...(mixedPressure?{mixedPressure:true}:{}),...(pressureVector?{pressureVector:{...pressureVector}}:{})});
+    const attackerLabel=kind==='coreHit'?metadata?.coreAttackAttribution?.label:undefined;
+    this.survivalResponseVfx.push({kind,x:target.x,y:target.y,ttl:maxTtl,maxTtl,...(metadata?.mitigationRatio!==undefined?{mitigationRatio:metadata.mitigationRatio}:{}),...(damageSource?{damageSource}:{}),...(mixedPressure?{mixedPressure:true}:{}),...(pressureVector?{pressureVector:{...pressureVector}}:{}),...(attackerLabel?{attackerLabel}:{})});
     if(this.survivalResponseVfx.length>12)this.survivalResponseVfx.splice(0,this.survivalResponseVfx.length-12);
   }
 
@@ -4513,6 +4515,7 @@ export class Game {
       const base=cue.kind==='coreRecover'?126:cue.kind==='coreHit'?118:cue.kind==='heroPotionBoost'?114:cue.kind.includes('Guard')?104:98,size=base*(1+progress*.18)*arbitrationSizeScale,drawW=size*(sourceComposition?.bodyScaleX??sourceBody?.bodyScaleX??1),drawH=size*(sourceComposition?.bodyScaleY??sourceBody?.bodyScaleY??1);
       ctx.save();ctx.globalAlpha=Math.min(this.presentationSettings.reducedFlash?.48:.82,t*(cue.kind==='coreHit'?.78:.92))*arbitrationAlphaScale;
       ctx.drawImage(this.survivalResponseVfxAtlasImage,sprite.sx,sprite.sy,sprite.sw,sprite.sh,cue.x-drawW/2,cue.y-drawH/2,drawW,drawH);ctx.restore();
+      if(cue.kind==='coreHit'&&cue.attackerLabel&&arbitrationAlphaScale>0){ctx.save();ctx.globalAlpha=Math.min(this.presentationSettings.reducedFlash?.38:.66,t*.72)*arbitrationAlphaScale;ctx.fillStyle='#d9f8ff';ctx.font='800 11px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.shadowColor='rgba(0,0,0,.72)';ctx.shadowBlur=this.presentationSettings.reducedFlash?2:5;ctx.fillText(cue.attackerLabel,cue.x,cue.y-54*arbitrationSizeScale);ctx.restore();}
     }
   }
 

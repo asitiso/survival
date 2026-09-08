@@ -46,7 +46,7 @@ test('phase 2471 armored and mana shield responses are image-backed without chan
 
 test('phase 2472 regeneration and frenzy threshold responses preserve existing formulas', () => {
   assert.match(enemiesSource, /queueEliteAffixResponseVfx\(enemy,'regenerating'\)/);
-  assert.match(enemiesSource, /queueEliteAffixResponseVfx\(enemy,'frenzied'\)/);
+  assert.match(enemiesSource, /queueEliteAffixResponseVfx\(enemy,'frenzied','thresholdEntry'\)/);
   assert.match(enemiesSource, /enemy\.maxHp \* \(enemy\.regenPerSecondRatio \?\? 0\) \* dt/);
   assert.match(enemiesSource, /enemy\.hp \/ Math\.max\(1, enemy\.maxHp\) <= 0\.42/);
 });
@@ -59,7 +59,7 @@ test('phase 2473 swift and commander responses reuse existing attack and aura pa
 });
 
 test('phase 2474 elite affix lifecycle audit is release-bound presentation-only and fail-open', async () => {
-  const mod = await importRequired('../src/game/elite-affix-lifecycle-vfx-audit.ts', '../dist/game/elite-affix-lifecycle-vfx-audit.js');
+  const mod = await importRequired('../src/game/elite-affix-lifecycle-vfx-assets.ts', '../dist/game/elite-affix-lifecycle-vfx-assets.js');
   const audit = mod.runEliteAffixLifecycleVfxAudit();
   assert.equal(audit.samples.length, 64);
   assert.equal(audit.actionCount, 9);

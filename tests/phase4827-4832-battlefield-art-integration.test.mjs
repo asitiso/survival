@@ -11,17 +11,15 @@ function api() {
 
 test('phase 4827 gameplay art declares dedicated backdrop and prop atlas assets', () => {
   const { BATTLEFIELD_GAMEPLAY_ART } = api();
-  assert.equal(BATTLEFIELD_GAMEPLAY_ART.backdrop.src, './assets/arena/battlefield-gameplay-backdrop.jpg');
-  assert.equal(BATTLEFIELD_GAMEPLAY_ART.props.src, './assets/arena/battlefield-gameplay-props.png');
+  assert.equal(BATTLEFIELD_GAMEPLAY_ART.backdrop.src, './assets/arena/battlefield-gameplay-backdrop.svg');
+  assert.equal(BATTLEFIELD_GAMEPLAY_ART.props.src, './assets/arena/battlefield-gameplay-props.svg');
   assert.equal(BATTLEFIELD_GAMEPLAY_ART.props.columns, 3);
   assert.equal(BATTLEFIELD_GAMEPLAY_ART.props.rows, 2);
 });
 
 test('phase 4828 generated battlefield assets are checked into the served asset tree', () => {
-  assert.equal(existsSync(new URL('../assets/arena/battlefield-gameplay-backdrop.jpg', import.meta.url)), true);
-  assert.equal(existsSync(new URL('../assets/arena/battlefield-gameplay-props.png', import.meta.url)), true);
-  const server = readFileSync(new URL('../scripts/serve.mjs', import.meta.url), 'utf8');
-  assert.match(server, /'\.jpg':'image\/jpeg'/);
+  assert.equal(existsSync(new URL('../assets/arena/battlefield-gameplay-backdrop.svg', import.meta.url)), true);
+  assert.equal(existsSync(new URL('../assets/arena/battlefield-gameplay-props.svg', import.meta.url)), true);
 });
 
 test('phase 4829 decoration anchors stay outside the central combat readability zone', () => {
@@ -64,8 +62,10 @@ test('phase 4832 arena rendering keeps generated art underneath gameplay telegra
   assert.match(source, /battlefieldGameplayPropSprite/);
   const drawArena = source.indexOf('private drawArena');
   const drawBackdrop = source.indexOf('battlefieldGameplayBackdropImage', drawArena);
+  const drawPropsCall = source.indexOf('this.drawBattlefieldGameplayProps(ctx)');
   const drawTelegraphs = source.indexOf('this.drawDangerTelegraphs(ctx)');
   assert.ok(drawArena >= 0 && drawBackdrop > drawArena);
-  assert.ok(drawTelegraphs > drawArena, 'danger telegraphs must remain a later world layer');
+  assert.ok(drawPropsCall > drawArena && drawPropsCall < drawTelegraphs, 'props must stay below gameplay warnings');
   assert.match(source, /if \(this\.battlefieldGameplayBackdropReady && this\.battlefieldGameplayBackdropImage\)/);
+  assert.match(source, /if \(!this\.battlefieldGameplayPropsReady \|\| !this\.battlefieldGameplayPropsImage\) return;/);
 });

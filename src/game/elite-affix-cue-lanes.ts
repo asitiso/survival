@@ -188,7 +188,7 @@ export function eliteAffixCueLanePresentation(
   const radius = Math.max(1, Number.isFinite(input.enemyRadius) ? input.enemyRadius : 1);
   const baseOffset = Math.max(6, Math.min(16, radius * 0.52));
   const densityScale = Math.max(0.40, 1 - stress * 0.52);
-  const priorityScale = input.higherPriorityCue ? 0.68 : 1;
+  const priorityScale = input.higherPriorityCue ? (state?.importantEvent ? 0.82 : 0.68) : 1;
   const offset = baseOffset * densityScale * priorityScale;
   const routineTimeRemaining = Math.max(0, (state?.holdTtl ?? 0) + (state?.releaseTtl ?? 0));
   const routineProgress = clamp01(1 - routineTimeRemaining / ROUTINE_SETTLE_SECONDS);

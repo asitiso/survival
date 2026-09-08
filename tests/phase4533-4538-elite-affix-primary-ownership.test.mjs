@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const identity = await import('../dist/game/elite-affix-identity-assets.js');
+const identity = await import('../dist/game/elite-affix-cue-arbitration.js');
 
 const baseInput = {
   affixes: ['swift', 'frenzied'],

@@ -6,6 +6,7 @@ import { eliteAffixCueLanePresentation } from './elite-affix-cue-lanes.js';
 import {
   captureEliteAffixResponseLaneSnapshot,
   eliteAffixResponseCueOrigin,
+  promoteEliteAffixResponseLaneSnapshot,
   retainEliteAffixResponseLaneSnapshot,
   type EliteAffixResponseLaneSnapshot,
 } from './elite-affix-response-lane.js';
@@ -116,8 +117,11 @@ export function installEliteAffixResponseLaneRuntime(): void {
       cue.responseBasePos ??= { ...cue.pos };
       const liveLane = laneForEnemy(sourceEnemy, battlefieldStress, higherPriorityCue, reducedMotion, reducedFlash);
       const importantEvent = Boolean(cue.importantEvent || importantFromSource(sourceEnemy, cue));
-      const candidate = captureEliteAffixResponseLaneSnapshot(sourceEnemy ? liveLane : undefined, importantEvent);
-      cue.laneSnapshot = retainEliteAffixResponseLaneSnapshot(cue.laneSnapshot, candidate) ?? candidate;
+      const candidate = sourceEnemy
+        ? captureEliteAffixResponseLaneSnapshot(liveLane, importantEvent)
+        : undefined;
+      const retained = retainEliteAffixResponseLaneSnapshot(cue.laneSnapshot, candidate);
+      cue.laneSnapshot = promoteEliteAffixResponseLaneSnapshot(retained, candidate, importantEvent);
       const frozenOrigin = eliteAffixResponseCueOrigin(cue.responseBasePos, cue.laneSnapshot);
       restore.push({ cue, pos: cue.pos });
       cue.pos = {

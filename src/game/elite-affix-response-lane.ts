@@ -61,6 +61,38 @@ export function retainEliteAffixResponseLaneSnapshot(
   return existing ?? candidate;
 }
 
+export function promoteEliteAffixResponseLaneSnapshot(
+  existing: EliteAffixResponseLaneSnapshot | undefined,
+  candidate: EliteAffixResponseLaneSnapshot | undefined,
+  importantEvent: boolean,
+): EliteAffixResponseLaneSnapshot {
+  const important = Boolean(existing?.importantEvent || candidate?.importantEvent || importantEvent);
+  if (!existing) {
+    const seed = candidate ?? captureEliteAffixResponseLaneSnapshot(undefined, important);
+    return {
+      offsetX: finite(seed.offsetX),
+      offsetY: finite(seed.offsetY),
+      motionScale: clamp01(seed.motionScale),
+      sourceAlphaScale: clamp01(seed.sourceAlphaScale, 1),
+      importantEvent: important,
+    };
+  }
+
+  const existingAlpha = clamp01(existing.sourceAlphaScale, 1);
+  const candidateAlpha = candidate && Number.isFinite(candidate.sourceAlphaScale)
+    ? clamp01(candidate.sourceAlphaScale)
+    : existingAlpha;
+  const canRecoverAlpha = Boolean(importantEvent || candidate?.importantEvent);
+
+  return {
+    offsetX: finite(existing.offsetX),
+    offsetY: finite(existing.offsetY),
+    motionScale: clamp01(existing.motionScale),
+    sourceAlphaScale: canRecoverAlpha ? Math.max(existingAlpha, candidateAlpha) : existingAlpha,
+    importantEvent: important,
+  };
+}
+
 export function eliteAffixResponseLanePresentation(
   snapshot: EliteAffixResponseLaneSnapshot | undefined,
   input: EliteAffixResponseLanePresentationInput,

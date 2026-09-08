@@ -21,11 +21,40 @@ function safeTtl(value: number, fallback: number): number {
   return Math.max(0, Number.isFinite(fallback) ? fallback : 0);
 }
 
+function activeHandoff(state: EliteAffixResponseCrossAffixHandoffState | undefined): state is EliteAffixResponseCrossAffixHandoffState {
+  return Boolean(
+    state &&
+    state.fromAffixId &&
+    Number.isFinite(state.progress) &&
+    state.progress >= 0 &&
+    state.progress < 1,
+  );
+}
+
+export function eliteAffixResponseCrossAffixRetargetProgress(
+  state: EliteAffixResponseCrossAffixHandoffState | undefined,
+): number {
+  if (!activeHandoff(state)) return 0;
+  return clamp01(state.progress);
+}
+
+export function eliteAffixResponseCrossAffixReentrantFrom(
+  state: EliteAffixResponseCrossAffixHandoffState | undefined,
+  activeAffixIds: readonly EliteAffixId[],
+): EliteAffixId | null {
+  if (!state) return null;
+  if (!activeHandoff(state)) return state.ownerAffixId;
+  if (activeAffixIds.includes(state.ownerAffixId)) return state.ownerAffixId;
+  if (state.fromAffixId && activeAffixIds.includes(state.fromAffixId)) return state.fromAffixId;
+  return state.ownerAffixId;
+}
+
 export function advanceEliteAffixResponseCrossAffixHandoff(
   previous: EliteAffixResponseCrossAffixHandoffState | undefined,
   ownerAffixId: EliteAffixId,
   ownerImportant: boolean,
   ownerTtl: number,
+  activeAffixIds: readonly EliteAffixId[] = [],
 ): EliteAffixResponseCrossAffixHandoffState {
   if (!previous) {
     return {
@@ -41,8 +70,8 @@ export function advanceEliteAffixResponseCrossAffixHandoff(
     return {
       ownerAffixId,
       ownerImportant,
-      fromAffixId: previous.ownerAffixId,
-      progress: 0,
+      fromAffixId: eliteAffixResponseCrossAffixReentrantFrom(previous, activeAffixIds) ?? previous.ownerAffixId,
+      progress: eliteAffixResponseCrossAffixRetargetProgress(previous),
       lastOwnerTtl: safeTtl(ownerTtl, previous.lastOwnerTtl),
     };
   }

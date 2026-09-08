@@ -200,16 +200,18 @@ function crossAffixResponseDecisions(
     }
 
     const primaryCue = group[ownership.primaryIndex]!;
+    const activeAffixIds = group.map((cue) => cue.affixId);
     const handoffState = advanceEliteAffixResponseCrossAffixHandoff(
       previousState,
       ownership.primaryAffixId,
       ownership.primaryImportant,
       primaryCue.ttl,
+      activeAffixIds,
     );
     ownerByEnemy.set(enemyId, handoffState);
     const handoffHasOutgoing = eliteAffixResponseCrossAffixOutgoingPresent(
       handoffState,
-      group.map((cue) => cue.affixId),
+      activeAffixIds,
     );
 
     for (let index = 0; index < group.length; index += 1) {

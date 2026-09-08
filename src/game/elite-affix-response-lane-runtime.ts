@@ -6,8 +6,13 @@ import { eliteAffixCueLanePresentation } from './elite-affix-cue-lanes.js';
 import { eliteAffixLifecycleVfxSprite } from './elite-affix-lifecycle-vfx-assets.js';
 import { swiftStrikeOwnershipPresentation } from './elite-affix-identity-assets.js';
 import {
+  eliteAffixResponseCrossAffixOwnership,
+  eliteAffixResponseCrossAffixPresentation,
+} from './elite-affix-response-arbitration.js';
+import {
   captureEliteAffixResponseLaneSnapshot,
   eliteAffixResponseCueOrigin,
+  eliteAffixResponseLifeRatio,
   eliteAffixResponseRenderPresentation,
   promoteEliteAffixResponseLaneSnapshot,
   refreshEliteAffixResponseTarget,
@@ -45,7 +50,13 @@ type RuntimePrototype = {
   renderEnemies: EnemyManager['renderEnemies'];
 };
 
+interface CrossAffixDecision {
+  primary: boolean;
+  primaryImportant: boolean;
+}
+
 let installed = false;
+const crossAffixOwner = new WeakMap<RuntimeEnemyManagerState, Map<number, EliteAffixId>>();
 
 function finiteStress(value: unknown): number {
   return Math.max(0, Math.min(1, typeof value === 'number' && Number.isFinite(value) ? value : 0));
@@ -123,6 +134,65 @@ function responseLayerFor(
   });
 }
 
+function crossAffixResponseDecisions(
+  cues: RuntimeResponseCue[],
+  state: RuntimeEnemyManagerState,
+): Map<RuntimeResponseCue, CrossAffixDecision> {
+  let ownerByEnemy = crossAffixOwner.get(state);
+  if (!ownerByEnemy) {
+    ownerByEnemy = new Map<number, EliteAffixId>();
+    crossAffixOwner.set(state, ownerByEnemy);
+  }
+
+  const groups = new Map<number, RuntimeResponseCue[]>();
+  for (const cue of cues) {
+    if (!Number.isFinite(cue.ttl) || cue.ttl <= 0) continue;
+    const group = groups.get(cue.enemyId);
+    if (group) group.push(cue);
+    else groups.set(cue.enemyId, [cue]);
+  }
+
+  for (const enemyId of [...ownerByEnemy.keys()]) {
+    if (!groups.has(enemyId)) ownerByEnemy.delete(enemyId);
+  }
+
+  const decisions = new Map<RuntimeResponseCue, CrossAffixDecision>();
+  for (const [enemyId, group] of groups) {
+    const sourceEnemy = state.enemies.find((candidate) => candidate.id === enemyId && candidate.alive);
+    const previousOwner = ownerByEnemy.get(enemyId) ?? null;
+    const previousCue = previousOwner
+      ? [...group].reverse().find((candidate) => candidate.affixId === previousOwner && Number.isFinite(candidate.ttl) && candidate.ttl > 0)
+      : undefined;
+    const holdActive = previousCue
+      ? eliteAffixResponseLifeRatio(previousCue.ttl, previousCue.maxTtl) >= 0.80
+      : false;
+    const ownership = eliteAffixResponseCrossAffixOwnership(
+      group.map((cue) => ({
+        affixId: cue.affixId,
+        importantEvent: Boolean(cue.laneSnapshot?.importantEvent || cue.importantEvent),
+        ttl: cue.ttl,
+        maxTtl: cue.maxTtl,
+        livePrimary: sourceEnemy?.eliteAffixCueOwnership?.owner === cue.affixId,
+      })),
+      previousOwner,
+      holdActive,
+    );
+
+    if (ownership.primaryAffixId) ownerByEnemy.set(enemyId, ownership.primaryAffixId);
+    else ownerByEnemy.delete(enemyId);
+
+    for (let index = 0; index < group.length; index += 1) {
+      const cue = group[index]!;
+      decisions.set(cue, {
+        primary: index === ownership.primaryIndex,
+        primaryImportant: ownership.primaryImportant,
+      });
+    }
+  }
+
+  return decisions;
+}
+
 function renderFrozenEliteAffixResponses(
   ctx: CanvasRenderingContext2D,
   cues: RuntimeResponseCue[],
@@ -155,6 +225,7 @@ function renderFrozenEliteAffixResponses(
   };
   const priority = [...activeAffixElites].sort((a, b) => score(b) - score(a) || a.id - b.id);
   const priorityRank = new Map(priority.map((enemy, index) => [enemy, index]));
+  const crossDecisions = crossAffixResponseDecisions(cues, state);
 
   for (const cue of cues) {
     const sourceEnemy = state.enemies.find((candidate) => candidate.id === cue.enemyId && candidate.alive);
@@ -178,14 +249,28 @@ function renderFrozenEliteAffixResponses(
       reducedMotion,
       reducedFlash,
     });
-    if (!responsePresentation.visible) continue;
+    const crossDecision = crossDecisions.get(cue) ?? {
+      primary: true,
+      primaryImportant: responsePresentation.importantEvent,
+    };
+    const crossPresentation = eliteAffixResponseCrossAffixPresentation({
+      primary: crossDecision.primary,
+      importantEvent: responsePresentation.importantEvent,
+      primaryImportant: crossDecision.primaryImportant,
+      baseVisible: responsePresentation.visible,
+      baseAlphaScale: responsePresentation.alphaScale,
+      battlefieldStress,
+      higherPriorityCue,
+      reducedFlash,
+    });
+    if (!crossPresentation.visible) continue;
 
     const responseCuePos = eliteAffixResponseCueOrigin(cue.responseBasePos ?? cue.pos, cue.laneSnapshot);
     const sprite = eliteAffixLifecycleVfxSprite(cue.affixId, 'response');
-    const t = Math.max(0, Math.min(1, cue.ttl / Math.max(0.001, cue.maxTtl)));
+    const t = eliteAffixResponseLifeRatio(cue.ttl, cue.maxTtl);
     const size = 92 + (1 - t) * 22;
     ctx.save();
-    ctx.globalAlpha = Math.min(reducedFlash ? 0.48 : 0.88, t) * responsePresentation.alphaScale;
+    ctx.globalAlpha = Math.min(reducedFlash ? 0.48 : 0.88, t) * crossPresentation.alphaScale;
     ctx.drawImage(
       atlasImage,
       sprite.sx,
@@ -223,7 +308,7 @@ function renderFrozenEliteAffixResponses(
     const perpY = nx;
     const wing = 6 * ownership.chevronScale;
     ctx.save();
-    ctx.globalAlpha = ownership.connectorAlpha * t * responsePresentation.alphaScale;
+    ctx.globalAlpha = ownership.connectorAlpha * t * crossPresentation.alphaScale;
     ctx.strokeStyle = '#9edfff';
     ctx.lineWidth = 2 * ownership.priorityScale;
     ctx.beginPath();

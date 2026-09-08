@@ -85,8 +85,14 @@ function preferredIndex(candidates: readonly EliteAffixResponseCrossAffixCandida
   return bestIndex;
 }
 
-function tertiaryHandoffScale(importantEvent: boolean, progress: number): number {
-  const start = importantEvent ? 0.35 : 0.15;
+function tertiaryHandoffScale(
+  importantEvent: boolean,
+  progress: number,
+  outgoingPresent = true,
+): number {
+  const start = outgoingPresent
+    ? (importantEvent ? 0.35 : 0.15)
+    : (importantEvent ? 0.52 : 0.30);
   return start + (1 - start) * clamp01(progress);
 }
 
@@ -176,7 +182,11 @@ export function eliteAffixResponseCrossAffixPresentation(
       alphaScale = outgoingAlpha;
     }
   } else if (handoffRole === 'none' && handoffProgress < 1) {
-    alphaScale *= tertiaryHandoffScale(input.importantEvent, handoffProgress);
+    alphaScale *= tertiaryHandoffScale(
+      input.importantEvent,
+      handoffProgress,
+      input.handoffHasOutgoing ?? true,
+    );
   }
 
   if (input.reducedFlash) alphaScale = Math.min(0.72, alphaScale);

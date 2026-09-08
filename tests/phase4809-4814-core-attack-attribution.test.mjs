@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-// Final-gate sync: behavior is unchanged; this commit re-triggers PR verification outside Actions recursion.
 const linkage = await import('../dist/game/attack-outcome-linkage.js').catch(() => null);
 const attribution = await import('../dist/game/core-attack-outcome-attribution.js').catch(() => null);
 

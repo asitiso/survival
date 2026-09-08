@@ -22,7 +22,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Apply bounded EnemyManager integration
-        run: node scripts/apply-phase4533-4550-integration.mjs
+        run: node scripts/apply-phase4533-4550-integration-v2.mjs
       - name: Build focused target
         run: npm run build
       - name: Phase focused tests

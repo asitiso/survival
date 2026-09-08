@@ -43,6 +43,6 @@ test('phase 4522 strike ownership preserves core-near urgency and accessibility 
 test('phase 4523 enemy update tags swift cadence and queues the actual strike toward its target', async () => {
   const source = await readFile(new URL('../src/game/enemies.ts', import.meta.url), 'utf8');
   assert.match(source, /advanceSwiftCadenceLifecycle/);
-  assert.match(source, /queueEliteAffixResponseVfx\(enemy,'swift',targetObj\.pos\)/);
+  assert.match(source, /queueEliteAffixResponseVfx\(enemy,'swift','strike',targetObj\.pos\)/);
   assert.match(source, /enemy\.attackTimer = enemy\.attackInterval;/);
 });

@@ -32,6 +32,8 @@ jobs:
           text = path.read_text()
           old = "const coreAttackAttribution=consumeCoreAttackAttribution(source);"
           new = "const coreAttackAttribution=consumeCoreAttackAttribution(source,origin);"
+          if new in text:
+              raise SystemExit(0)
           count = text.count(old)
           if count != 1:
               raise SystemExit(f'expected one game wiring match, found {count}')
@@ -43,12 +45,15 @@ jobs:
         run: node --test tests/phase4803-4808-attack-outcome-linkage.test.mjs tests/phase4809-4814-core-attack-attribution.test.mjs tests/phase4815-4820-attack-resolution-handoff.test.mjs tests/phase4821-4826-core-spatial-disambiguation.test.mjs
       - name: Diff check
         run: git diff --check
-      - name: Commit verified implementation and remove applicator
+      - name: Commit verified game wiring
         shell: bash
         run: |
-          rm .github/workflows/phase4821-4826-apply.yml
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add src/game/attack-outcome-linkage.ts src/game/enemy-presentation.ts src/game/core-attack-outcome-attribution.ts src/game/game.ts tests/phase4821-4826-core-spatial-disambiguation.test.mjs .github/workflows/phase4821-4826-apply.yml
-          git commit -m "feat: resolve core attacks by spatial origin"
+          git add src/game/game.ts
+          if git diff --cached --quiet; then
+            echo "No game wiring change needed"
+            exit 0
+          fi
+          git commit -m "feat: wire core damage spatial attribution"
           git push origin HEAD:work/phase4821-4826-core-spatial-disambiguation

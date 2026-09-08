@@ -41,8 +41,14 @@ jobs:
           PY
       - name: Build
         run: npm run build
-      - name: Focused attack outcome regression
-        run: node --test tests/phase4803-4808-attack-outcome-linkage.test.mjs tests/phase4809-4814-core-attack-attribution.test.mjs tests/phase4815-4820-attack-resolution-handoff.test.mjs tests/phase4821-4826-core-spatial-disambiguation.test.mjs
+      - name: Phase 4803-4808 linkage regression
+        run: node --test tests/phase4803-4808-attack-outcome-linkage.test.mjs
+      - name: Phase 4809-4814 core attribution regression
+        run: node --test tests/phase4809-4814-core-attack-attribution.test.mjs
+      - name: Phase 4815-4820 resolution handoff regression
+        run: node --test tests/phase4815-4820-attack-resolution-handoff.test.mjs
+      - name: Phase 4821-4826 spatial disambiguation
+        run: node --test tests/phase4821-4826-core-spatial-disambiguation.test.mjs
       - name: Diff check
         run: git diff --check
       - name: Commit verified game wiring

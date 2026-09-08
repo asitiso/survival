@@ -15,6 +15,7 @@ export interface EliteAffixCueLaneState {
   holdTtl: number;
   releaseTtl: number;
   importantEvent: boolean;
+  releaseFromLane?: EliteAffixCueLane;
 }
 
 export interface AdvanceEliteAffixCueLaneInput {
@@ -98,6 +99,12 @@ function progressLaneState(previous: EliteAffixCueLaneState, dt: number): EliteA
   return { ...previous, holdTtl, releaseTtl };
 }
 
+function withoutReleaseFromLane(state: EliteAffixCueLaneState): EliteAffixCueLaneState {
+  if (state.releaseFromLane === undefined) return state;
+  const { releaseFromLane: _releaseFromLane, ...rest } = state;
+  return rest;
+}
+
 export function advanceEliteAffixCueLane(
   previous: EliteAffixCueLaneState | undefined,
   input: AdvanceEliteAffixCueLaneInput,
@@ -114,8 +121,10 @@ export function advanceEliteAffixCueLane(
 
   const progressed = progressLaneState(previous, input.dt);
   if (progressed.lane === desiredLane) {
-    if (!input.importantEvent && progressed.importantEvent && progressed.holdTtl <= 0 && progressed.releaseTtl <= 0) {
-      return { ...progressed, importantEvent: false };
+    if (progressed.holdTtl <= 0 && progressed.releaseTtl <= 0) {
+      const released = withoutReleaseFromLane(progressed);
+      if (!input.importantEvent && released.importantEvent) return { ...released, importantEvent: false };
+      return released;
     }
     return progressed;
   }
@@ -130,11 +139,13 @@ export function advanceEliteAffixCueLane(
   }
 
   if (progressed.holdTtl > 0 || progressed.releaseTtl > 0) return progressed;
+  const releaseFromLane = desiredLane === 0 && progressed.lane !== 0 ? progressed.lane : undefined;
   return {
     lane: desiredLane,
     holdTtl: ROUTINE_HOLD_SECONDS,
     releaseTtl: ROUTINE_RELEASE_SECONDS,
     importantEvent: false,
+    ...(releaseFromLane !== undefined ? { releaseFromLane } : {}),
   };
 }
 
@@ -149,18 +160,22 @@ export function eliteAffixCueLanePresentation(
   const densityScale = Math.max(0.40, 1 - stress * 0.52);
   const priorityScale = input.higherPriorityCue ? 0.68 : 1;
   const offset = baseOffset * densityScale * priorityScale;
-  const sign = lane < 0 ? -1 : lane > 0 ? 1 : 0;
-  const magnitude = Math.abs(lane);
   const routineTimeRemaining = Math.max(0, (state?.holdTtl ?? 0) + (state?.releaseTtl ?? 0));
   const routineProgress = clamp01(1 - routineTimeRemaining / ROUTINE_SETTLE_SECONDS);
-  const settleScale = state?.importantEvent
-    ? 1
-    : ROUTINE_SETTLE_FLOOR + (1 - ROUTINE_SETTLE_FLOOR) * routineProgress;
+  const releasingToCenter = lane === 0 && state?.releaseFromLane !== undefined && state.releaseFromLane !== 0;
+  const presentationLane = releasingToCenter ? state.releaseFromLane! : lane;
+  const sign = presentationLane < 0 ? -1 : presentationLane > 0 ? 1 : 0;
+  const magnitude = Math.abs(presentationLane);
+  const settleScale = releasingToCenter
+    ? 1 - routineProgress
+    : state?.importantEvent
+      ? 1
+      : ROUTINE_SETTLE_FLOOR + (1 - ROUTINE_SETTLE_FLOOR) * routineProgress;
 
   return {
     lane,
     offsetX: magnitude >= 2 ? sign * offset * 0.18 * settleScale : 0,
-    offsetY: lane * offset * settleScale,
+    offsetY: presentationLane * offset * settleScale,
     motionScale: input.reducedMotion ? 0 : (input.higherPriorityCue ? 0.45 : Math.max(0.30, 1 - stress * 0.45)),
     alphaScale: input.reducedFlash ? 0.72 : 1,
   };

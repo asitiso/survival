@@ -85,6 +85,11 @@ function preferredIndex(candidates: readonly EliteAffixResponseCrossAffixCandida
   return bestIndex;
 }
 
+function tertiaryHandoffScale(importantEvent: boolean, progress: number): number {
+  const start = importantEvent ? 0.35 : 0.15;
+  return start + (1 - start) * clamp01(progress);
+}
+
 export function eliteAffixResponseCrossAffixOwnership(
   candidates: readonly EliteAffixResponseCrossAffixCandidate[],
   previousOwnerAffixId: EliteAffixId | null = null,
@@ -170,6 +175,8 @@ export function eliteAffixResponseCrossAffixPresentation(
       visible = true;
       alphaScale = outgoingAlpha;
     }
+  } else if (handoffRole === 'none' && handoffProgress < 1) {
+    alphaScale *= tertiaryHandoffScale(input.importantEvent, handoffProgress);
   }
 
   if (input.reducedFlash) alphaScale = Math.min(0.72, alphaScale);

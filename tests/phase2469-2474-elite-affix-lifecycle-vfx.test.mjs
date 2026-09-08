@@ -46,7 +46,7 @@ test('phase 2471 armored and mana shield responses are image-backed without chan
 
 test('phase 2472 regeneration and frenzy threshold responses preserve existing formulas', () => {
   assert.match(enemiesSource, /queueEliteAffixResponseVfx\(enemy,'regenerating'\)/);
-  assert.match(enemiesSource, /queueEliteAffixResponseVfx\(enemy,'frenzied'\)/);
+  assert.match(enemiesSource, /queueEliteAffixResponseVfx\(enemy,'frenzied','thresholdEntry'\)/);
   assert.match(enemiesSource, /enemy\.maxHp \* \(enemy\.regenPerSecondRatio \?\? 0\) \* dt/);
   assert.match(enemiesSource, /enemy\.hp \/ Math\.max\(1, enemy\.maxHp\) <= 0\.42/);
 });

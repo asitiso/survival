@@ -36,7 +36,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/game/enemies.ts dist/game/enemies.js dist/game/elite-affix-cue-arbitration.js
+          git add src/game/enemies.ts
           if ! git diff --cached --quiet; then
             git commit -m 'feat: integrate elite multi-affix cue arbitration'
             git push origin HEAD:work/phase4533-4550-elite-affix-cue-arbitration

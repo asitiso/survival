@@ -1,4 +1,4 @@
-import { consumeRenderedAttackOutcome, type AttackOutcomeMetadata, type AttackOutcomeSource } from './attack-outcome-linkage.js';
+import { consumeRenderedAttackOutcome, consumeRenderedAttackOutcomeNear, type AttackOutcomeMetadata, type AttackOutcomeOrigin, type AttackOutcomeSource } from './attack-outcome-linkage.js';
 
 export interface CoreAttackAttribution {
   attackIntent: AttackOutcomeMetadata;
@@ -11,8 +11,10 @@ function coreAttackerLabel(intent: AttackOutcomeMetadata): string | null {
   return null;
 }
 
-export function consumeCoreAttackAttribution(source: AttackOutcomeSource): CoreAttackAttribution | null {
-  const attackIntent = consumeRenderedAttackOutcome('core', source);
+export function consumeCoreAttackAttribution(source: AttackOutcomeSource, origin?: AttackOutcomeOrigin): CoreAttackAttribution | null {
+  const attackIntent = origin
+    ? consumeRenderedAttackOutcomeNear('core', source, origin)
+    : consumeRenderedAttackOutcome('core', source);
   if (!attackIntent) return null;
   const label = coreAttackerLabel(attackIntent);
   return label ? { attackIntent, label } : null;

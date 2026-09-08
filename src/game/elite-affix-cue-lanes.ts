@@ -16,6 +16,7 @@ export interface EliteAffixCueLaneState {
   releaseTtl: number;
   importantEvent: boolean;
   releaseFromLane?: EliteAffixCueLane;
+  settleFloor?: number;
 }
 
 export interface AdvanceEliteAffixCueLaneInput {
@@ -99,9 +100,9 @@ function progressLaneState(previous: EliteAffixCueLaneState, dt: number): EliteA
   return { ...previous, holdTtl, releaseTtl };
 }
 
-function withoutReleaseFromLane(state: EliteAffixCueLaneState): EliteAffixCueLaneState {
-  if (state.releaseFromLane === undefined) return state;
-  const { releaseFromLane: _releaseFromLane, ...rest } = state;
+function withoutTransientLaneState(state: EliteAffixCueLaneState): EliteAffixCueLaneState {
+  if (state.releaseFromLane === undefined && state.settleFloor === undefined) return state;
+  const { releaseFromLane: _releaseFromLane, settleFloor: _settleFloor, ...rest } = state;
   return rest;
 }
 
@@ -120,9 +121,21 @@ export function advanceEliteAffixCueLane(
   }
 
   const progressed = progressLaneState(previous, input.dt);
+
+  if (!input.importantEvent && progressed.lane === 0 && desiredLane !== 0 && progressed.releaseFromLane === desiredLane) {
+    const releaseContinuity = clamp01((progressed.holdTtl + progressed.releaseTtl) / ROUTINE_SETTLE_SECONDS);
+    return {
+      lane: desiredLane,
+      holdTtl: ROUTINE_HOLD_SECONDS,
+      releaseTtl: ROUTINE_RELEASE_SECONDS,
+      importantEvent: false,
+      settleFloor: Math.max(ROUTINE_SETTLE_FLOOR, releaseContinuity),
+    };
+  }
+
   if (progressed.lane === desiredLane) {
     if (progressed.holdTtl <= 0 && progressed.releaseTtl <= 0) {
-      const released = withoutReleaseFromLane(progressed);
+      const released = withoutTransientLaneState(progressed);
       if (!input.importantEvent && released.importantEvent) return { ...released, importantEvent: false };
       return released;
     }
@@ -166,11 +179,12 @@ export function eliteAffixCueLanePresentation(
   const presentationLane = releasingToCenter ? state.releaseFromLane! : lane;
   const sign = presentationLane < 0 ? -1 : presentationLane > 0 ? 1 : 0;
   const magnitude = Math.abs(presentationLane);
+  const routineFloor = Math.max(ROUTINE_SETTLE_FLOOR, clamp01(state?.settleFloor ?? ROUTINE_SETTLE_FLOOR));
   const settleScale = releasingToCenter
     ? 1 - routineProgress
     : state?.importantEvent
       ? 1
-      : ROUTINE_SETTLE_FLOOR + (1 - ROUTINE_SETTLE_FLOOR) * routineProgress;
+      : routineFloor + (1 - routineFloor) * routineProgress;
 
   return {
     lane,

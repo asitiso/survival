@@ -358,6 +358,7 @@ import { openingHudFocusPolicy } from './opening-hud-focus.js';
 import { autoTargetIndicator, primaryWeakpointNode, weakpointIndicator } from './auto-target-visibility.js';
 import { advanceDamageReason, recordDamageReason, type DamageReasonState } from './damage-reason-feedback.js';
 import { consumeCoreAttackAttribution, type CoreAttackAttribution } from './core-attack-outcome-attribution.js';
+import { attackResolutionHandoffPresentation, createAttackResolutionHandoffState, recordAttackResolutionHandoff, type AttackResolutionHandoffState } from './attack-resolution-handoff.js';
 import { purchaseImpactFeedback } from './purchase-impact-feedback.js';
 import { dangerProjectileCues } from './projectile-threat-visibility.js';
 import { BOSS_RESPONSE_ACK_SECONDS, bossActionAssist, bossResponseActions, type BossActionAssistCue } from './boss-action-assist.js';
@@ -508,6 +509,7 @@ export class Game {
   private shopOffers: ShopDisplayOffer[] = [];
   private shopImpactMessage = '';
   private damageReasonState: DamageReasonState | null = null;
+  private attackResolutionHandoffState:AttackResolutionHandoffState=createAttackResolutionHandoffState();
   private rerollsThisVisit = 0;
   private nextShopTokenAt = SHOP_FIRST_TOKEN_AT;
   private catastrophe: Catastrophe | null = null;
@@ -2350,6 +2352,7 @@ export class Game {
     this.rerollsThisVisit = 0;
     this.shopImpactMessage = '';
     this.damageReasonState = null;
+    this.attackResolutionHandoffState=createAttackResolutionHandoffState();
     this.nextShopTokenAt = SHOP_FIRST_TOKEN_AT;
     this.catastrophe = null;
     this.lastCatastropheId = null;
@@ -2708,7 +2711,10 @@ export class Game {
           const crisisKind:HeroCrisisVfxState=damageRatio>=.32?'critical':damageRatio>=.12?'heavy':'hit';
           if(beforeHpRatio>.22&&afterHpRatio<=.22)this.queueHeroCrisisVfx('nearDeath');else this.queueHeroCrisisVfx(crisisKind);
           this.frameEndlessEvents.push({ type: 'hero_damaged', amount: applied });
-          this.damageReasonState = recordDamageReason(this.damageReasonState, source, applied, this.hero.maxHp, this.elapsed);
+          const previousDamageReason=this.damageReasonState;
+          const nextDamageReason=recordDamageReason(previousDamageReason, source, applied, this.hero.maxHp, this.elapsed);
+          this.damageReasonState=nextDamageReason;
+          if(nextDamageReason!==previousDamageReason&&nextDamageReason.attackIntent)this.attackResolutionHandoffState=recordAttackResolutionHandoff(this.attackResolutionHandoffState,nextDamageReason.attackIntent,this.elapsed);
         }
         const prevented=Math.max(0,amount-applied);
         if(prevented>=this.hero.maxHp*.002)this.queueSurvivalResponseVfx('heroGuard');
@@ -2719,7 +2725,7 @@ export class Game {
         const applied = amount * this.hero.equipmentCoreDamageTakenMultiplier * this.runCoreDamageTakenMultiplier * fateRewardMultipliers(this.fateRuntime.modifiers).coreDamageTakenMultiplier * catastropheMods.coreDamageMultiplier * contractMods.coreDamageTakenMultiplier * (edricAura ? combatBuild.edricCoreAuraMultiplier : 1);
         this.core.hp = Math.max(0, this.core.hp - applied);
         const prevented=Math.max(0,amount-applied),mitigationRatio=amount>0?Math.max(0,Math.min(1,prevented/amount)):0;
-        if (applied > 0) { const coreAttackAttribution=consumeCoreAttackAttribution(source); this.frameEndlessEvents.push({ type: 'core_damaged', amount: applied }); this.queueSurvivalResponseVfx('coreHit',{mitigationRatio,damageSource:source,...(coreAttackAttribution?{coreAttackAttribution}:{}),...(origin?{pressureVector:{x:this.core.pos.x-origin.x,y:this.core.pos.y-origin.y}}:{})}); }
+        if (applied > 0) { const coreAttackAttribution=consumeCoreAttackAttribution(source); if(coreAttackAttribution?.attackIntent)this.attackResolutionHandoffState=recordAttackResolutionHandoff(this.attackResolutionHandoffState,coreAttackAttribution.attackIntent,this.elapsed); this.frameEndlessEvents.push({ type: 'core_damaged', amount: applied }); this.queueSurvivalResponseVfx('coreHit',{mitigationRatio,damageSource:source,...(coreAttackAttribution?{coreAttackAttribution}:{}),...(origin?{pressureVector:{x:this.core.pos.x-origin.x,y:this.core.pos.y-origin.y}}:{})}); }
         if(prevented>=this.core.maxHp*.002)this.queueSurvivalResponseVfx('coreGuard');
         if (applied > 0 && this.onboarding.signal('core')) this.saveStoredOnboardingState();
         this.advanceHeroMeter(0, { preventedDamageRatio: Math.max(0, amount - applied) / Math.max(1, this.core.maxHp) });
@@ -4244,21 +4250,22 @@ export class Game {
     for (const cue of cues) {
       const enemy = this.enemies.enemies.find((candidate) => candidate.id === cue.enemyId);
       if (!enemy) continue;
-      ctx.globalAlpha = cue.style === 'support-ring' ? 0.42 : 0.78;
-      ctx.strokeStyle = cue.color; ctx.lineWidth = cue.style === 'boss-ring' ? 5 : 3.5;
+      const handoff=cue.attackIntent?attackResolutionHandoffPresentation(this.attackResolutionHandoffState,cue.attackIntent.key,this.elapsed,this.presentationSettings.reducedMotion,this.presentationSettings.reducedFlash):{resolved:false,alphaScale:1,sizeScale:1};
+      ctx.globalAlpha = (cue.style === 'support-ring' ? 0.42 : 0.78)*handoff.alphaScale;
+      ctx.strokeStyle = cue.color; ctx.lineWidth = (cue.style === 'boss-ring' ? 5 : 3.5)*handoff.sizeScale;
       if (enemy.type === 'boss') {
         const phase = bossPhaseForRatio(enemy.hp / Math.max(1, enemy.maxHp));
         const pattern = bossPatternTelegraph(enemy.bossArchetype ?? 'inferno', phase);
-        ctx.strokeStyle = pattern.color; ctx.globalAlpha = pattern.opacity;
+        ctx.strokeStyle = pattern.color; ctx.globalAlpha = pattern.opacity*handoff.alphaScale;
         if (pattern.style === 'lane') {
-          ctx.lineWidth = Math.max(10, pattern.width * 0.12);
+          ctx.lineWidth = Math.max(7, pattern.width * 0.12*handoff.sizeScale);
           ctx.beginPath(); ctx.moveTo(enemy.pos.x, enemy.pos.y); ctx.lineTo(this.hero.pos.x, this.hero.pos.y); ctx.stroke();
         } else {
-          ctx.lineWidth = pattern.width;
-          ctx.beginPath(); ctx.arc(enemy.pos.x, enemy.pos.y, pattern.radius, 0, Math.PI * 2); ctx.stroke();
+          ctx.lineWidth = pattern.width*handoff.sizeScale;
+          ctx.beginPath(); ctx.arc(enemy.pos.x, enemy.pos.y, pattern.radius*handoff.sizeScale, 0, Math.PI * 2); ctx.stroke();
         }
       } else {
-        ctx.beginPath(); ctx.arc(enemy.pos.x, enemy.pos.y, cue.radius, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(enemy.pos.x, enemy.pos.y, cue.radius*handoff.sizeScale, 0, Math.PI * 2); ctx.stroke();
       }
     }
     ctx.restore();

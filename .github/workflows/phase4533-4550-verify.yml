@@ -8,7 +8,7 @@ on:
       - work/phase4533-4550-elite-affix-cue-arbitration
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
@@ -21,6 +21,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Apply bounded EnemyManager integration
+        run: node scripts/apply-phase4533-4550-integration.mjs
       - name: Build focused target
         run: npm run build
       - name: Phase focused tests
@@ -28,3 +30,14 @@ jobs:
         run: |
           files=$(find tests -maxdepth 1 -type f \( -name 'phase4533-*.test.mjs' -o -name 'phase4539-*.test.mjs' -o -name 'phase4545-*.test.mjs' \) -print | sort)
           node --test $files
+      - name: Commit generated integration
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/game/enemies.ts dist/game/enemies.js dist/game/elite-affix-cue-arbitration.js
+          if ! git diff --cached --quiet; then
+            git commit -m 'feat: integrate elite multi-affix cue arbitration'
+            git push origin HEAD:work/phase4533-4550-elite-affix-cue-arbitration
+          fi

@@ -171,11 +171,21 @@ export function eliteAffixCueLayerPresentation(
       ? importantOwner ? 0.86 : 0.72 + (input.activeAttack ? 0.28 : 0)
       : Math.max(0.12, 0.36 - stress * 0.18);
 
+  const responseDensityAlpha = importantOwner
+    ? Math.max(0.82, 1 - stress * 0.12)
+    : Math.max(0.52, 1 - stress * 0.40);
+  const responsePriorityAlpha = input.higherPriorityCue
+    ? (importantOwner ? 0.94 : 0.74)
+    : 1;
+  const responseOwnerAlpha = primary ? 1 : 0.72;
+  let responseAlphaScale = responseDensityAlpha * responsePriorityAlpha * responseOwnerAlpha;
+  if (input.reducedFlash) responseAlphaScale = Math.min(0.72, responseAlphaScale);
+
   return {
     visible,
     primary,
     alphaScale,
     motionScale,
-    responseAlphaScale: alphaScale,
+    responseAlphaScale,
   };
 }

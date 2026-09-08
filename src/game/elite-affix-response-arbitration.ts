@@ -1,4 +1,5 @@
 import type { EliteAffixId } from './elite-affixes.js';
+import type { EliteAffixResponseCrossAffixHandoffRole } from './elite-affix-response-handoff.js';
 
 export interface EliteAffixResponseCrossAffixCandidate {
   affixId: EliteAffixId;
@@ -23,6 +24,8 @@ export interface EliteAffixResponseCrossAffixPresentationInput {
   battlefieldStress: number;
   higherPriorityCue: boolean;
   reducedFlash: boolean;
+  handoffRole?: EliteAffixResponseCrossAffixHandoffRole;
+  handoffProgress?: number;
 }
 
 export interface EliteAffixResponseCrossAffixPresentation {
@@ -120,9 +123,17 @@ export function eliteAffixResponseCrossAffixPresentation(
   const baseAlpha = clamp01(input.baseAlphaScale);
   if (!input.baseVisible) return { visible: false, alphaScale: 0 };
 
+  const handoffProgress = clamp01(input.handoffProgress ?? 1, 1);
+  const handoffRole = input.handoffRole ?? 'none';
+
   if (input.primary) {
-    const alphaScale = input.reducedFlash ? Math.min(0.72, baseAlpha) : baseAlpha;
-    return { visible: true, alphaScale };
+    const primaryBase = input.reducedFlash ? Math.min(0.72, baseAlpha) : baseAlpha;
+    if (handoffRole === 'incoming' && handoffProgress < 1) {
+      const start = input.importantEvent ? 0.90 : 0.68;
+      const handoffScale = start + (1 - start) * handoffProgress;
+      return { visible: true, alphaScale: clamp01(primaryBase * handoffScale) };
+    }
+    return { visible: true, alphaScale: primaryBase };
   }
 
   const stress = clamp01(input.battlefieldStress);
@@ -142,6 +153,15 @@ export function eliteAffixResponseCrossAffixPresentation(
         ? Math.max(0.16, 0.28 - stress * 0.08)
         : Math.max(0.24, 0.46 - stress * 0.18);
       alphaScale = baseAlpha * multiplier;
+    }
+  }
+
+  if (handoffRole === 'outgoing' && handoffProgress < 1) {
+    const outgoingMultiplier = (input.importantEvent ? 0.45 : 0.32) * (1 - handoffProgress);
+    const outgoingAlpha = baseAlpha * outgoingMultiplier;
+    if (outgoingAlpha > alphaScale) {
+      visible = true;
+      alphaScale = outgoingAlpha;
     }
   }
 

@@ -10,6 +10,12 @@ import {
   eliteAffixResponseCrossAffixPresentation,
 } from './elite-affix-response-arbitration.js';
 import {
+  advanceEliteAffixResponseCrossAffixHandoff,
+  eliteAffixResponseCrossAffixHandoffRole,
+  type EliteAffixResponseCrossAffixHandoffRole,
+  type EliteAffixResponseCrossAffixHandoffState,
+} from './elite-affix-response-handoff.js';
+import {
   captureEliteAffixResponseLaneSnapshot,
   eliteAffixResponseCueOrigin,
   eliteAffixResponseLifeRatio,
@@ -53,10 +59,15 @@ type RuntimePrototype = {
 interface CrossAffixDecision {
   primary: boolean;
   primaryImportant: boolean;
+  handoffRole: EliteAffixResponseCrossAffixHandoffRole;
+  handoffProgress: number;
 }
 
 let installed = false;
-const crossAffixOwner = new WeakMap<RuntimeEnemyManagerState, Map<number, EliteAffixId>>();
+const crossAffixOwner = new WeakMap<
+  RuntimeEnemyManagerState,
+  Map<number, EliteAffixResponseCrossAffixHandoffState>
+>();
 
 function finiteStress(value: unknown): number {
   return Math.max(0, Math.min(1, typeof value === 'number' && Number.isFinite(value) ? value : 0));
@@ -140,7 +151,7 @@ function crossAffixResponseDecisions(
 ): Map<RuntimeResponseCue, CrossAffixDecision> {
   let ownerByEnemy = crossAffixOwner.get(state);
   if (!ownerByEnemy) {
-    ownerByEnemy = new Map<number, EliteAffixId>();
+    ownerByEnemy = new Map<number, EliteAffixResponseCrossAffixHandoffState>();
     crossAffixOwner.set(state, ownerByEnemy);
   }
 
@@ -159,7 +170,8 @@ function crossAffixResponseDecisions(
   const decisions = new Map<RuntimeResponseCue, CrossAffixDecision>();
   for (const [enemyId, group] of groups) {
     const sourceEnemy = state.enemies.find((candidate) => candidate.id === enemyId && candidate.alive);
-    const previousOwner = ownerByEnemy.get(enemyId) ?? null;
+    const previousState = ownerByEnemy.get(enemyId);
+    const previousOwner = previousState?.ownerAffixId ?? null;
     const previousCue = previousOwner
       ? [...group].reverse().find((candidate) => candidate.affixId === previousOwner && Number.isFinite(candidate.ttl) && candidate.ttl > 0)
       : undefined;
@@ -178,14 +190,28 @@ function crossAffixResponseDecisions(
       holdActive,
     );
 
-    if (ownership.primaryAffixId) ownerByEnemy.set(enemyId, ownership.primaryAffixId);
-    else ownerByEnemy.delete(enemyId);
+    if (!ownership.primaryAffixId || ownership.primaryIndex < 0) {
+      ownerByEnemy.delete(enemyId);
+      continue;
+    }
+
+    const primaryCue = group[ownership.primaryIndex]!;
+    const handoffState = advanceEliteAffixResponseCrossAffixHandoff(
+      previousState,
+      ownership.primaryAffixId,
+      ownership.primaryImportant,
+      primaryCue.ttl,
+    );
+    ownerByEnemy.set(enemyId, handoffState);
 
     for (let index = 0; index < group.length; index += 1) {
       const cue = group[index]!;
+      const primary = index === ownership.primaryIndex;
       decisions.set(cue, {
-        primary: index === ownership.primaryIndex,
+        primary,
         primaryImportant: ownership.primaryImportant,
+        handoffRole: eliteAffixResponseCrossAffixHandoffRole(handoffState, cue.affixId, primary),
+        handoffProgress: handoffState.progress,
       });
     }
   }
@@ -252,6 +278,8 @@ function renderFrozenEliteAffixResponses(
     const crossDecision = crossDecisions.get(cue) ?? {
       primary: true,
       primaryImportant: responsePresentation.importantEvent,
+      handoffRole: 'none' as EliteAffixResponseCrossAffixHandoffRole,
+      handoffProgress: 1,
     };
     const crossPresentation = eliteAffixResponseCrossAffixPresentation({
       primary: crossDecision.primary,
@@ -262,6 +290,8 @@ function renderFrozenEliteAffixResponses(
       battlefieldStress,
       higherPriorityCue,
       reducedFlash,
+      handoffRole: crossDecision.handoffRole,
+      handoffProgress: crossDecision.handoffProgress,
     });
     if (!crossPresentation.visible) continue;
 

@@ -14,6 +14,7 @@ export interface EliteAffixCueLaneState {
   lane: EliteAffixCueLane;
   holdTtl: number;
   releaseTtl: number;
+  importantEvent: boolean;
 }
 
 export interface AdvanceEliteAffixCueLaneInput {
@@ -42,6 +43,8 @@ const ROUTINE_HOLD_SECONDS = 0.12;
 const ROUTINE_RELEASE_SECONDS = 0.08;
 const IMPORTANT_HOLD_SECONDS = 0.16;
 const IMPORTANT_RELEASE_SECONDS = 0.10;
+const ROUTINE_SETTLE_SECONDS = ROUTINE_HOLD_SECONDS + ROUTINE_RELEASE_SECONDS;
+const ROUTINE_SETTLE_FLOOR = 0.32;
 const LANE_PATTERN: readonly EliteAffixCueLane[] = [0, -1, 1, -2, 2];
 
 function clamp01(value: number): number {
@@ -105,17 +108,24 @@ export function advanceEliteAffixCueLane(
       lane: desiredLane,
       holdTtl: input.importantEvent ? IMPORTANT_HOLD_SECONDS : ROUTINE_HOLD_SECONDS,
       releaseTtl: input.importantEvent ? IMPORTANT_RELEASE_SECONDS : ROUTINE_RELEASE_SECONDS,
+      importantEvent: input.importantEvent,
     };
   }
 
   const progressed = progressLaneState(previous, input.dt);
-  if (progressed.lane === desiredLane) return progressed;
+  if (progressed.lane === desiredLane) {
+    if (!input.importantEvent && progressed.importantEvent && progressed.holdTtl <= 0 && progressed.releaseTtl <= 0) {
+      return { ...progressed, importantEvent: false };
+    }
+    return progressed;
+  }
 
   if (input.importantEvent) {
     return {
       lane: desiredLane,
       holdTtl: IMPORTANT_HOLD_SECONDS,
       releaseTtl: IMPORTANT_RELEASE_SECONDS,
+      importantEvent: true,
     };
   }
 
@@ -124,6 +134,7 @@ export function advanceEliteAffixCueLane(
     lane: desiredLane,
     holdTtl: ROUTINE_HOLD_SECONDS,
     releaseTtl: ROUTINE_RELEASE_SECONDS,
+    importantEvent: false,
   };
 }
 
@@ -140,11 +151,16 @@ export function eliteAffixCueLanePresentation(
   const offset = baseOffset * densityScale * priorityScale;
   const sign = lane < 0 ? -1 : lane > 0 ? 1 : 0;
   const magnitude = Math.abs(lane);
+  const routineTimeRemaining = Math.max(0, (state?.holdTtl ?? 0) + (state?.releaseTtl ?? 0));
+  const routineProgress = clamp01(1 - routineTimeRemaining / ROUTINE_SETTLE_SECONDS);
+  const settleScale = state?.importantEvent
+    ? 1
+    : ROUTINE_SETTLE_FLOOR + (1 - ROUTINE_SETTLE_FLOOR) * routineProgress;
 
   return {
     lane,
-    offsetX: magnitude >= 2 ? sign * offset * 0.18 : 0,
-    offsetY: lane * offset,
+    offsetX: magnitude >= 2 ? sign * offset * 0.18 * settleScale : 0,
+    offsetY: lane * offset * settleScale,
     motionScale: input.reducedMotion ? 0 : (input.higherPriorityCue ? 0.45 : Math.max(0.30, 1 - stress * 0.45)),
     alphaScale: input.reducedFlash ? 0.72 : 1,
   };

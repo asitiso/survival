@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+<defs>
+  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#9ed9f5"/><stop offset=".5" stop-color="#d9edf4"/><stop offset="1" stop-color="#93aab7"/></linearGradient>
+  <radialGradient id="ground" cx="48%" cy="48%" r="70%"><stop stop-color="#7f9a55"/><stop offset=".55" stop-color="#566f42"/><stop offset="1" stop-color="#293a32"/></radialGradient>
+  <linearGradient id="stone" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#b9b39d"/><stop offset="1" stop-color="#666b61"/></linearGradient>
+  <linearGradient id="cliff" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#66756f"/><stop offset="1" stop-color="#2d3c3b"/></linearGradient>
+  <linearGradient id="crystal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d8fbff"/><stop offset=".42" stop-color="#42c9ff"/><stop offset="1" stop-color="#5834d6"/></linearGradient>
+  <filter id="glow"><feGaussianBlur stdDeviation="13" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<rect width="1600" height="900" fill="url(#sky)"/>
+<g opacity=".38" fill="#456273">
+  <path d="M90 170l86-63 70 33 74-89 66 99 97-60 81 72 90-98 94 90 102-79 100 86 89-69 72 54 100-82 114 100v160H90z"/>
+  <path d="M460 118h38V52h25v66h52v25H460zM858 126h31V41h23v85h52v22H858zM1198 120h34V28h24v92h47v24h-105z"/>
+</g>
+<g opacity=".72" fill="url(#cliff)"><path d="M0 260l170-45 120 34 115-24 99 55v120H0z"/><path d="M1600 250l-175-43-119 42-108-21-91 50v122h493z"/></g>
+<path d="M0 302C220 252 393 322 548 294c199-36 302-59 482-10 214 58 376-14 570 19v597H0z" fill="url(#ground)"/>
+<path d="M0 455c243-87 388-22 522-19 194 4 343-70 537-20 188 48 348 31 541-37v521H0z" fill="#8da65a" opacity=".45"/>
+<path d="M84 625c214-45 351-8 485-80 129-69 288-57 417-8 163 62 320 31 533-29" fill="none" stroke="#c9b88f" stroke-width="146" stroke-linecap="round" opacity=".65"/>
+<path d="M84 625c214-45 351-8 485-80 129-69 288-57 417-8 163 62 320 31 533-29" fill="none" stroke="#8f866f" stroke-width="116" stroke-linecap="round" opacity=".48"/>
+<g fill="none" stroke="#595d57" stroke-width="5" opacity=".52">
+  <path d="M160 580l46 58m47-98l24 75m91-102l12 78m97-112l41 76m86-108l34 75m92-81l15 74m103-50l23 83m98-70l33 75m116-60l21 69m85-51l40 62"/>
+</g>
+<g opacity=".82">
+  <g transform="translate(85 310)"><path d="M0 132h170l-18-23-32-5-16-83H67l-8 82-40 7z" fill="#565f55"/><rect x="64" y="13" width="46" height="111" rx="6" fill="url(#stone)"/><path d="M58 20h58l-8-18H66z" fill="#868878"/><path d="M8 124h150" stroke="#314038" stroke-width="9"/></g>
+  <g transform="translate(1300 270)"><path d="M0 145h196l-28-28-47-8-7-90H72l-10 91-41 9z" fill="#4f5c54"/><rect x="70" y="7" width="51" height="123" rx="6" fill="url(#stone)"/><path d="M62 16h67L119 0H72z" fill="#878979"/></g>
+  <g transform="translate(250 220)" fill="#4b5d53"><path d="M0 102h236v39H0z"/><path d="M18 102V22h31v80m56 0V0h34v102m61 0V33h30v69"/></g>
+</g>
+<g opacity=".62" fill="#303f39"><ellipse cx="245" cy="786" rx="260" ry="78"/><ellipse cx="1380" cy="778" rx="250" ry="78"/></g>
+<g transform="translate(1375 560)" filter="url(#glow)">
+  <ellipse cx="0" cy="104" rx="126" ry="46" fill="#39a8ff" opacity=".28"/>
+  <ellipse cx="0" cy="104" rx="83" ry="28" fill="none" stroke="#78dfff" stroke-width="8" opacity=".78"/>
+  <path d="M-45 91L-18 15 0-58 22 13 51 90 0 124z" fill="url(#crystal)" stroke="#b8f2ff" stroke-width="6"/>
+  <path d="M0-58v182M-18 15L0 35l22-22M-45 91L0 74l51 16" fill="none" stroke="#dcfbff" stroke-width="4" opacity=".72"/>
+  <path d="M-93 111l31-62 31 58m123 4L61 48l-30 60" fill="none" stroke="#b99cff" stroke-width="13" stroke-linecap="round" opacity=".8"/>
+</g>
+<g fill="#3b6b45" opacity=".82">
+  <circle cx="120" cy="710" r="34"/><circle cx="165" cy="727" r="27"/><circle cx="1450" cy="690" r="39"/><circle cx="1500" cy="715" r="28"/>
+  <circle cx="325" cy="350" r="26"/><circle cx="1260" cy="354" r="29"/>
+</g>
+<g fill="#dceca8" opacity=".75"><circle cx="205" cy="682" r="5"/><circle cx="220" cy="694" r="4"/><circle cx="1185" cy="744" r="5"/><circle cx="1203" cy="730" r="4"/><circle cx="505" cy="720" r="4"/><circle cx="1020" cy="685" r="5"/></g>
+<g fill="#7757d9" opacity=".72"><path d="M368 310l12-32 14 31-13 22z"/><path d="M1124 327l14-37 16 36-16 24z"/><path d="M1149 338l9-26 12 25-11 18z"/></g>
+<rect width="1600" height="900" fill="none" stroke="#152624" stroke-width="46" opacity=".18"/>
+</svg>

@@ -14,7 +14,7 @@ test('Phase 1938 arena keeps gradient fallback before optional battlefield raste
   const drawArena=game.slice(game.indexOf('private drawArena('),game.indexOf('private drawCore('));
   const fallback=drawArena.indexOf('ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT)');
   const ready=drawArena.indexOf('this.battlefieldEnvironmentAtlasReady');
-  const draw=drawArena.indexOf('ctx.drawImage(');
+  const draw=drawArena.indexOf('ctx.drawImage(this.battlefieldEnvironmentAtlasImage');
   assert.ok(fallback>=0 && ready>fallback && draw>ready);
 });
 

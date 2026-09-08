@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="576" height="384" viewBox="0 0 576 384">
+<defs>
+ <linearGradient id="rock" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a9aa96"/><stop offset="1" stop-color="#4d5850"/></linearGradient>
+ <linearGradient id="wood" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#9a6b38"/><stop offset="1" stop-color="#4c2d20"/></linearGradient>
+ <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d7fbff"/><stop offset=".4" stop-color="#35c8ff"/><stop offset="1" stop-color="#5836d5"/></linearGradient>
+ <filter id="g"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<!-- rune stone -->
+<g transform="translate(0 0)"><ellipse cx="96" cy="157" rx="68" ry="17" fill="#20362b" opacity=".4"/><path d="M48 145L61 54l22-26 45 5 21 35-7 78z" fill="url(#rock)" stroke="#46534c" stroke-width="6"/><path d="M92 56l17 18-12 16 18 19-19 19-19-22 14-17-14-16z" fill="none" stroke="#49cfff" stroke-width="7" filter="url(#g)"/><path d="M49 143l-20 9m113-6l25 8" stroke="#47674b" stroke-width="8" stroke-linecap="round"/></g>
+<!-- arcane crystal -->
+<g transform="translate(192 0)" filter="url(#g)"><ellipse cx="96" cy="158" rx="70" ry="18" fill="#1c3d46" opacity=".5"/><path d="M61 146L48 105l22-19 12-52 17 25 19-43 15 63 27 25-24 42z" fill="url(#blue)" stroke="#a8edff" stroke-width="5"/><path d="M99 59v83M69 87l30 18 34-26M61 123l38-10 37 17" fill="none" stroke="#e2fbff" stroke-width="3" opacity=".7"/></g>
+<!-- barricade -->
+<g transform="translate(384 0)"><ellipse cx="96" cy="159" rx="79" ry="15" fill="#203326" opacity=".4"/><g fill="url(#wood)" stroke="#39271f" stroke-width="5"><path d="M22 121l143-59 9 23-143 59z"/><path d="M18 79l150 52-9 24L10 103z"/></g><g fill="#d5c49b" stroke="#5d4531" stroke-width="4"><path d="M25 75l20-35 5 44z"/><path d="M75 84l20-40 6 50z"/><path d="M126 75l18-38 8 50z"/><path d="M158 97l19-34 3 43z"/></g><g fill="#677078"><rect x="57" y="92" width="22" height="19" rx="3"/><rect x="118" y="99" width="22" height="19" rx="3"/></g></g>
+<!-- blue brazier -->
+<g transform="translate(0 192)"><ellipse cx="96" cy="161" rx="55" ry="14" fill="#20352f" opacity=".4"/><path d="M62 146l9-71h50l10 71z" fill="url(#rock)" stroke="#4a5652" stroke-width="5"/><path d="M55 79h82l-11 22H65z" fill="#8c7a56" stroke="#4e4638" stroke-width="5"/><path d="M82 81c-18-25 12-33 7-58 19 12 20 28 14 39 9-8 18-17 18-29 14 21 4 38-11 50z" fill="#49d9ff" stroke="#a9f4ff" stroke-width="4" filter="url(#g)"/><path d="M77 117h38" stroke="#3daee8" stroke-width="7"/></g>
+<!-- supply crate -->
+<g transform="translate(192 192)"><ellipse cx="96" cy="159" rx="70" ry="14" fill="#20352b" opacity=".4"/><rect x="35" y="62" width="121" height="88" rx="7" fill="url(#wood)" stroke="#3e2c22" stroke-width="6"/><path d="M42 83h106M66 65v82m61-82v82" stroke="#c19a63" stroke-width="6" opacity=".7"/><path d="M83 59h37v94H83z" fill="#345ca0" opacity=".82"/><path d="M101 86l9 13-9 14-9-14z" fill="#e9cf75"/><g fill="#6d7376"><rect x="31" y="58" width="15" height="15"/><rect x="145" y="58" width="15" height="15"/><rect x="31" y="141" width="15" height="15"/><rect x="145" y="141" width="15" height="15"/></g></g>
+<!-- bones -->
+<g transform="translate(384 192)"><ellipse cx="96" cy="160" rx="78" ry="13" fill="#29372c" opacity=".38"/><g fill="#d8d0aa" stroke="#776f5a" stroke-width="4"><path d="M65 104c0-28 21-47 44-43 22 4 31 27 19 44-8 11-18 14-32 12-16-2-31-1-31-13z"/><circle cx="85" cy="91" r="7" fill="#4c473b"/><circle cx="112" cy="91" r="7" fill="#4c473b"/><path d="M95 107l7-7 7 7-7 10z" fill="#4c473b"/><path d="M30 141l111-55 8 13-111 55zM41 89l113 59-8 13-113-59z"/></g><g fill="#d8d0aa"><circle cx="31" cy="147" r="9"/><circle cx="146" cy="91" r="9"/><circle cx="39" cy="94" r="9"/><circle cx="151" cy="153" r="9"/></g></g>
+</svg>

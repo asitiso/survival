@@ -27,6 +27,25 @@ export interface EliteAffixCueOwnershipInput {
   armoredActive?: boolean;
 }
 
+export interface EliteAffixCueLayerInput {
+  activeEliteCount: number;
+  indexFromPriority: number;
+  priorityTarget: boolean;
+  activeAttack: boolean;
+  higherPriorityCue: boolean;
+  battlefieldStress: number;
+  reducedMotion: boolean;
+  reducedFlash: boolean;
+}
+
+export interface EliteAffixCueLayerPresentation {
+  visible: boolean;
+  primary: boolean;
+  alphaScale: number;
+  motionScale: number;
+  responseAlphaScale: number;
+}
+
 const IMPORTANT_HOLD_SECONDS = 0.16;
 const IMPORTANT_RELEASE_SECONDS = 0.10;
 const RESPONSE_HOLD_SECONDS = 0.08;
@@ -110,4 +129,21 @@ export function advanceEliteAffixCueOwnership(
   if (!owner) return { owner: null, holdTtl: 0, releaseTtl: 0, eventPriority: 0 };
   if (previous?.owner === owner) return { owner, holdTtl: 0, releaseTtl: 0, eventPriority: 1 };
   return { owner, holdTtl: PASSIVE_HOLD_SECONDS, releaseTtl: PASSIVE_RELEASE_SECONDS, eventPriority: 1 };
+}
+
+export function eliteAffixCueLayerPresentation(
+  state: EliteAffixCueOwnershipState | undefined,
+  affixId: EliteAffixId,
+  input: EliteAffixCueLayerInput,
+): EliteAffixCueLayerPresentation {
+  const primary = state?.owner === affixId;
+  const flashScale = input.reducedFlash ? 0.72 : 1;
+  const alphaScale = (primary ? 1 : 0.42) * flashScale;
+  return {
+    visible: true,
+    primary,
+    alphaScale,
+    motionScale: input.reducedMotion ? 0 : primary ? 1 : 0.36,
+    responseAlphaScale: alphaScale,
+  };
 }

@@ -59,7 +59,7 @@ test('phase 2473 swift and commander responses reuse existing attack and aura pa
 });
 
 test('phase 2474 elite affix lifecycle audit is release-bound presentation-only and fail-open', async () => {
-  const mod = await importRequired('../src/game/elite-affix-lifecycle-vfx-assets.ts', '../dist/game/elite-affix-lifecycle-vfx-assets.js');
+  const mod = await importRequired('../src/game/elite-affix-lifecycle-vfx-audit.ts', '../dist/game/elite-affix-lifecycle-vfx-audit.js');
   const audit = mod.runEliteAffixLifecycleVfxAudit();
   assert.equal(audit.samples.length, 64);
   assert.equal(audit.actionCount, 9);

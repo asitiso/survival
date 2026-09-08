@@ -65,6 +65,15 @@ function normalizeLane(value: number): EliteAffixCueLane {
   return 0;
 }
 
+export function eliteAffixCueStableStress(battlefieldStress: number): number {
+  const stress = clamp01(battlefieldStress);
+  if (stress < 0.24) return 0.12;
+  if (stress < 0.48) return 0.36;
+  if (stress < 0.72) return 0.60;
+  if (stress < 0.90) return 0.81;
+  return 1;
+}
+
 export function eliteAffixCueLaneSlotCount(activeEliteCount: number, battlefieldStress: number): 1 | 3 | 5 {
   const active = Math.max(1, finiteFloor(activeEliteCount, 1));
   if (active <= 1) return 1;
@@ -167,7 +176,7 @@ export function eliteAffixCueLanePresentation(
   input: EliteAffixCueLanePresentationInput,
 ): EliteAffixCueLanePresentation {
   const lane = state?.lane ?? 0;
-  const stress = clamp01(input.battlefieldStress);
+  const stress = eliteAffixCueStableStress(input.battlefieldStress);
   const radius = Math.max(1, Number.isFinite(input.enemyRadius) ? input.enemyRadius : 1);
   const baseOffset = Math.max(6, Math.min(16, radius * 0.52));
   const densityScale = Math.max(0.40, 1 - stress * 0.52);

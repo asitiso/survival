@@ -1,4 +1,5 @@
 import { Game } from './game/game.js';
+import './game/elite-affix-response-lane-runtime.js';
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from './game/config.js';
 import { visualRegressionProbe, visualProbeSignature } from './game/visual-regression-probe.js';
 import { auditRenderContract, renderContract, renderContractSignature } from './game/render-contract.js';

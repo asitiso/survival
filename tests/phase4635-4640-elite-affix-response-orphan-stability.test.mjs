@@ -58,12 +58,13 @@ test('phase 4639 invalid response-lane values collapse to a finite center-safe s
   assert.equal(fallback.offsetY, 0);
 });
 
-test('phase 4640 EnemyManager stores one response snapshot and reuses it for sprite and Swift connector rendering', async () => {
-  const source = await readFile(new URL('../src/game/enemies.ts', import.meta.url), 'utf8');
-  assert.match(source, /elite-affix-response-lane\.js/);
-  assert.match(source, /laneSnapshot\?:\s*EliteAffixResponseLaneSnapshot/);
-  assert.match(source, /captureEliteAffixResponseLaneSnapshot/);
-  assert.match(source, /retainEliteAffixResponseLaneSnapshot/);
-  assert.match(source, /eliteAffixResponseCueOrigin/);
-  assert.match(source, /responseLane\.alphaScale/);
+test('phase 4640 runtime integration freezes one response snapshot and applies it before the game starts', async () => {
+  const mainSource = await readFile(new URL('../src/main.ts', import.meta.url), 'utf8');
+  const runtimeSource = await readFile(new URL('../src/game/elite-affix-response-lane-runtime.ts', import.meta.url), 'utf8');
+  assert.match(mainSource, /elite-affix-response-lane-runtime\.js/);
+  assert.match(runtimeSource, /laneSnapshot\?:\s*EliteAffixResponseLaneSnapshot/);
+  assert.match(runtimeSource, /captureEliteAffixResponseLaneSnapshot/);
+  assert.match(runtimeSource, /retainEliteAffixResponseLaneSnapshot/);
+  assert.match(runtimeSource, /eliteAffixResponseCueOrigin/);
+  assert.match(runtimeSource, /renderEnemiesWithFrozenResponseLane/);
 });

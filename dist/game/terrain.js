@@ -75,7 +75,7 @@ export class TerrainSystem {
                 continue;
             for (const pool of this.pools) {
                 if (distance(enemy.pos, pool) <= pool.radius + enemy.radius)
-                    enemies.applySlow(enemy, pool.slowFactor, 0.18);
+                    enemies.applySlow(enemy, pool.slowFactor, 0.18, 'terrain');
             }
             for (const wall of this.walls)
                 enemy.pos = resolveCircleVsRect(enemy.pos, enemy.radius, wall);

@@ -12,7 +12,7 @@ import { mythicLastLawIdentityProfile } from './endless/mythic-last-law-identity
 import { activeMythicTacticAttackLink } from './endless/mythic-tactic-attack-link.js';
 import { enemySpritePresentation, enemySpriteRect, isEnemySpriteType } from './enemy-sprite-assets.js';
 import { bossSpritePresentation, bossSpriteRect } from './boss-sprite-assets.js';
-import { eliteAffixIdentityEmphasis, eliteAffixIdentityIcon, eliteAffixIdentityRowLayout } from './elite-affix-identity-assets.js';
+import { advanceFrenziedThresholdLifecycle, advanceSwiftCadenceLifecycle, eliteAffixIdentityEmphasis, eliteAffixIdentityIcon, eliteAffixIdentityRowLayout, frenziedThresholdDensityPresentation, frenziedThresholdPresentation, swiftCadenceDensityPresentation, swiftCadencePresentation, swiftStrikeOwnershipPresentation } from './elite-affix-identity-assets.js';
 import { isSpecialistIntentType, specialistIntentEmphasis, specialistIntentIcon, specialistIntentOnBodyLayout } from './specialist-intent-identity-assets.js';
 import { projectileImpactSourceContinuity } from './projectile-impact-source-continuity.js';
 import { projectileImpactClusters } from './projectile-impact-cluster-compression.js';
@@ -77,6 +77,7 @@ import { bossProjectileReengagementLockPresentation, criticalReengagementBudgetP
 import { effectiveAlphaFloorBudgetPresentation, projectileEffectiveAlphaFloorPresentation, specialistEffectiveAlphaFloorPresentation } from './threat-impact-effective-alpha-floor-rendering.js';
 import { projectileSecondaryCeilingPresentation, secondaryCeilingBudgetPresentation, specialistSecondaryCeilingPresentation } from './threat-impact-secondary-ceiling-rendering.js';
 import { projectileReadabilityContrastPresentation, readabilityContrastBudgetPresentation, specialistReadabilityContrastPresentation } from './threat-impact-readability-contrast-rendering.js';
+import { valueChromaFilter } from './threat-impact-value-chroma-ownership-rendering.js';
 import { finalReadabilitySettleBudgetPresentation, projectileFinalReadabilitySettlePresentation, specialistFinalReadabilitySettlePresentation } from './threat-impact-final-readability-settle-rendering.js';
 import { projectileSecondaryRecoveryGatePresentation, secondaryRecoveryGateBudgetPresentation, specialistSecondaryRecoveryGatePresentation } from './threat-impact-secondary-recovery-gate-rendering.js';
 import { focusTransferCoherenceBudgetPresentation, projectileFocusTransferCoherencePresentation, specialistFocusTransferCoherencePresentation } from './threat-impact-focus-transfer-coherence-rendering.js';
@@ -111,6 +112,13 @@ import { specialistImpactFinishDensityBudgetPresentation } from './specialist-im
 import { bossAnticipationOriginLockPresentation } from './boss-anticipation-origin-lock-rendering.js';
 import { specialistStrikeCueBudgetPresentation } from './specialist-strike-cue-budget-rendering.js';
 import { bossSpecialOriginAnchorPresentation } from './boss-special-origin-anchor-rendering.js';
+export function enemyHealingAccounting(currentHp, maxHp, requestedHeal) {
+    const safeMax = Math.max(0, Number.isFinite(maxHp) ? maxHp : 0);
+    const safeHp = Math.max(0, Math.min(safeMax, Number.isFinite(currentHp) ? currentHp : 0));
+    const requested = Math.max(0, Number.isFinite(requestedHeal) ? requestedHeal : 0);
+    const hpRestored = Math.min(requested, Math.max(0, safeMax - safeHp));
+    return { requestedHeal: requested, hpRestored, overheal: Math.max(0, requested - hpRestored) };
+}
 function isSpecialistEnemyType(type) { return type === 'shieldbearer' || type === 'assassin' || type === 'siegeGolem' || type === 'nullifier'; }
 function pointSegmentProximity(point, a, b, band) { if (!a || !b)
     return 0; const dx = b.x - a.x, dy = b.y - a.y, len2 = dx * dx + dy * dy, safeBand = Math.max(1, band); if (len2 <= .001)
@@ -358,8 +366,10 @@ export class EnemyManager {
                 enemy.spawnGroundMaterialize = advanceEnemyPortalGroundMaterializeState(enemy.spawnGroundMaterialize, null, dt, ctx.reducedMotion ?? false);
             if (enemy.slowTimer > 0)
                 enemy.slowTimer -= dt;
-            else
+            else {
                 enemy.slowFactor = 1;
+                delete enemy.slowSource;
+            }
             if (isSpecialistEnemyType(enemy.type))
                 enemy.specialistLocomotionSignature = advanceSpecialistLocomotionSignatureState(enemy.specialistLocomotionSignature, enemy.type, null, dt);
             if (enemy.type === 'assassin') {
@@ -382,16 +392,24 @@ export class EnemyManager {
             }
             if ((enemy.regenPerSecondRatio ?? 0) > 0 && enemy.hp > 0 && enemy.hp < enemy.maxHp) {
                 const hpBeforeRegen = enemy.hp;
+                const requestedHeal = enemy.maxHp * (enemy.regenPerSecondRatio ?? 0) * dt;
                 enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * (enemy.regenPerSecondRatio ?? 0) * dt);
-                if (enemy.hp > hpBeforeRegen && enemy.eliteAffixes?.includes('regenerating'))
+                const healing = enemyHealingAccounting(hpBeforeRegen, enemy.maxHp, requestedHeal);
+                if (enemy.hp > hpBeforeRegen && enemy.eliteAffixes?.includes('regenerating')) {
                     this.queueEliteAffixResponseVfx(enemy, 'regenerating');
+                    this.feedback?.addHealingResponse?.(enemy.pos, healing, 'regenerating', enemy.pos, enemy.id, enemy.type);
+                }
             }
+            if (enemy.eliteAffixes?.includes('frenzied'))
+                enemy.frenziedPresentation = advanceFrenziedThresholdLifecycle(enemy.frenziedPresentation, enemy.hp / Math.max(1, enemy.maxHp), dt);
             if (enemy.type === 'boss')
                 this.updateBossSpecial(enemy, dt, ctx, director.danger, director.enemyBudget, ctx.bossVariantBonus ?? 0);
             const targetObj = enemy.target === 'core' ? ctx.core : ctx.hero;
             const toTarget = { x: targetObj.pos.x - enemy.pos.x, y: targetObj.pos.y - enemy.pos.y };
             const dist = Math.hypot(toTarget.x, toTarget.y);
             const contact = enemy.radius + targetObj.radius + 5;
+            if (enemy.eliteAffixes?.includes('swift'))
+                enemy.swiftCadencePresentation = advanceSwiftCadenceLifecycle(enemy.swiftCadencePresentation, { inAttackRange: dist <= contact, attackTimer: enemy.attackTimer, attackInterval: enemy.attackInterval, struck: false, dt });
             if (enemy.type === 'nullifier') {
                 const inside = distance(enemy.pos, ctx.hero.pos) <= SPECIALIST_COMBAT_CONTRACT.nullifierEffectRadius + enemy.radius;
                 const wasInside = this.nullifierHeroInside.has(enemy.id);
@@ -466,6 +484,8 @@ export class EnemyManager {
                         this.specialistStrikeOriginVfx.splice(0, this.specialistStrikeOriginVfx.length - 24);
                 }
                 const frenzyDamage = enemy.hp / Math.max(1, enemy.maxHp) <= 0.42 ? (enemy.lowHpDamageMultiplier ?? 1) : 1;
+                if (frenzyDamage > 1 && enemy.eliteAffixes?.includes('frenzied'))
+                    this.feedback?.addFrenziedAttackResponse?.(enemy.pos, targetObj.pos, enemy.id, enemy.target, enemy.type);
                 // Legacy source continuity: if (enemy.target === 'core') ctx.onCoreDamage(...)
                 if (enemy.target === 'core') {
                     const appliedResult = ctx.onCoreDamage(enemy.damage * frenzyDamage, 'contact', enemy.pos);
@@ -485,8 +505,11 @@ export class EnemyManager {
                     this.queueSpecialistReactionVfx(enemy, 'siegeGolem', enemy.pos, targetObj.pos, 0.56);
                     enemy.specialistLocomotionSignature = advanceSpecialistLocomotionSignatureState(enemy.specialistLocomotionSignature, 'siegeGolem', 'plant', 0);
                 }
-                if (enemy.eliteAffixes?.includes('swift'))
-                    this.queueEliteAffixResponseVfx(enemy, 'swift');
+                // Legacy Phase 2473 source contract: this.queueEliteAffixResponseVfx(enemy,'swift');
+                if (enemy.eliteAffixes?.includes('swift')) {
+                    enemy.swiftCadencePresentation = advanceSwiftCadenceLifecycle(enemy.swiftCadencePresentation, { inAttackRange: true, attackTimer: enemy.attackTimer, attackInterval: enemy.attackInterval, struck: true, dt: 0 });
+                    this.queueEliteAffixResponseVfx(enemy, 'swift', targetObj.pos);
+                }
                 enemy.attackTimer = enemy.attackInterval;
             }
             commitRenderMotion();
@@ -517,11 +540,17 @@ export class EnemyManager {
             return false;
         const hpRatioBeforeDamage = enemy.hp / Math.max(1, enemy.maxHp);
         let remaining = amount;
+        let guardBroken = false;
+        let guardBlocked = 0;
+        let shieldAbsorbed = 0;
+        const guardBeforeDamage = enemy.guardHp ?? 0;
+        const shieldBeforeDamage = enemy.manaShield ?? 0;
         if ((enemy.guardHp ?? 0) > 0) {
             const guardBefore = enemy.guardHp ?? 0;
             const blocked = Math.min(enemy.guardHp ?? 0, remaining * 0.72);
+            guardBlocked = blocked;
             enemy.guardHp = Math.max(0, (enemy.guardHp ?? 0) - blocked);
-            const guardBroken = guardBefore > 0 && (enemy.guardHp ?? 0) <= 0;
+            guardBroken = guardBefore > 0 && (enemy.guardHp ?? 0) <= 0;
             if (blocked > 0 && enemy.type === 'shieldbearer') {
                 this.queueSpecialistReactionVfx(enemy, 'shieldbearer', enemy.pos, undefined, guardBroken ? 0.66 : 0.44);
                 enemy.specialistLocomotionSignature = advanceSpecialistLocomotionSignatureState(enemy.specialistLocomotionSignature, 'shieldbearer', 'brace', 0);
@@ -530,15 +559,22 @@ export class EnemyManager {
         }
         if ((enemy.manaShield ?? 0) > 0) {
             const absorbed = Math.min(enemy.manaShield ?? 0, remaining);
+            shieldAbsorbed = absorbed;
             enemy.manaShield = Math.max(0, (enemy.manaShield ?? 0) - absorbed);
             remaining -= absorbed;
             if (absorbed > 0 && enemy.eliteAffixes?.includes('manaShield'))
                 this.queueEliteAffixResponseVfx(enemy, 'manaShield');
         }
         const bossEncounterMultiplier = enemy.type === 'boss' ? this.bossEncounterModifiers.bossDamageTakenMultiplier : 1;
+        const damageTakenMultiplier = enemy.damageTakenMultiplier ?? 1;
+        const appliedHpDamage = remaining * (enemy.damageTakenMultiplier ?? 1) * bossEncounterMultiplier;
         enemy.hp -= remaining * (enemy.damageTakenMultiplier ?? 1) * bossEncounterMultiplier;
+        const defenseResponse = { incoming: amount, guardBlocked, shieldAbsorbed, hpIncoming: remaining, hpApplied: appliedHpDamage, mitigation: remaining - appliedHpDamage, multiplier: damageTakenMultiplier * bossEncounterMultiplier, guardBroken, shieldBroken: shieldBeforeDamage > 0 && (enemy.manaShield ?? 0) <= 0, armored: enemy.eliteAffixes?.includes('armored') ?? false, bossMultiplier: bossEncounterMultiplier };
+        this.feedback?.addDefenseResponse?.(enemy.pos, defenseResponse, source);
         if (remaining > 0 && enemy.eliteAffixes?.includes('armored'))
             this.queueEliteAffixResponseVfx(enemy, 'armored');
+        if (enemy.eliteAffixes?.includes('frenzied'))
+            enemy.frenziedPresentation = advanceFrenziedThresholdLifecycle(enemy.frenziedPresentation, enemy.hp / Math.max(1, enemy.maxHp), 0);
         if (hpRatioBeforeDamage > 0.42 && enemy.hp / Math.max(1, enemy.maxHp) <= 0.42 && enemy.eliteAffixes?.includes('frenzied'))
             this.queueEliteAffixResponseVfx(enemy, 'frenzied');
         enemy.hitFlash = 0.10;
@@ -551,24 +587,37 @@ export class EnemyManager {
         enemy.hitDirectionY = hitVector.y;
         if (enemy.type === 'boss' && impactTier !== 'normal')
             enemy.bossHeavyHitStagger = advanceBossHeavyHitStaggerState(enemy.bossHeavyHitStagger, { tier: impactTier, directionX: hitVector.x, directionY: hitVector.y }, 0);
-        this.feedback?.addHit(enemy.pos, amount, impactTier, enemy.type, source);
-        if (enemy.type === 'boss' && impactTier !== 'normal')
+        if (appliedHpDamage > 0) {
+            const amount = appliedHpDamage;
+            this.feedback?.addHit(enemy.pos, amount, impactTier, enemy.type, source);
+            this.feedback?.tagLatestHitTarget?.(enemy.id);
+        }
+        if (guardBroken)
+            this.feedback?.addActionResult?.(enemy.pos, 'guardBreak', source);
+        if (enemy.type === 'boss' && impactTier !== 'normal') {
             this.feedback?.addImpact(enemy.pos, 'bossHit');
+            this.feedback?.addActionResult?.(enemy.pos, 'bossStagger', source);
+        }
         if (!killed)
             return false;
+        this.feedback?.addActionResult?.(enemy.pos, 'enemyKill', source);
         enemy.alive = false;
         const mythicLastLawReward = enemy.type === 'boss' && enemy.isMythic ? 1.12 : 1;
         this.deaths.push({
             x: enemy.pos.x, y: enemy.pos.y, xp: Math.round(enemy.xp * mythicLastLawReward), gold: Math.round(enemy.gold * mythicLastLawReward), type: enemy.type,
             ...(enemy.type === 'boss' && enemy.bossArchetype ? { bossArchetype: enemy.bossArchetype } : {}),
             wasSlowed: enemy.slowTimer > 0 || enemy.slowFactor < 0.99,
+            ...(enemy.slowSource ? { slowSource: enemy.slowSource } : {}),
             visualSource,
             ...(enemy.type !== 'boss' ? { deathPose: { radius: enemy.radius, facingX: enemy.renderMotion?.facingX ?? 1, facingY: enemy.renderMotion?.facingY ?? 0, motionBlend: enemy.renderMotion?.motionBlend ?? 0, turn: enemy.renderMotion?.turn ?? 0, impactX: enemy.hitDirectionX ?? fallbackDirection.x, impactY: enemy.hitDirectionY ?? fallbackDirection.y, tier: impactTier } } : {}),
         });
         return true;
     }
-    applySlow(enemy, factor, duration) {
-        enemy.slowFactor = Math.min(enemy.slowFactor, Math.max(0.25, factor));
+    applySlow(enemy, factor, duration, source = 'generic') {
+        const appliedFactor = Math.max(0.25, factor);
+        if (appliedFactor < enemy.slowFactor - 0.0001 || !enemy.slowSource)
+            enemy.slowSource = source;
+        enemy.slowFactor = Math.min(enemy.slowFactor, appliedFactor);
         enemy.slowTimer = Math.max(enemy.slowTimer, duration);
     }
     pushAway(enemy, origin, distanceAmount) {
@@ -697,7 +746,7 @@ export class EnemyManager {
                 ctx.globalAlpha = Math.min(bossTravel?.alpha ?? 0, bossTravelRelease.alpha) * bossBridgeBudget.alphaScale * threatOwnership.travelAlphaScale * projectilePriority.secondaryAlphaScale * projectileLayerBudget.projectileDecorationScale * projectileSpatial.trailAlphaScale * bossSpatialFocus.secondaryAlphaScale * projectileTemporal.directionAlphaScale * projectileTemporalBudget.secondaryAlphaScale * projectileDepth.trailAlphaScale * projectileLaneDepth.trailAlphaScale * projectileDepthBudget.secondaryAlphaScale * projectileDepthRecovery.trailAlphaScale * safeLaneDepthRecovery.trailAlphaScale * projectileRecoveryBudget.secondaryRecoveryScale * projectileCriticalLatch.secondaryAlphaScale * projectileCanonicalStack.trailAlphaScale * projectileUnifiedStack.secondaryAlphaScale * projectileCorridorSeparation.trailAlphaScale * projectileSpatialSeparationBudget.secondaryAlphaScale * projectileCorridorRelease.trailAlphaScale * projectileSpatialRecoveryBudget.secondaryRecoveryScale * projectileDenseArbitration.trailAlphaScale * projectileDenseBattlefield.secondaryAlphaScale * projectileDepthPlane.trailScale * projectileDepthPlaneBudget.backgroundScale * projectileDepthReentry.trailScale * projectileDepthReentryBudget.secondaryReentryScale * projectileBossFocus.trailScale * projectileBossFocusBudget.secondaryScale * projectileCanonicalReacquisition.trailScale * projectileCanonicalReacquisitionBudget.staleDecorationScale * projectileDirectionReacquisition.primaryDirectionScale * projectileDirectionReacquisitionBudget.staleDirectionScale * projectileCriticalReengagement.trailScale * projectileCriticalReengagementBudget.secondaryScale * projectileSecondaryCeiling.trailScale * projectileSecondaryCeilingBudget.secondaryScale * projectileReadabilityContrast.trailScale * projectileReadabilityContrastBudget.secondaryScale * projectileFinalSettle.secondaryScale * projectileFinalSettleBudget.secondaryScale * projectileSecondaryRecoveryGate.secondaryScale * projectileSecondaryRecoveryGateBudget.secondaryScale * projectileFocusTransfer.secondaryScale * projectileFocusTransferBudget.secondaryScale * projectileRhythm.secondaryScale * projectileRhythmBudget.secondaryScale * projectileRhythmRecovery.secondaryScale * projectileRhythmRecoveryBudget.secondaryScale * projectileDenseRhythm.secondaryScale * projectileDenseRhythmBudget.secondaryScale;
                 ctx.translate(projectileNormalX * projectileSpatial.lateralOffset, projectileNormalY * projectileSpatial.lateralOffset);
                 ctx.strokeStyle = '#ffb26f';
-                ctx.lineWidth = Math.max(1.2, projectile.radius * .15);
+                ctx.lineWidth = Math.max(1.2, projectile.radius * .15) * projectileReadabilityContrast.strokeWidthScale * (projectile.bossArchetype ? 1 : projectileFinalSettle.strokeWidthScale * projectileReadabilityContrastBudget.secondaryStrokeWidthScale);
                 ctx.beginPath();
                 ctx.moveTo(bossTravelRelease.start.x, bossTravelRelease.start.y);
                 ctx.lineTo(bossTravelRelease.end.x, bossTravelRelease.end.y);
@@ -709,7 +758,8 @@ export class EnemyManager {
                 ctx.globalAlpha = trail.alpha * threatOwnership.launchAlphaScale * directionCarryRecovery.tailAlphaScale * projectileResolution.transitionAlphaScale * projectileResolutionBudget.effectStrength * projectilePriority.secondaryAlphaScale * projectileOverlap.alphaScale * projectileLayerBudget.projectileDecorationScale * projectileSpatial.trailAlphaScale * bossSpatialFocus.secondaryAlphaScale * projectileTemporal.directionAlphaScale * projectileTemporalBudget.secondaryAlphaScale * projectileDepth.trailAlphaScale * projectileLaneDepth.trailAlphaScale * projectileDepthBudget.secondaryAlphaScale * projectileDepthRecovery.trailAlphaScale * safeLaneDepthRecovery.trailAlphaScale * projectileRecoveryBudget.secondaryRecoveryScale * projectileCriticalLatch.secondaryAlphaScale * projectileCanonicalStack.trailAlphaScale * projectileUnifiedStack.secondaryAlphaScale * projectileCorridorSeparation.trailAlphaScale * projectileSpatialSeparationBudget.secondaryAlphaScale * projectileCorridorRelease.trailAlphaScale * projectileSpatialRecoveryBudget.secondaryRecoveryScale * projectileDenseArbitration.trailAlphaScale * projectileDenseBattlefield.secondaryAlphaScale * projectileDepthPlane.trailScale * projectileDepthPlaneBudget.backgroundScale * projectileDepthReentry.trailScale * projectileDepthReentryBudget.secondaryReentryScale * projectileBossFocus.trailScale * projectileBossFocusBudget.secondaryScale * projectileCanonicalReacquisition.trailScale * projectileCanonicalReacquisitionBudget.staleDecorationScale * projectileDirectionReacquisition.primaryDirectionScale * projectileDirectionReacquisitionBudget.staleDirectionScale * projectileCriticalReengagement.trailScale * projectileCriticalReengagementBudget.secondaryScale * projectileSecondaryCeiling.trailScale * projectileSecondaryCeilingBudget.secondaryScale * projectileReadabilityContrast.trailScale * projectileReadabilityContrastBudget.secondaryScale * projectileFinalSettle.secondaryScale * projectileFinalSettleBudget.secondaryScale * projectileSecondaryRecoveryGate.secondaryScale * projectileSecondaryRecoveryGateBudget.secondaryScale * projectileFocusTransfer.secondaryScale * projectileFocusTransferBudget.secondaryScale * projectileRhythm.secondaryScale * projectileRhythmBudget.secondaryScale * projectileRhythmRecovery.secondaryScale * projectileRhythmRecoveryBudget.secondaryScale * projectileDenseRhythm.secondaryScale * projectileDenseRhythmBudget.secondaryScale;
                 ctx.translate(projectileNormalX * projectileSpatial.lateralOffset, projectileNormalY * projectileSpatial.lateralOffset);
                 ctx.strokeStyle = projectile.bossArchetype ? '#ffb26f' : '#ff7c86';
-                ctx.lineWidth = Math.max(1.3, projectile.radius * .2);
+                ctx.filter = projectile.bossArchetype ? 'none' : valueChromaFilter(projectileReadabilityContrast.valueScale * projectileFinalSettle.valueScale * projectileReadabilityContrastBudget.secondaryValueScale, projectileReadabilityContrast.chromaScale * projectileFinalSettle.chromaScale * projectileReadabilityContrastBudget.secondaryChromaScale);
+                ctx.lineWidth = Math.max(1.3, projectile.radius * .2) * projectileReadabilityContrast.strokeWidthScale * (projectile.bossArchetype ? 1 : projectileFinalSettle.strokeWidthScale * projectileReadabilityContrastBudget.secondaryStrokeWidthScale);
                 ctx.beginPath();
                 ctx.moveTo(trail.tail.x, trail.tail.y);
                 ctx.lineTo(trail.head.x, trail.head.y);
@@ -722,7 +772,8 @@ export class EnemyManager {
                 ctx.globalAlpha = travelThreatCarry.alphaScale * threatOwnership.travelAlphaScale * directionCarryRecovery.tailAlphaScale * projectileResolution.transitionAlphaScale * projectileResolutionBudget.effectStrength * projectilePriority.secondaryAlphaScale * projectileOverlap.alphaScale * projectileLayerBudget.projectileDecorationScale * projectileSpatial.trailAlphaScale * bossSpatialFocus.secondaryAlphaScale * projectileTemporal.directionAlphaScale * projectileTemporalBudget.secondaryAlphaScale * projectileDepth.trailAlphaScale * projectileLaneDepth.trailAlphaScale * projectileDepthBudget.secondaryAlphaScale * projectileDepthRecovery.trailAlphaScale * safeLaneDepthRecovery.trailAlphaScale * projectileRecoveryBudget.secondaryRecoveryScale * projectileCriticalLatch.secondaryAlphaScale * projectileCanonicalStack.trailAlphaScale * projectileUnifiedStack.secondaryAlphaScale * projectileCorridorSeparation.trailAlphaScale * projectileSpatialSeparationBudget.secondaryAlphaScale * projectileCorridorRelease.trailAlphaScale * projectileSpatialRecoveryBudget.secondaryRecoveryScale * projectileDenseArbitration.trailAlphaScale * projectileDenseBattlefield.secondaryAlphaScale * projectileDepthPlane.trailScale * projectileDepthPlaneBudget.backgroundScale * projectileDepthReentry.trailScale * projectileDepthReentryBudget.secondaryReentryScale * projectileBossFocus.trailScale * projectileBossFocusBudget.secondaryScale * projectileCanonicalReacquisition.trailScale * projectileCanonicalReacquisitionBudget.staleDecorationScale * projectileDirectionReacquisition.primaryDirectionScale * projectileDirectionReacquisitionBudget.staleDirectionScale * projectileCriticalReengagement.trailScale * projectileCriticalReengagementBudget.secondaryScale * projectileSecondaryCeiling.trailScale * projectileSecondaryCeilingBudget.secondaryScale * projectileReadabilityContrast.trailScale * projectileReadabilityContrastBudget.secondaryScale * projectileFinalSettle.secondaryScale * projectileFinalSettleBudget.secondaryScale * projectileSecondaryRecoveryGate.secondaryScale * projectileSecondaryRecoveryGateBudget.secondaryScale * projectileFocusTransfer.secondaryScale * projectileFocusTransferBudget.secondaryScale * projectileRhythm.secondaryScale * projectileRhythmBudget.secondaryScale * projectileRhythmRecovery.secondaryScale * projectileRhythmRecoveryBudget.secondaryScale * projectileDenseRhythm.secondaryScale * projectileDenseRhythmBudget.secondaryScale;
                 ctx.translate(projectileNormalX * projectileSpatial.lateralOffset, projectileNormalY * projectileSpatial.lateralOffset);
                 ctx.strokeStyle = projectile.bossArchetype ? '#ffb26f' : '#ff7c86';
-                ctx.lineWidth = Math.max(1.1, projectile.radius * .14);
+                ctx.filter = projectile.bossArchetype ? 'none' : valueChromaFilter(projectileReadabilityContrast.valueScale * projectileFinalSettle.valueScale * projectileReadabilityContrastBudget.secondaryValueScale, projectileReadabilityContrast.chromaScale * projectileFinalSettle.chromaScale * projectileReadabilityContrastBudget.secondaryChromaScale);
+                ctx.lineWidth = Math.max(1.1, projectile.radius * .14) * projectileReadabilityContrast.strokeWidthScale * (projectile.bossArchetype ? 1 : projectileFinalSettle.strokeWidthScale * projectileReadabilityContrastBudget.secondaryStrokeWidthScale);
                 ctx.beginPath();
                 ctx.moveTo(visualPos.x - dx * len, visualPos.y - dy * len);
                 ctx.lineTo(visualPos.x, visualPos.y);
@@ -733,7 +784,7 @@ export class EnemyManager {
             ctx.save();
             ctx.globalAlpha = Math.max(projectileEffectiveFloor.bodyAlphaFloor * projectileEffectiveFloorBudget.canonicalFloorScale, projectileReadabilityContrast.bodyAlphaFloor * projectileReadabilityContrastBudget.primaryScale, projectileFinalSettle.primaryFloor, (hasBossVisual ? 0.28 : 1) * projectileResolution.bodyAlphaScale * projectileDepth.bodyAlphaScale * projectileLaneDepth.bodyAlphaScale * projectileDepthBudget.canonicalBodyAlphaScale * projectileDepthRecovery.bodyAlphaScale * safeLaneDepthRecovery.bodyAlphaScale * projectileRecoveryBudget.canonicalBodyAlphaScale * projectileCriticalLatch.criticalAlphaScale * projectileCanonicalStack.bodyAlphaScale * projectileUnifiedStack.canonicalBodyAlphaScale * projectileCorridorSeparation.bodyAlphaScale * projectileSpatialSeparationBudget.canonicalBodyAlphaScale * projectileCorridorRelease.bodyAlphaScale * projectileSpatialRecoveryBudget.canonicalBodyAlphaScale * projectileDenseArbitration.bodyAlphaScale * projectileDenseBattlefield.canonicalBodyAlphaScale * projectileDepthPlane.bodyScale * projectileDepthPlaneBudget.canonicalScale * projectileDepthReentry.bodyScale * projectileDepthReentryBudget.canonicalScale * projectileBossFocus.bodyScale * projectileBossFocusBudget.canonicalScale * projectileCanonicalReacquisition.bodyScale * projectileCanonicalReacquisitionBudget.canonicalScale * projectileCriticalReengagement.bodyScale * projectileCriticalReengagementBudget.canonicalScale);
             ctx.shadowColor = '#ff4457';
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = projectile.bossArchetype ? 10 : 10 * projectileReadabilityContrast.glowBlurScale * projectileFinalSettle.glowBlurScale * projectileReadabilityContrastBudget.secondaryGlowBlurScale;
             ctx.fillStyle = '#ff7c86';
             ctx.beginPath();
             ctx.arc(visualPos.x, visualPos.y, projectile.radius, 0, Math.PI * 2);
@@ -932,6 +983,12 @@ export class EnemyManager {
         const activeSpecialists = this.enemies.filter((enemy) => isSpecialistEnemyType(enemy.type));
         const activeSpecialistCount = activeSpecialists.length;
         const specialistAnticipationRank = new Map(activeSpecialists.map((enemy, index) => [enemy, Math.max(0, activeSpecialists.length - 1 - index)]));
+        const activeFrenzied = this.enemies.filter((enemy) => enemy.eliteAffixes?.includes('frenzied') && enemy.frenziedPresentation?.phase !== 'inactive');
+        const frenziedPriority = [...activeFrenzied].sort((a, b) => { const score = (enemy) => { const target = enemy.target === 'core' ? corePos : heroPos; const d = target ? distance(enemy.pos, target) : 9999; return (enemy.target === 'core' ? 4 : 0) + (d <= 120 ? 4 : 0) + (enemy.hitFlash > 0 ? 2 : 0) + (enemy.frenziedPresentation?.phase === 'entered' ? 1 : 0); }; return score(b) - score(a); });
+        const frenziedPriorityRank = new Map(frenziedPriority.map((enemy, index) => [enemy, index]));
+        const activeSwift = this.enemies.filter((enemy) => enemy.eliteAffixes?.includes('swift') && enemy.swiftCadencePresentation);
+        const swiftPriority = [...activeSwift].sort((a, b) => { const score = (enemy) => { const target = enemy.target === 'core' ? corePos : heroPos; const d = target ? distance(enemy.pos, target) : 9999; return (enemy.target === 'core' ? 4 : 0) + (d <= 120 ? 4 : 0) + (enemy.hitFlash > 0 ? 2 : 0) + (enemy.swiftCadencePresentation?.phase === 'strike' ? 3 : enemy.swiftCadencePresentation?.phase === 'ready' ? 1 : 0); }; return score(b) - score(a); });
+        const swiftPriorityRank = new Map(swiftPriority.map((enemy, index) => [enemy, index]));
         for (const enemy of this.enemies) {
             ctx.save();
             ctx.translate(enemy.pos.x, enemy.pos.y);
@@ -1390,6 +1447,41 @@ export class EnemyManager {
                         ctx.restore();
                     }
                 }
+                if (enemy.eliteAffixes.includes('swift') && enemy.swiftCadencePresentation && targetPos) {
+                    const swift = swiftCadencePresentation(enemy.swiftCadencePresentation, reducedMotion, reducedFlash), swiftPriorityTarget = enemy.target === 'core' || targetDistance <= 120 || enemy.hitFlash > 0 || enemy.swiftCadencePresentation?.phase === 'strike', swiftDensity = swiftCadenceDensityPresentation(enemy.swiftCadencePresentation, { activeCount: activeSwift.length, indexFromPriority: swiftPriorityRank.get(enemy) ?? activeSwift.length, priorityTarget: swiftPriorityTarget, higherPriorityCue: hazardPressure >= .72, battlefieldStress: Math.max(0, Math.min(1, hazardPressure)), reducedMotion, reducedFlash });
+                    if (swift.alpha > 0 && swiftDensity.visible) {
+                        const mag = Math.max(1, targetDistance), nx = targetDx / mag, ny = targetDy / mag, start = enemy.radius + 8, end = start + swift.chevronLength * (.8 + .2 * swiftDensity.motionScale), perpX = -ny, perpY = nx, wing = 4;
+                        ctx.save();
+                        ctx.globalAlpha = swift.alpha * swiftDensity.alphaScale;
+                        ctx.strokeStyle = '#9edfff';
+                        ctx.lineWidth = swift.lineWidth;
+                        ctx.beginPath();
+                        ctx.moveTo(nx * start, ny * start);
+                        ctx.lineTo(nx * end, ny * end);
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(nx * end, ny * end);
+                        ctx.lineTo(nx * (end - 5) + perpX * wing, ny * (end - 5) + perpY * wing);
+                        ctx.moveTo(nx * end, ny * end);
+                        ctx.lineTo(nx * (end - 5) - perpX * wing, ny * (end - 5) - perpY * wing);
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+                }
+                if (enemy.eliteAffixes.includes('frenzied')) {
+                    const frenzy = frenziedThresholdPresentation(enemy.frenziedPresentation, reducedMotion, reducedFlash), frenzyPriority = enemy.target === 'core' || targetDistance <= 120 || enemy.hitFlash > 0, frenzyDensity = frenziedThresholdDensityPresentation(enemy.frenziedPresentation, { activeCount: activeFrenzied.length, indexFromPriority: frenziedPriorityRank.get(enemy) ?? activeFrenzied.length, priorityTarget: frenzyPriority, battlefieldStress: Math.max(0, Math.min(1, hazardPressure)), reducedMotion, reducedFlash });
+                    if (frenzy.alpha > 0 && frenzyDensity.visible) {
+                        const hpRatio = enemy.hp / Math.max(1, enemy.maxHp), pulse = Math.sin((1 - hpRatio) * Math.PI * 4) * frenzy.pulse * frenzyDensity.pulseScale;
+                        ctx.save();
+                        ctx.globalAlpha = frenzy.alpha * frenzyDensity.alphaScale;
+                        ctx.strokeStyle = '#ff7a68';
+                        ctx.lineWidth = frenzy.lineWidth;
+                        ctx.beginPath();
+                        ctx.arc(0, 0, enemy.radius + frenzy.radiusOffset + pulse, 0, Math.PI * 2);
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+                }
                 const layout = eliteAffixIdentityRowLayout(enemy.eliteAffixes.length, enemy.radius, enemy.pos);
                 if (eliteAffixAtlasReady && eliteAffixAtlasImage) {
                     const hpRatio = enemy.hp / Math.max(1, enemy.maxHp);
@@ -1458,6 +1550,28 @@ export class EnemyManager {
                 ctx.globalAlpha = Math.min(reducedFlash ? 0.48 : 0.88, t);
                 ctx.drawImage(eliteAffixLifecycleVfxAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, cue.pos.x - size / 2, cue.pos.y - size / 2, size, size);
                 ctx.restore();
+                if (cue.affixId === 'swift' && cue.targetPos && cue.targetKind) {
+                    const sourceEnemy = this.enemies.find((candidate) => candidate.id === cue.enemyId);
+                    const ownership = swiftStrikeOwnershipPresentation({ actualStrike: true, targetKind: cue.targetKind, distanceToTarget: distance(cue.pos, cue.targetPos), recentlyHit: (sourceEnemy?.hitFlash ?? 0) > 0, battlefieldStress: Math.max(0, Math.min(1, hazardPressure)), reducedMotion, reducedFlash });
+                    if (ownership.visible) {
+                        const dx = cue.targetPos.x - cue.pos.x, dy = cue.targetPos.y - cue.pos.y, mag = Math.hypot(dx, dy) || 1, nx = dx / mag, ny = dy / mag, travel = Math.min(72, Math.max(30, mag * .55)), endX = cue.pos.x + nx * travel, endY = cue.pos.y + ny * travel, perpX = -ny, perpY = nx, wing = 6 * ownership.chevronScale;
+                        ctx.save();
+                        ctx.globalAlpha = ownership.connectorAlpha * t;
+                        ctx.strokeStyle = '#9edfff';
+                        ctx.lineWidth = 2 * ownership.priorityScale;
+                        ctx.beginPath();
+                        ctx.moveTo(cue.pos.x + nx * 10, cue.pos.y + ny * 10);
+                        ctx.lineTo(endX, endY);
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(endX, endY);
+                        ctx.lineTo(endX - nx * 7 + perpX * wing, endY - ny * 7 + perpY * wing);
+                        ctx.moveTo(endX, endY);
+                        ctx.lineTo(endX - nx * 7 - perpX * wing, endY - ny * 7 - perpY * wing);
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+                }
             }
         }
         if (specialistReactionLifecycleVfxAtlasReady && specialistReactionLifecycleVfxAtlasImage) {
@@ -1540,6 +1654,15 @@ export class EnemyManager {
             if (distance(candidate.pos, enemy.pos) <= 190 + candidate.radius) {
                 if (candidate.eliteAffixes?.includes('commander'))
                     this.queueEliteAffixResponseVfx(candidate, 'commander');
+                if (enemy.commandAuraOwnerId !== candidate.id) {
+                    if (enemy.commandAuraOwnerId !== undefined)
+                        enemy.commandAuraPreviousOwnerId = enemy.commandAuraOwnerId;
+                    enemy.commandAuraHandoffTtl = 0.18;
+                }
+                enemy.commandAuraOwnerId = candidate.id;
+                enemy.commandAuraOwnerPos = { ...candidate.pos };
+                enemy.commandAuraPresentationTtl = 0.24;
+                this.feedback?.addCommanderAuraResponse?.(candidate.pos, enemy.pos, candidate.id, enemy.id, enemy.type, enemy.target);
                 return candidate.commandAuraMultiplier ?? 1;
             }
         }
@@ -1778,7 +1901,11 @@ export class EnemyManager {
                 continue;
             if (distance(shaman.pos, ally.pos) > SPECIALIST_COMBAT_CONTRACT.shamanHealRadius + ally.radius)
                 continue;
+            const hpBeforeHeal = ally.hp;
+            const requestedHeal = Math.max(SPECIALIST_COMBAT_CONTRACT.shamanHealMinimum, ally.maxHp * SPECIALIST_COMBAT_CONTRACT.shamanHealRatio);
             ally.hp = Math.min(ally.maxHp, ally.hp + Math.max(SPECIALIST_COMBAT_CONTRACT.shamanHealMinimum, ally.maxHp * SPECIALIST_COMBAT_CONTRACT.shamanHealRatio));
+            const healing = enemyHealingAccounting(hpBeforeHeal, ally.maxHp, requestedHeal);
+            this.feedback?.addHealingResponse?.(ally.pos, healing, 'shaman', shaman.pos, ally.id, ally.type);
             ally.hitFlash = Math.max(ally.hitFlash, 0.04);
             healedCount += 1;
         }
@@ -1808,12 +1935,12 @@ export class EnemyManager {
         if (this.regularEnemyActionVfx.length > 28)
             this.regularEnemyActionVfx.splice(0, this.regularEnemyActionVfx.length - 28);
     }
-    queueEliteAffixResponseVfx(enemy, affixId) {
+    queueEliteAffixResponseVfx(enemy, affixId, targetPos) {
         const existing = this.eliteAffixResponseVfx.find((cue) => cue.enemyId === enemy.id && cue.affixId === affixId && cue.ttl > 0.12);
         if (existing)
             return;
         const maxTtl = 0.42;
-        this.eliteAffixResponseVfx.push({ pos: { ...enemy.pos }, enemyId: enemy.id, affixId, ttl: maxTtl, maxTtl });
+        this.eliteAffixResponseVfx.push({ pos: { ...enemy.pos }, enemyId: enemy.id, affixId, ...(targetPos ? { targetPos: { ...targetPos }, targetKind: enemy.target } : {}), ttl: maxTtl, maxTtl });
         if (this.eliteAffixResponseVfx.length > 32)
             this.eliteAffixResponseVfx.splice(0, this.eliteAffixResponseVfx.length - 32);
     }

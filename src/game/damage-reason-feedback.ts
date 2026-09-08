@@ -1,6 +1,8 @@
+import { consumeRenderedAttackOutcome, type AttackOutcomeMetadata } from './attack-outcome-linkage.js';
+
 export type DamageReasonSource='contact'|'projectile'|'explosion'|'arena'|'strain';
 export type DamageReasonSeverity='normal'|'heavy'|'critical';
-export interface DamageReasonState{source:DamageReasonSource;label:string;severity:DamageReasonSeverity;amount:number;expiresAt:number;}
+export interface DamageReasonState{source:DamageReasonSource;label:string;severity:DamageReasonSeverity;amount:number;expiresAt:number;attackIntent?:AttackOutcomeMetadata;}
 
 const LABELS:Record<DamageReasonSource,string>={
   contact:'근접 공격',projectile:'투사체 피격',explosion:'폭발 피격',arena:'위험지대',strain:'과부하 피해',
@@ -8,6 +10,11 @@ const LABELS:Record<DamageReasonSource,string>={
 const DENSITY_GUARD_SECONDS=.22;
 const SEVERITY_RANK:Record<DamageReasonSeverity,number>={normal:0,heavy:1,critical:2};
 function dwellSeconds(severity:DamageReasonSeverity):number{return severity==='critical'?1.15:severity==='heavy'?.95:.72;}
+function linkedDamageLabel(intent:AttackOutcomeMetadata,baseLabel:string):string{
+  if(intent.enemyType==='boss')return `보스 · ${baseLabel}`;
+  if(intent.enemyType==='bomber')return `폭탄병 · ${baseLabel}`;
+  return baseLabel;
+}
 export function damageReasonCue(source:DamageReasonSource,amount:number,maxHp:number):Pick<DamageReasonState,'source'|'label'|'severity'> {
   const ratio=Math.max(0,amount)/Math.max(1,maxHp);
   const severity:DamageReasonSeverity=ratio>=.32?'critical':ratio>=.12?'heavy':'normal';
@@ -24,6 +31,8 @@ export function recordDamageReason(previous:DamageReasonState|null,source:Damage
   }
   const total=merge&&previous?previous.amount+Math.max(0,amount):Math.max(0,amount);
   const mergedCue=damageReasonCue(source,total,maxHp);
-  return{...mergedCue,amount:total,expiresAt:nowSeconds+dwellSeconds(mergedCue.severity)};
+  const attackIntent=consumeRenderedAttackOutcome('hero',source);
+  const label=attackIntent?linkedDamageLabel(attackIntent,mergedCue.label):mergedCue.label;
+  return{...mergedCue,label,amount:total,expiresAt:nowSeconds+dwellSeconds(mergedCue.severity),...(attackIntent?{attackIntent}:{})};
 }
 export function advanceDamageReason(state:DamageReasonState|null,nowSeconds:number):DamageReasonState|null{return state&&state.expiresAt>nowSeconds?state:null;}

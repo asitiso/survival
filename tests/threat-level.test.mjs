@@ -10,8 +10,12 @@ test('threat levels clamp to zero through five and have readable names', () => {
 
 test('higher threat increases simultaneous pressure and rewards without player damage nerfs', () => {
   const zero = threatLevelModifiers(0);
+  const two = threatLevelModifiers(2);
   const five = threatLevelModifiers(5);
-  assert.equal(zero.spawnPressureMultiplier, 1);
+  assert.equal(zero.spawnPressureMultiplier, 0.8);
+  assert.equal(two.spawnPressureMultiplier, 1);
+  assert.ok(zero.projectileSpeedMultiplier < two.projectileSpeedMultiplier);
+  assert.ok(zero.bossSpecialCadenceMultiplier > two.bossSpecialCadenceMultiplier);
   assert.ok(five.spawnPressureMultiplier >= 1.45);
   assert.ok(five.eliteIntervalMultiplier < zero.eliteIntervalMultiplier);
   assert.ok(five.enemySpeedMultiplier > zero.enemySpeedMultiplier);

@@ -1,0 +1,3 @@
+const clamp01=(value:number)=>Math.max(0,Math.min(1,Number.isFinite(value)?value:0));
+const smooth01=(value:number)=>{const x=clamp01(value);return x*x*(3-2*x);};
+export function contourReleasePresentation(input:{reacquire:number;stress:number;critical:boolean},reducedMotion=false,reducedFlash=false){const release=smooth01(input.reacquire),stress=clamp01(input.stress),hold=(1-release)*((input.critical?.028:.04)+stress*(input.critical?.018:.025)),accessibility=(reducedMotion?.997:1)*(reducedFlash?.997:1);return{release,canonicalContourScale:1,secondaryContourScale:Math.max(input.critical?.954:.935,1-hold)*accessibility,presentationOnly:true as const};}

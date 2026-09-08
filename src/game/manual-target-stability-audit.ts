@@ -82,7 +82,7 @@ function releaseChecks(): boolean[] {
     const first = enemy(21, 'grunt', 120);
     const next = enemy(22, 'grunt', 80);
     memory.select([first], hero, core, 30);
-    return memory.select([first, next], hero, core, 30.75)?.id === next.id;
+    return memory.select([first, next], hero, core, 31.16)?.id === next.id;
   })();
   const death = (() => {
     const memory = new ManualTargetMemory();

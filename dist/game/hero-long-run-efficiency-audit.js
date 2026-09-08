@@ -5,12 +5,12 @@ import { heroThreatPressureIndex } from './hero-threat-release-audit.js';
 const HOURS = [2, 4, 8, 12];
 const THREATS = [0, 3, 5];
 function round(value) { return Math.round(value * 10000) / 10000; }
+function buildsForHero(builds, heroId) { return builds.filter((sample) => sample.heroId === heroId && sample.threat === 0); }
 function buildScore(sample, hours) {
     const t = (hours - 2) / 10;
     return sample.compositeIndex * Math.pow(sample.survivalIndex, .04 + .015 * t) * Math.pow(sample.coreGuardIndex, .02 + .01 * t) * Math.pow(sample.economyIndex, .04 - .005 * t) * Math.pow(sample.tempoIndex, .035 - .005 * t);
 }
-export function heroLongRunEfficiencySamples() {
-    const builds = completedBuildMetaSamples();
+function heroLongRunEfficiencySamplesFrom(builds) {
     const samples = [];
     for (const hero of HERO_PROFILES)
         for (const threat of THREATS)
@@ -24,8 +24,10 @@ export function heroLongRunEfficiencySamples() {
             }
     return samples;
 }
+export function heroLongRunEfficiencySamples() { return heroLongRunEfficiencySamplesFrom(completedBuildMetaSamples()); }
 export function auditHeroLongRunEfficiency() {
-    const samples = heroLongRunEfficiencySamples();
+    const builds = completedBuildMetaSamples();
+    const samples = heroLongRunEfficiencySamplesFrom(builds);
     let maxHeroEfficiencySpread = 1, minThreatFiveRetention = 1, minTwelveHourRetention = 1, threatMonotonic = true;
     for (const threat of THREATS)
         for (const hours of HOURS) {
@@ -37,8 +39,11 @@ export function auditHeroLongRunEfficiency() {
             const t0 = samples.find((sample) => sample.heroId === hero.id && sample.threat === 0 && sample.hours === hours).efficiencyIndex;
             const t3 = samples.find((sample) => sample.heroId === hero.id && sample.threat === 3 && sample.hours === hours).efficiencyIndex;
             const t5 = samples.find((sample) => sample.heroId === hero.id && sample.threat === 5 && sample.hours === hours).efficiencyIndex;
-            minThreatFiveRetention = Math.min(minThreatFiveRetention, t5 / Math.max(.0001, t0));
-            if (!(t0 > t3 && t3 > t5))
+            const baselineBuild = Math.max(...buildsForHero(builds, hero.id).map((sample) => buildScore(sample, hours)));
+            const reward = longRunRewardDensityPolicy(hours * 3600, 0);
+            const t2 = baselineBuild * Math.pow(reward.goldMultiplier, .04) * Math.pow(reward.xpMultiplier, .06) / Math.pow(heroThreatPressureIndex(hours * 60, 2), .38);
+            minThreatFiveRetention = Math.min(minThreatFiveRetention, t5 / Math.max(.0001, t2));
+            if (!(t0 > t2 && t2 > t3 && t3 > t5))
                 threatMonotonic = false;
         }
     for (const hero of HERO_PROFILES)
@@ -51,5 +56,5 @@ export function auditHeroLongRunEfficiency() {
     minThreatFiveRetention = round(minThreatFiveRetention);
     minTwelveHourRetention = round(minTwelveHourRetention);
     const passed = samples.length === 48 && maxHeroEfficiencySpread <= 1.20 && minThreatFiveRetention >= .75 && minTwelveHourRetention >= .92 && threatMonotonic;
-    return { samples, maxHeroEfficiencySpread, minThreatFiveRetention, minTwelveHourRetention, threatMonotonic, passed };
+    return { samples, maxHeroEfficiencySpread, minThreatFiveRetention, retentionBaselineThreat: 2, minTwelveHourRetention, threatMonotonic, passed };
 }

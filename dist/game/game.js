@@ -186,6 +186,7 @@ import { coreGuardPressureVectorOrientationPresentation } from './core-guard-pre
 import { advanceCoreGuardPressureVectorHysteresis, createCoreGuardPressureVectorHysteresisState } from './core-guard-pressure-vector-hysteresis-rendering.js';
 import { advanceCoreGuardDamageSourceHysteresis, createCoreGuardDamageSourceHysteresisState } from './core-guard-damage-source-hysteresis-rendering.js';
 import { FREEZE_CONTROL_VFX_ATLAS, freezeControlVfxClassForEnemyType, freezeControlVfxSprite } from './freeze-control-vfx-assets.js';
+import { advanceFreezeStatusLifecycle, createFreezeStatusLifecycleState, freezeCrowdBudget, freezeStatusEdgePresentation, slowSourceCuePresentation, slowDeathUsesFreezeShatter } from './freeze-status-readability.js';
 import { REGULAR_ENEMY_ACTION_VFX_ATLAS } from './regular-enemy-action-vfx-assets.js';
 import { ELITE_AFFIX_LIFECYCLE_VFX_ATLAS } from './elite-affix-lifecycle-vfx-assets.js';
 import { ENEMY_TARGET_PRESSURE_VFX_ATLAS } from './enemy-target-pressure-vfx-assets.js';
@@ -235,6 +236,8 @@ import { bossTelegraphReengagementLockPresentation, criticalReengagementBudgetPr
 import { effectiveAlphaFloorBudgetPresentation, hazardEffectiveAlphaFloorPresentation, safeLaneEffectiveAlphaFloorPresentation } from './threat-impact-effective-alpha-floor-rendering.js';
 import { bossSecondaryCeilingPresentation, hazardSecondaryCeilingPresentation, secondaryCeilingBudgetPresentation } from './threat-impact-secondary-ceiling-rendering.js';
 import { hazardReadabilityContrastPresentation, readabilityContrastBudgetPresentation, safeLaneReadabilityContrastPresentation } from './threat-impact-readability-contrast-rendering.js';
+import { denseDashFamilyPresentation } from './threat-impact-dense-pattern-budget-rendering.js';
+import { valueChromaFilter } from './threat-impact-value-chroma-ownership-rendering.js';
 import { finalReadabilitySettleBudgetPresentation, hazardFinalReadabilitySettlePresentation, safeLaneFinalReadabilitySettlePresentation } from './threat-impact-final-readability-settle-rendering.js';
 import { hazardSecondaryRecoveryGatePresentation, safeLaneSecondaryRecoveryGatePresentation, secondaryRecoveryGateBudgetPresentation } from './threat-impact-secondary-recovery-gate-rendering.js';
 import { focusTransferCoherenceBudgetPresentation, hazardFocusTransferCoherencePresentation, safeLaneFocusTransferCoherencePresentation } from './threat-impact-focus-transfer-coherence-rendering.js';
@@ -287,7 +290,10 @@ import { calculateTacticalScoreBonus, tacticalRecapLines } from '../domain/tacti
 import { BattlefieldObjectiveDirector, objectiveDefinition } from './battlefield-objectives.js';
 import { ObjectiveRuntime, objectiveRewardFor } from './objective-runtime.js';
 import { chooseObjectiveAnchor } from './objective-rules.js';
-import { chooseSpellTarget } from './auto-targeting.js';
+import { AutoCombatBrain } from './auto-combat-brain.js';
+import { autoWeakpointAimPoint } from './auto-weakpoint-aim.js';
+import { manualWeakpointAssistAimPoint } from './manual-weakpoint-assist.js';
+import { targetIntentCuePresentation } from './target-intent-cue.js';
 import { FusionRuntime } from './fusion-runtime.js';
 import { fusionDefinition } from './spell-fusions.js';
 import { fusionProcForCast } from './fusion-integration.js';
@@ -442,6 +448,7 @@ export class Game {
     goldEarned = 0;
     autoCastNormal = false;
     autoTargetId = null;
+    autoCombatBrain = new AutoCombatBrain();
     bossActionAssistCue = null;
     bossActionAssistCueSince = 0;
     bossActionAssistBossId = null;
@@ -797,6 +804,7 @@ export class Game {
     freezeControlVfxAtlasImage = null;
     freezeControlVfxAtlasReady = false;
     freezeShatterVfx = [];
+    freezeStatusLifecycleByEnemy = new Map();
     regularEnemyActionVfxAtlasImage = null;
     regularEnemyActionVfxAtlasReady = false;
     eliteAffixLifecycleVfxAtlasImage = null;
@@ -2349,6 +2357,7 @@ export class Game {
         this.goldEarned = 0;
         this.autoCastNormal = openingAutoReadyProfile().initialAutoEnabled;
         this.autoTargetId = null;
+        this.autoCombatBrain.reset();
         this.enemies.reset();
         this.spells.reset();
         this.enemyDeathImageBursts = [];
@@ -2406,6 +2415,7 @@ export class Game {
         this.coreGuardPressureVectorLastAt = -99;
         this.observedCoreHpForVfx = this.core.hp;
         this.freezeShatterVfx = [];
+        this.freezeStatusLifecycleByEnemy.clear();
         this.finalFormWorldVfx = [];
         this.fusionWorldVfx = [];
         this.heroMeterWorldVfx = [];
@@ -2690,6 +2700,7 @@ export class Game {
         if (this.input.consumePressed('auto')) {
             this.autoCastNormal = !this.autoCastNormal;
             this.manualTargetMemory.clear();
+            this.autoCombatBrain.reset();
         }
         if (this.input.consumePressed('shop') && this.shopTokens > 0) {
             this.openShop();
@@ -2752,24 +2763,32 @@ export class Game {
         this.syncBossEncounter();
         this.bossEncounter.update(dt);
         this.enemies.setBossEncounterModifiers(this.endlessBossEncounterModifiers(this.bossEncounter.modifiers));
-        this.enemies.setEndlessScaling(endlessMods.enemyHealthMultiplier, endlessMods.enemyDamageMultiplier, endlessMods.projectilePressureMultiplier * ascensionMutatorMods.projectileSpeedMultiplier, ascensionMutatorMods.eliteHealthMultiplier);
+        this.enemies.setEndlessScaling(endlessMods.enemyHealthMultiplier, endlessMods.enemyDamageMultiplier, endlessMods.projectilePressureMultiplier * pressure.projectileSpeedMultiplier * ascensionMutatorMods.projectileSpeedMultiplier, ascensionMutatorMods.eliteHealthMultiplier);
         if (this.autoCastNormal)
-            this.autoTargetId = chooseSpellTarget(this.enemies.enemies, this.hero.pos, this.core.pos, true, this.autoTargetId)?.id ?? null;
+            this.autoTargetId = this.autoCombatBrain.selectTarget(this.enemies.enemies, this.hero.pos, this.core.pos, this.elapsed)?.id ?? null;
         else
             this.autoTargetId = null;
-        const spellWorld = { hero: this.hero, core: this.core, enemies: this.enemies, terrain: this.terrain, feedback: this.feedback, magicTargets: this.bossEncounter, weakpointAim: this.bossEncounter, fusions: this.fusionRuntime.equipped, preferredAutoTargetId: this.autoTargetId, preferredManualTargetId: null, visualBodyOffset: this.heroLastRenderedBodyOffset, visualActionFacing: this.heroLastRenderedActionFacing, visualActionPoseStrength: this.heroLastRenderedActionPoseStrength, visualActionOwner: this.heroLastRenderedActionOwner, reducedMotion: this.presentationSettings.reducedMotion, reducedFlash: this.presentationSettings.reducedFlash };
+        const autoWeakpointId = this.autoCastNormal ? this.autoCombatBrain.selectWeakpoint(this.bossEncounter.activeBossId, this.bossEncounter.nodes, this.hero.pos, this.elapsed) : null;
+        const spellWorld = { hero: this.hero, core: this.core, enemies: this.enemies, terrain: this.terrain, feedback: this.feedback, magicTargets: this.bossEncounter, weakpointAim: this.bossEncounter, fusions: this.fusionRuntime.equipped, preferredAutoTargetId: this.autoTargetId, preferredAutoWeakpointId: autoWeakpointId, preferredManualTargetId: null, visualBodyOffset: this.heroLastRenderedBodyOffset, visualActionFacing: this.heroLastRenderedActionFacing, visualActionPoseStrength: this.heroLastRenderedActionPoseStrength, visualActionOwner: this.heroLastRenderedActionOwner, reducedMotion: this.presentationSettings.reducedMotion, reducedFlash: this.presentationSettings.reducedFlash };
         this.flushBufferedManualCasts(spellWorld);
         for (const action of COMBAT_CAST_ACTIONS) {
             if (this.input.consumePressed(action))
                 this.handleManualCastPress(action, spellWorld);
         }
-        for (const action of ['spell1', 'spell2', 'spell3', 'spell4']) {
+        const normalSpellActions = ['spell1', 'spell2', 'spell3', 'spell4'];
+        const readyAutoActions = this.autoCastNormal ? normalSpellActions.filter((action) => this.spells.cooldownRemaining(action) <= 0) : [];
+        const autoCastAction = this.autoCastNormal ? this.autoCombatBrain.chooseAutoCastAction(readyAutoActions, this.elapsed) : null;
+        for (const action of normalSpellActions) {
             const held = this.input.isHeld(action);
-            const { autoTriggered } = openingAutoCastIntent(this.autoCastNormal, held);
+            const intent = openingAutoCastIntent(this.autoCastNormal, held);
+            const autoTriggered = intent.autoTriggered && autoCastAction === action;
             if (held && !autoTriggered && this.spells.cooldownRemaining(action) <= 0)
                 this.prepareManualTarget(spellWorld);
-            if ((autoTriggered || held) && this.spells.tryCast(action, { ...spellWorld, autoAim: autoTriggered }))
+            if ((autoTriggered || held) && this.spells.tryCast(action, { ...spellWorld, autoAim: autoTriggered })) {
                 this.handleSuccessfulCast(action, autoTriggered ? 'auto' : 'manual');
+                if (autoTriggered)
+                    this.autoCombatBrain.recordAutoCast(action, this.elapsed);
+            }
         }
         this.spells.update(dt, spellWorld);
         this.syncBossWeakpointBreakFeedback();
@@ -2884,6 +2903,8 @@ export class Game {
         this.rewardRateWindowStartedAt = this.elapsed;
         this.rewardRateWindowStartGold = this.goldEarned;
     }
+    queueSlowedDeathFreezeShatter(death) { if (death.wasSlowed)
+        this.queueFreezeShatterVfx(death.type, death.x, death.y); }
     processEnemyDeaths() {
         for (let wave = 0; wave < 6; wave++) {
             const deaths = this.enemies.drainDeaths();
@@ -2893,8 +2914,8 @@ export class Game {
                 this.hero.kills += 1;
                 this.frameEndlessEvents.push({ type: 'enemy_killed', elite: death.type === 'elite' || death.type === 'boss' });
                 this.advanceHeroMeter(0, heroMeterKillSignals(this.hero.profileId, death));
-                if (death.wasSlowed)
-                    this.queueFreezeShatterVfx(death.type, death.x, death.y);
+                if (slowDeathUsesFreezeShatter(death.slowSource))
+                    this.queueSlowedDeathFreezeShatter(death);
                 if (this.hero.profileId === 'seria' && death.wasSlowed && this.heroMeter.activeTimer > 0)
                     this.triggerSeriaShatter(death);
                 const eventMods = fieldEventModifiers(this.fieldEvents.active);
@@ -3119,6 +3140,7 @@ export class Game {
         this.queueFinalFormWorldVfx(formId, link ? 'flow' : 'signature', this.hero.pos.x, this.hero.pos.y, radius);
         const pushDistance = pattern.pushDistance * (link?.pushMultiplier ?? 1);
         const slowDuration = pattern.slowDuration + (link?.slowDurationBonus ?? 0);
+        const slowSource = this.hero.profileId === 'seria' ? 'frost' : 'generic';
         const baseDamage = 72 * this.hero.spellPower * this.hero.equipmentSpellPower * pattern.damageMultiplier * (link?.damageMultiplier ?? 1);
         const living = this.enemies.enemies.filter((enemy) => enemy.alive);
         if (pattern.kind === 'chain') {
@@ -3130,7 +3152,7 @@ export class Game {
                 if (this.enemies.damage(enemy, baseDamage))
                     this.enemies.markLastDeathVisualSource('finalForm');
                 if (slowDuration > 0)
-                    this.enemies.applySlow(enemy, pattern.slowFactor, slowDuration);
+                    this.enemies.applySlow(enemy, pattern.slowFactor, slowDuration, slowSource);
             }
         }
         else {
@@ -3142,7 +3164,7 @@ export class Game {
                 if (pushDistance > 0)
                     this.enemies.pushAway(enemy, this.hero.pos, pushDistance);
                 if (slowDuration > 0)
-                    this.enemies.applySlow(enemy, pattern.slowFactor, slowDuration);
+                    this.enemies.applySlow(enemy, pattern.slowFactor, slowDuration, slowSource);
             }
         }
         if (pattern.coreHealPercent > 0)
@@ -3441,6 +3463,7 @@ export class Game {
         const contract = getContractModifiers(this.endlessState.contracts, this.elapsed * 1000);
         const tacticMultiplier = this.elapsed * 1000 < this.mythicTacticBoostUntilMs ? this.mythicTacticBossDamageMultiplier : 1;
         out.bossDamageTakenMultiplier = clamp(out.bossDamageTakenMultiplier * heroAscension.bossDamageMultiplier * finalForm.bossDamageMultiplier * signature.bossDamageMultiplier * oath.bossDamageMultiplier * overdrive.bossDamageMultiplier * contract.bossDamageMultiplier * tacticMultiplier, 0.7, 1.85);
+        out.specialCadenceMultiplier *= threatLevelModifiers(this.runThreatLevel).bossSpecialCadenceMultiplier;
         out.specialCadenceMultiplier = clamp(out.specialCadenceMultiplier, 0.62, 1.4);
         out.summonCountMultiplier = clamp(out.summonCountMultiplier, 0.72, 1.55);
         out.dashDistanceMultiplier = clamp(out.dashDistanceMultiplier, 0.82, 1.55);
@@ -3663,7 +3686,10 @@ export class Game {
         this.drawEnemyStatusCues(ctx, secondaryMotion);
         this.drawPriorityThreats(ctx, secondaryMotion);
         this.presentation.renderDecorative(ctx, this.presentationSettings.reducedMotion);
-        this.feedback.render(ctx, this.presentation.quality);
+        const actionResultLiveEnemyCount = this.enemies.enemies.reduce((count, enemy) => count + (enemy.alive ? 1 : 0), 0);
+        const actionResultBattlefieldStress = Math.max(0, Math.min(1, (actionResultLiveEnemyCount + this.bossArena.hazards.length * 2 - 8) / 22));
+        const actionResultProtectedWarning = Boolean((this.bossPhaseCue && this.bossPhaseCueTimer > 0) || this.dangerState.heroCritical || this.dangerState.coreCritical);
+        this.feedback.render(ctx, this.presentation.quality, { battlefieldStress: actionResultBattlefieldStress, protectedWarning: actionResultProtectedWarning, safeLaneVisible: Boolean(this.currentMythicSafeLanePresentation), reducedMotion: this.presentationSettings.reducedMotion, reducedFlash: this.presentationSettings.reducedFlash });
         this.presentation.renderScreenEffects(ctx, this.presentationSettings.reducedFlash, this.presentationSettings.reducedMotion);
         this.pickups.render(ctx, this.battlefieldInteractionVfxAtlasImage, this.battlefieldInteractionVfxAtlasReady, this.pickupFlowVfxAtlasImage, this.pickupFlowVfxAtlasReady, this.presentationSettings.reducedFlash);
         this.drawCore(ctx, secondaryMotion);
@@ -3880,7 +3906,7 @@ export class Game {
             if (!enemy.alive || distance(enemy.pos, origin) > meter.shatterRadius + enemy.radius)
                 continue;
             this.enemies.damage(enemy, damage, origin, 'freeze');
-            this.enemies.applySlow(enemy, 0.38, 1.4);
+            this.enemies.applySlow(enemy, 0.38, 1.4, 'frost');
         }
         this.feedback.addImpact(origin, 'final');
     }
@@ -4242,6 +4268,26 @@ export class Game {
         for (const cue of this.freezeShatterVfx)
             cue.ttl -= safeDt;
         this.freezeShatterVfx = this.freezeShatterVfx.filter((cue) => cue.ttl > 0);
+        const liveFreezeEnemyIds = new Set();
+        for (const enemy of this.enemies.enemies) {
+            if (!enemy.alive)
+                continue;
+            liveFreezeEnemyIds.add(enemy.id);
+            const previous = this.freezeStatusLifecycleByEnemy.get(enemy.id);
+            if (enemy.slowTimer <= 0 && !previous)
+                continue;
+            const enemyClass = freezeControlVfxClassForEnemyType(enemy.type);
+            const source = enemy.slowSource ?? 'frost';
+            const presentation = slowSourceCuePresentation({ source, slowFactor: enemy.slowFactor, slowTimer: enemy.slowTimer, enemyClass, reducedFlash: this.presentationSettings.reducedFlash });
+            const lifecycle = advanceFreezeStatusLifecycle(previous ?? createFreezeStatusLifecycleState(), { active: presentation.visible, targetAlpha: presentation.alpha, targetSizeScale: presentation.visible ? presentation.sizeScale : .72, source }, safeDt, this.presentationSettings.reducedMotion);
+            if (lifecycle.visible)
+                this.freezeStatusLifecycleByEnemy.set(enemy.id, lifecycle);
+            else
+                this.freezeStatusLifecycleByEnemy.delete(enemy.id);
+        }
+        for (const enemyId of [...this.freezeStatusLifecycleByEnemy.keys()])
+            if (!liveFreezeEnemyIds.has(enemyId))
+                this.freezeStatusLifecycleByEnemy.delete(enemyId);
         if (this.core.hp > this.observedCoreHpForVfx + .5)
             this.queueSurvivalResponseVfx('coreRecover');
         this.observedCoreHpForVfx = this.core.hp;
@@ -4638,31 +4684,141 @@ export class Game {
     }
     drawEnemyStatusCues(ctx, motion) {
         const frost = enemyStatusCue('freeze');
-        const frozen = this.enemies.enemies.filter((enemy) => enemy.alive && enemy.slowTimer > 0);
+        const frozen = this.enemies.enemies.filter((enemy) => enemy.alive && (enemy.slowTimer > 0 || Boolean(this.freezeStatusLifecycleByEnemy.get(enemy.id)?.visible)));
         const primaryFrozenEnemyId = motion.owner === 'freeze-status'
             ? frozen.reduce((best, enemy) => !best || distance(this.hero.pos, enemy.pos) < distance(this.hero.pos, best.pos) ? enemy : best, null)?.id ?? null
             : null;
+        const currentTargetId = this.autoCastNormal ? this.autoCombatBrain.currentTargetId() : this.manualTargetMemory.currentTargetId();
+        const liveEnemyCount = this.enemies.enemies.reduce((count, enemy) => count + (enemy.alive ? 1 : 0), 0);
+        const battlefieldStress = Math.max(0, Math.min(1, (liveEnemyCount + this.bossArena.hazards.length * 2 - 8) / 22));
+        const protectedWarning = Boolean((this.bossPhaseCue && this.bossPhaseCueTimer > 0) || this.dangerState.heroCritical || this.dangerState.coreCritical);
+        const safeLaneVisible = Boolean(this.currentMythicSafeLanePresentation);
+        const crowd = freezeCrowdBudget(frozen.map((enemy) => ({
+            id: enemy.id,
+            enemyClass: freezeControlVfxClassForEnemyType(enemy.type),
+            distanceToHero: distance(this.hero.pos, enemy.pos),
+            currentTarget: enemy.id === currentTargetId,
+            resultCueNearby: this.feedback.hasActionResultNear(enemy.pos, 48),
+        })), { battlefieldStress, protectedWarning, safeLaneVisible });
+        const crowdById = new Map(crowd.entries.map((entry) => [entry.id, entry]));
         ctx.save();
         for (const enemy of frozen) {
+            const crowdEntry = crowdById.get(enemy.id);
+            if (!crowdEntry)
+                continue;
             const amplitude = enemy.id === primaryFrozenEnemyId ? motion.freezeStatusMotionAmplitude : 0;
-            if (this.freezeControlVfxAtlasReady && this.freezeControlVfxAtlasImage) {
-                const enemyClass = freezeControlVfxClassForEnemyType(enemy.type), sprite = freezeControlVfxSprite(enemyClass, 'active');
-                const size = Math.max(enemyClass === 'boss' ? 142 : enemyClass === 'elite' ? 112 : enemyClass === 'specialist' ? 92 : 78, enemy.radius * (enemyClass === 'boss' ? 2.5 : 3.15));
-                ctx.globalAlpha = Math.min(this.presentationSettings.reducedFlash ? .46 : .72, .56 + Math.sin(this.elapsed * 5 + enemy.id) * amplitude);
-                ctx.drawImage(this.freezeControlVfxAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, enemy.pos.x - size / 2, enemy.pos.y - size / 2, size, size);
+            const enemyClass = freezeControlVfxClassForEnemyType(enemy.type);
+            const requestedSource = enemy.slowSource ?? 'frost';
+            const initialPresentation = slowSourceCuePresentation({ source: requestedSource, slowFactor: enemy.slowFactor, slowTimer: enemy.slowTimer, enemyClass, reducedFlash: this.presentationSettings.reducedFlash });
+            const lifecycle = this.freezeStatusLifecycleByEnemy.get(enemy.id) ?? advanceFreezeStatusLifecycle(createFreezeStatusLifecycleState(), { active: initialPresentation.visible, targetAlpha: initialPresentation.alpha, targetSizeScale: initialPresentation.visible ? initialPresentation.sizeScale : .72, source: requestedSource }, 1 / 60, this.presentationSettings.reducedMotion);
+            if (!lifecycle.visible)
+                continue;
+            const source = lifecycle.source;
+            const presentation = slowSourceCuePresentation({ source, slowFactor: enemy.slowFactor, slowTimer: enemy.slowTimer, enemyClass, reducedFlash: this.presentationSettings.reducedFlash });
+            const pulse = Math.sin(this.elapsed * 5 + enemy.id) * amplitude * presentation.pulseAmplitude * crowdEntry.pulseScale * lifecycle.pulseScale;
+            const rawSize = Math.max(presentation.baseSize, enemy.radius * (enemyClass === 'boss' ? 2.5 : 3.15)) * lifecycle.sizeScale * crowdEntry.sizeScale;
+            const edge = freezeStatusEdgePresentation({ x: enemy.pos.x, y: enemy.pos.y, size: rawSize, viewportWidth: LOGICAL_WIDTH, viewportHeight: LOGICAL_HEIGHT });
+            const size = rawSize * edge.sizeScale;
+            ctx.globalAlpha = Math.max(0, Math.min(1, (lifecycle.alpha * crowdEntry.alphaScale + pulse) * (.72 + .28 * lifecycle.sourceBlend)));
+            ctx.strokeStyle = presentation.color;
+            ctx.lineWidth = presentation.lineWidth;
+            if (source === 'frost' && presentation.useFreezeAtlas && this.freezeControlVfxAtlasReady && this.freezeControlVfxAtlasImage) {
+                const sprite = freezeControlVfxSprite(enemyClass, 'active');
+                ctx.drawImage(this.freezeControlVfxAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, enemy.pos.x - size / 2 + edge.offsetX, enemy.pos.y - size / 2 + edge.offsetY, size, size);
             }
-            else {
-                ctx.globalAlpha = 0.52 + Math.sin(this.elapsed * 5 + enemy.id) * amplitude;
+            else if (source === 'frost') {
                 ctx.strokeStyle = frost.color;
                 ctx.lineWidth = 2.5;
                 ctx.beginPath();
                 ctx.arc(enemy.pos.x, enemy.pos.y, enemy.radius + 6, 0, Math.PI * 2);
                 ctx.stroke();
             }
+            else if (presentation.renderMode === 'gravityOrbit') {
+                const r = Math.max(enemy.radius + 7, size * .32);
+                for (let i = 0; i < presentation.segmentCount; i++) {
+                    const a = this.elapsed * 1.9 + i * Math.PI * 2 / presentation.segmentCount;
+                    ctx.beginPath();
+                    ctx.arc(enemy.pos.x, enemy.pos.y, r, a, a + .48);
+                    ctx.stroke();
+                    const x = enemy.pos.x + Math.cos(a) * r, y = enemy.pos.y + Math.sin(a) * r;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(enemy.pos.x + (x - enemy.pos.x) * .72, enemy.pos.y + (y - enemy.pos.y) * .72);
+                    ctx.stroke();
+                }
+            }
+            else if (presentation.renderMode === 'terrainGround') {
+                const y = enemy.pos.y + enemy.radius * presentation.groundOffsetRatio;
+                ctx.beginPath();
+                ctx.ellipse(enemy.pos.x, y, Math.max(enemy.radius + 8, size * .30), Math.max(5, enemy.radius * .34), 0, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            else if (presentation.renderMode === 'impactResistance') {
+                const r = enemy.radius + 7;
+                for (const side of [-1, 1]) {
+                    const center = side < 0 ? Math.PI : 0;
+                    ctx.beginPath();
+                    ctx.arc(enemy.pos.x, enemy.pos.y, r, center - .48, center + .48);
+                    ctx.stroke();
+                }
+            }
+            else if (presentation.renderMode === 'genericResistance') {
+                ctx.beginPath();
+                ctx.arc(enemy.pos.x, enemy.pos.y, enemy.radius + 5, Math.PI * .18, Math.PI * .82);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(enemy.pos.x, enemy.pos.y, enemy.radius + 5, Math.PI * 1.18, Math.PI * 1.82);
+                ctx.stroke();
+            }
+        }
+        ctx.restore();
+    }
+    drawTargetIntentCue(ctx) {
+        const mode = this.autoCastNormal ? 'auto' : 'manual';
+        const committedTargetId = mode === 'auto' ? this.autoCombatBrain.currentTargetId() : this.manualTargetMemory.currentTargetId();
+        const target = committedTargetId === null ? null : this.enemies.enemies.find((enemy) => enemy.alive && enemy.id === committedTargetId) ?? null;
+        if (!target)
+            return;
+        let weakpointAim = null;
+        if (target.type === 'boss') {
+            weakpointAim = mode === 'auto'
+                ? autoWeakpointAimPoint({ autoAim: true, target, heroPos: this.hero.pos, activeBossId: this.bossEncounter.activeBossId, nodes: this.bossEncounter.nodes, preferredNodeId: this.autoCombatBrain.currentWeakpointId() })
+                : manualWeakpointAssistAimPoint({ target, heroPos: this.hero.pos, activeBossId: this.bossEncounter.activeBossId, nodes: this.bossEncounter.nodes });
+        }
+        const liveEnemyCount = this.enemies.enemies.reduce((count, enemy) => count + (enemy.alive ? 1 : 0), 0);
+        const battlefieldStress = Math.max(0, Math.min(1, (liveEnemyCount + this.bossArena.hazards.length * 2 - 8) / 22));
+        const protectedWarning = Boolean((this.bossPhaseCue && this.bossPhaseCueTimer > 0) || this.dangerState.heroCritical || this.dangerState.coreCritical);
+        const cue = targetIntentCuePresentation({ mode, committedTargetId, targetAlive: target.alive, targetRadius: target.radius, weakpointAvailable: Boolean(weakpointAim && distance(weakpointAim, target.pos) > 1), battlefieldStress, protectedWarning, safeLaneVisible: Boolean(this.currentMythicSafeLanePresentation), reducedMotion: this.presentationSettings.reducedMotion, reducedFlash: this.presentationSettings.reducedFlash });
+        if (!cue.visible)
+            return;
+        const pulse = cue.pulseAmplitude > 0 ? Math.sin(this.elapsed * 5.1 + target.id) * cue.pulseAmplitude : 0;
+        const radius = cue.radius + pulse;
+        ctx.save();
+        ctx.globalAlpha = cue.alpha;
+        ctx.strokeStyle = mode === 'auto' ? '#8fdcff' : '#ffe39a';
+        ctx.lineWidth = cue.lineWidth;
+        ctx.lineCap = 'round';
+        for (let i = 0; i < 4; i++) {
+            const center = i * Math.PI * .5;
+            ctx.beginPath();
+            ctx.arc(target.pos.x, target.pos.y, radius, center - cue.segmentArc * .5, center + cue.segmentArc * .5);
+            ctx.stroke();
+        }
+        if (cue.showWeakpointDirection && weakpointAim) {
+            ctx.globalAlpha = cue.weakpointAlpha;
+            ctx.lineWidth = Math.max(1, cue.lineWidth * .82);
+            ctx.beginPath();
+            ctx.moveTo(target.pos.x, target.pos.y);
+            ctx.lineTo(weakpointAim.x, weakpointAim.y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(weakpointAim.x, weakpointAim.y, 2.5, 0, Math.PI * 2);
+            ctx.stroke();
         }
         ctx.restore();
     }
     drawDangerTelegraphs(ctx) {
+        this.drawTargetIntentCue(ctx);
         const cues = sortTelegraphsByPriority(this.enemies.enemies.map((enemy) => enemyThreatTelegraph(enemy))).slice(0, 24);
         ctx.save();
         for (const cue of cues) {
@@ -6493,6 +6649,7 @@ export class Game {
                 const finisher = finalFormEvadeFinisher(finalFormId, arenaDodgeFinisherProfile());
                 const finisherSignature = finalFormId ? finalFormFinisherSignature(finalFormId) : null;
                 const damage = 68 * this.hero.spellPower * this.hero.equipmentSpellPower * finisher.damageMultiplier;
+                const finisherSlowSource = this.hero.profileId === 'seria' ? 'frost' : 'impact';
                 const outside = [];
                 for (const enemy of this.enemies.enemies) {
                     if (!enemy.alive)
@@ -6501,7 +6658,7 @@ export class Game {
                     if (enemyDistance <= finisher.radius + enemy.radius) {
                         this.enemies.damage(enemy, damage);
                         this.enemies.pushAway(enemy, this.hero.pos, finisher.pushDistance);
-                        this.enemies.applySlow(enemy, finisher.slowFactor, finisher.slowDuration);
+                        this.enemies.applySlow(enemy, finisher.slowFactor, finisher.slowDuration, finisherSlowSource);
                     }
                     else if (finisher.chainTargets > 0 && enemyDistance <= finisher.radius * 1.65 + enemy.radius) {
                         outside.push({ enemy, distance: enemyDistance });
@@ -6511,7 +6668,7 @@ export class Game {
                     outside.sort((a, b) => a.distance - b.distance);
                     for (const { enemy } of outside.slice(0, finisher.chainTargets)) {
                         this.enemies.damage(enemy, damage * .55);
-                        this.enemies.applySlow(enemy, Math.max(.68, finisher.slowFactor), Math.max(.5, finisher.slowDuration * .65));
+                        this.enemies.applySlow(enemy, Math.max(.68, finisher.slowFactor), Math.max(.5, finisher.slowDuration * .65), finisherSlowSource);
                     }
                 }
                 if (finisher.coreHealPercent > 0)
@@ -6999,7 +7156,7 @@ export class Game {
             const safeLaneDirectionReacquisition = safeLaneDirectionReacquisitionPresentation({ visible: true, confidence: safeLane.confidence, reacquire: safeLaneReclaim.release, pressure: safeLaneDenseBattlefield.stress }, this.presentationSettings.reducedFlash), safeLaneDirectionReacquisitionBudget = directionReacquisitionBudgetPresentation({ criticalCount: (this.dangerState.coreCritical ? 1 : 0) + (this.dangerState.heroCritical ? 1 : 0), projectileCount: this.enemies.activeProjectileCount, impactCount: 0, hazardCount: this.bossArena.hazards.length, silhouetteCount: 0, safeLaneVisible: true }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
             const safeLaneCriticalReengagement = safeLaneCriticalReengagementLockPresentation({ visible: true, confidence: safeLane.confidence, bossPressure: safeLaneDenseBattlefield.stress, critical: this.dangerState.coreCritical || this.dangerState.heroCritical, reacquire: safeLaneReclaim.release }, this.presentationSettings.reducedFlash), safeLaneCriticalReengagementBudget = criticalReengagementBudgetPresentation({ bossActive: Boolean(boss), criticalCount: (this.dangerState.coreCritical ? 1 : 0) + (this.dangerState.heroCritical ? 1 : 0), projectileCount: this.enemies.activeProjectileCount, impactCount: 0, hazardCount: this.bossArena.hazards.length, silhouetteCount: 0, safeLaneVisible: true }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
             const safeLaneEffectiveFloor = safeLaneEffectiveAlphaFloorPresentation({ visible: true, confidence: safeLane.confidence, bossPressure: safeLaneDenseBattlefield.stress, critical: this.dangerState.coreCritical || this.dangerState.heroCritical, reacquire: safeLaneReclaim.release }, this.presentationSettings.reducedFlash), safeLaneEffectiveFloorBudget = effectiveAlphaFloorBudgetPresentation({ criticalCount: (this.dangerState.coreCritical ? 1 : 0) + (this.dangerState.heroCritical ? 1 : 0), crowd: safeLaneDenseBattlefield.stress, safeLaneVisible: true, bossActive: Boolean(boss) }, this.presentationSettings.reducedFlash);
-            const safeLaneReadabilityContrast = safeLaneReadabilityContrastPresentation({ pathFloor: safeLaneEffectiveFloor.pathAlphaFloor, confidence: safeLane.confidence, critical: this.dangerState.coreCritical || this.dangerState.heroCritical, bossActive: Boolean(boss), crowd: safeLaneDenseBattlefield.stress }, this.presentationSettings.reducedFlash), safeLaneReadabilityContrastBudget = readabilityContrastBudgetPresentation({ criticalCount: (this.dangerState.coreCritical ? 1 : 0) + (this.dangerState.heroCritical ? 1 : 0), crowd: safeLaneDenseBattlefield.stress, bossActive: Boolean(boss), safeLaneVisible: true }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
+            const safeLaneReadabilityContrast = safeLaneReadabilityContrastPresentation({ pathFloor: safeLaneEffectiveFloor.pathAlphaFloor, confidence: safeLane.confidence, critical: this.dangerState.coreCritical || this.dangerState.heroCritical, bossActive: Boolean(boss), crowd: safeLaneDenseBattlefield.stress }, this.presentationSettings.reducedFlash), safeLaneReadabilityContrastBudget = readabilityContrastBudgetPresentation({ criticalCount: (this.dangerState.coreCritical ? 1 : 0) + (this.dangerState.heroCritical ? 1 : 0), crowd: safeLaneDenseBattlefield.stress, bossActive: Boolean(boss), safeLaneVisible: true }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash), forecastPattern = denseDashFamilyPresentation({ family: 'forecast', crowd: safeLaneDenseBattlefield.stress, critical: false, bossProtected: false, safeLaneVisible: true }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash), forecastDashGapScale = safeLaneReadabilityContrastBudget.secondaryDashGapScale * forecastPattern.dashGapScale;
             const safeLaneFinalSettle = safeLaneFinalReadabilitySettlePresentation({ primaryFloor: safeLaneReadabilityContrast.pathAlphaFloor, reacquire: safeLaneReclaim.release, stress: safeLaneReadabilityContrastBudget.stress, critical: this.dangerState.coreCritical || this.dangerState.heroCritical, confidence: safeLane.confidence }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash), safeLaneFinalSettleBudget = finalReadabilitySettleBudgetPresentation({ criticalCount: (this.dangerState.coreCritical ? 1 : 0) + (this.dangerState.heroCritical ? 1 : 0), stress: safeLaneReadabilityContrastBudget.stress, bossActive: Boolean(boss), safeLaneVisible: true }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
             const safeLaneSecondaryRecoveryGate = safeLaneSecondaryRecoveryGatePresentation({ release: safeLaneFinalSettle.settle, stress: safeLaneFinalSettleBudget.stress, critical: this.dangerState.coreCritical || this.dangerState.heroCritical }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash), safeLaneSecondaryRecoveryGateBudget = secondaryRecoveryGateBudgetPresentation({ criticalCount: (this.dangerState.coreCritical ? 1 : 0) + (this.dangerState.heroCritical ? 1 : 0), stress: safeLaneFinalSettleBudget.stress, release: safeLaneFinalSettle.settle }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
             const safeLaneFocusTransfer = safeLaneFocusTransferCoherencePresentation({ incomingFocus: safeLane.confidence, outgoingFocus: Boolean(boss) ? safeLaneDenseBattlefield.stress : 0, stress: safeLaneSecondaryRecoveryGateBudget.hold, critical: this.dangerState.coreCritical || this.dangerState.heroCritical }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash), safeLaneFocusTransferBudget = focusTransferCoherenceBudgetPresentation({ criticalCount: (this.dangerState.coreCritical ? 1 : 0) + (this.dangerState.heroCritical ? 1 : 0), stress: safeLaneFinalSettleBudget.stress, incomingFocus: safeLane.confidence, outgoingFocus: Boolean(boss) ? safeLaneDenseBattlefield.stress : 0 }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
@@ -7015,7 +7172,7 @@ export class Game {
             ctx.globalAlpha = safeLaneBaseAlpha * Math.max(safeLaneHazardRecovery.pathAlphaScale, safeLaneStackProtection.pathAlphaFloor, safeLaneCorridorProtection.pathAlphaFloor, safeLaneDenseArbitration.pathAlphaFloor, safeLaneCanonicalReacquisition.pathAlphaFloor, safeLaneDirectionReacquisition.pathAlphaFloor, safeLaneCriticalReengagement.pathAlphaFloor);
             ctx.strokeStyle = '#8fffd3';
             ctx.fillStyle = '#8fffd3';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 2 * safeLaneReadabilityContrast.strokeWidthScale;
             ctx.setLineDash([7, 7]);
             ctx.beginPath();
             for (const segment of safeLaneGapFeather.bodySegments) {
@@ -7041,7 +7198,7 @@ export class Game {
             if (forecast && forecast.urgency >= .65 && safeLaneVisual.bridgeVisible) {
                 ctx.globalAlpha = (.18 + .22 * forecast.urgency) * safeLaneVisual.bridgeAlphaScale * safeLaneAttention.bridgeAlphaScale * safeLaneAttentionRecovery.bridgeRecoveryScale * safeLaneHazardRecovery.bridgeAlphaScale;
                 ctx.strokeStyle = '#7fd9ff';
-                ctx.setLineDash([4, 8]);
+                ctx.setLineDash([4, 8 * forecastDashGapScale * (1 + (1 - safeLaneFinalSettle.settle) * .24)]);
                 ctx.beginPath();
                 ctx.moveTo(forecast.currentTarget.x, forecast.currentTarget.y);
                 ctx.lineTo(forecast.nextTarget.x, forecast.nextTarget.y);
@@ -7108,7 +7265,7 @@ export class Game {
             const materializationTransitionCount = respawnMaterializationOwner.owner === 'footprint' ? activeHazardFootprints.length : respawnMaterializationOwner.owner === 'activation' ? activeActivationHazards.length : 0;
             const materializationTransitionRank = respawnMaterializationOwner.owner === 'footprint' ? (hazardFootprintRank.get(hazard) ?? materializationTransitionCount) : respawnMaterializationOwner.owner === 'activation' ? (activationHazardRank.get(hazard) ?? materializationTransitionCount) : 0;
             const respawnMaterializationDensityBudget = bossHazardRespawnMaterializationDensityBudgetPresentation({ activeCount: materializationTransitionCount, indexFromNewest: materializationTransitionRank, owner: respawnMaterializationOwner.owner }, this.presentationSettings.reducedMotion);
-            const telegraphAlphaScale = (clearedHandoff?.telegraphAlphaScale ?? 1) * (respawnGroundCoherence?.telegraphAlphaScale ?? 1) * (respawnGroundHandoff?.telegraphAlphaScale ?? 1) * (respawnGroundDensityBudget?.telegraphAlphaScale ?? 1) * respawnMaterializationOwner.telegraphAlphaScale;
+            const telegraphAlphaScale = (clearedHandoff?.telegraphAlphaScale ?? 1) * (respawnGroundCoherence?.telegraphAlphaScale ?? 1) * (respawnGroundHandoff?.telegraphAlphaScale ?? 1) * (respawnGroundDensityBudget?.telegraphAlphaScale ?? 1) * respawnMaterializationOwner.telegraphAlphaScale, hazardFootprintPattern = denseDashFamilyPresentation({ family: 'footprint', crowd: Math.min(1, this.bossArena.hazards.length / 6), critical: false, bossProtected: false, safeLaneVisible: Boolean(safeLane) }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
             if (hazard.launchOrigin && hazardHandoff.launchCueAlpha > 0) {
                 ctx.save();
                 ctx.globalAlpha = hazardHandoff.launchCueAlpha;
@@ -7127,7 +7284,7 @@ export class Game {
                 ctx.globalAlpha = hazardFootprint.alphaScale * hazardFootprintBudget.alphaScale * footprintLifecycle.footprintAlphaScale * respawnMaterializationOwner.footprintAlphaScale * respawnMaterializationSettle.materializationAlphaScale * respawnMaterializationDensityBudget.effectStrength;
                 ctx.strokeStyle = color;
                 ctx.lineWidth = 1.8;
-                ctx.setLineDash([4, 7]);
+                ctx.setLineDash([4, 7 * hazardFootprintPattern.dashGapScale]);
                 ctx.beginPath();
                 ctx.arc(hazardFootprint.center.x, hazardFootprint.center.y, hazardFootprint.radius, 0, Math.PI * 2);
                 ctx.stroke();
@@ -7152,7 +7309,7 @@ export class Game {
             const hazardCriticalReengagement = bossTelegraphReengagementLockPresentation({ active: hazard.telegraph > 0, critical: hazard.id === primaryTelegraphHazardId, reacquire: hazardCanonicalReacquisition.reacquire, crowd: Math.min(1, this.bossArena.hazards.length / 6) }, this.presentationSettings.reducedFlash), hazardCriticalReengagementBudget = criticalReengagementBudgetPresentation({ bossActive: Boolean(boss), criticalCount: hazard.id === primaryTelegraphHazardId ? 1 : 0, projectileCount: this.enemies.activeProjectileCount, impactCount: 0, hazardCount: this.bossArena.hazards.length, silhouetteCount: 0, safeLaneVisible: Boolean(safeLane) }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
             const hazardSecondaryCeiling = hazardSecondaryCeilingPresentation({ stress: Math.max(hazardDenseBattlefield.stress, hazardCriticalReengagement.lock), telegraph: hazard.telegraph > 0, critical: hazard.id === primaryTelegraphHazardId, reacquire: hazardCanonicalReacquisition.reacquire }, this.presentationSettings.reducedFlash), hazardSecondaryCeilingBudget = secondaryCeilingBudgetPresentation({ criticalCount: hazard.id === primaryTelegraphHazardId ? 1 : 0, crowd: Math.min(1, this.bossArena.hazards.length / 6), bossActive: Boolean(boss) }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash), hazardBossSecondaryCeiling = bossSecondaryCeilingPresentation({ stress: Math.max(hazardDenseBattlefield.stress, hazardCriticalReengagement.lock), critical: hazard.id === primaryTelegraphHazardId, reacquire: hazardCanonicalReacquisition.reacquire }, this.presentationSettings.reducedFlash);
             const hazardEffectiveFloor = hazardEffectiveAlphaFloorPresentation({ telegraph: hazard.telegraph > 0, critical: hazard.id === primaryTelegraphHazardId, laneProximity: hazardLaneProximity, reacquire: hazardCanonicalReacquisition.reacquire }, this.presentationSettings.reducedFlash), hazardEffectiveFloorBudget = effectiveAlphaFloorBudgetPresentation({ criticalCount: hazard.id === primaryTelegraphHazardId ? 1 : 0, crowd: Math.min(1, this.bossArena.hazards.length / 6), safeLaneVisible: Boolean(safeLane), bossActive: Boolean(boss) }, this.presentationSettings.reducedFlash);
-            const hazardReadabilityContrast = hazardReadabilityContrastPresentation({ edgeFloor: hazardEffectiveFloor.edgeAlphaFloor, fillScale: hazardSecondaryCeiling.fillScale, telegraph: hazard.telegraph > 0, critical: hazard.id === primaryTelegraphHazardId, crowd: Math.min(1, this.bossArena.hazards.length / 6) }, this.presentationSettings.reducedFlash), hazardReadabilityContrastBudget = readabilityContrastBudgetPresentation({ criticalCount: hazard.id === primaryTelegraphHazardId ? 1 : 0, crowd: Math.min(1, this.bossArena.hazards.length / 6), bossActive: Boolean(boss), safeLaneVisible: Boolean(safeLane) }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
+            const hazardReadabilityContrast = hazardReadabilityContrastPresentation({ edgeFloor: hazardEffectiveFloor.edgeAlphaFloor, fillScale: hazardSecondaryCeiling.fillScale, telegraph: hazard.telegraph > 0, critical: hazard.id === primaryTelegraphHazardId, crowd: Math.min(1, this.bossArena.hazards.length / 6) }, this.presentationSettings.reducedFlash), hazardReadabilityContrastBudget = readabilityContrastBudgetPresentation({ criticalCount: hazard.id === primaryTelegraphHazardId ? 1 : 0, crowd: Math.min(1, this.bossArena.hazards.length / 6), bossActive: Boolean(boss), safeLaneVisible: Boolean(safeLane) }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash), hazardResiduePattern = denseDashFamilyPresentation({ family: 'residue', crowd: Math.min(1, this.bossArena.hazards.length / 6), critical: false, bossProtected: false, safeLaneVisible: Boolean(safeLane) }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash), hazardDashGapScale = hazardReadabilityContrast.dashGapScale * hazardReadabilityContrastBudget.secondaryDashGapScale * hazardResiduePattern.dashGapScale;
             const hazardFinalSettle = hazardFinalReadabilitySettlePresentation({ primaryFloor: hazardReadabilityContrast.edgeAlphaFloor, reacquire: hazardCanonicalReacquisition.reacquire, stress: hazardReadabilityContrastBudget.stress, critical: hazard.id === primaryTelegraphHazardId }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash), hazardFinalSettleBudget = finalReadabilitySettleBudgetPresentation({ criticalCount: hazard.id === primaryTelegraphHazardId ? 1 : 0, stress: hazardReadabilityContrastBudget.stress, bossActive: Boolean(boss), safeLaneVisible: Boolean(safeLane) }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
             const hazardSecondaryRecoveryGate = hazardSecondaryRecoveryGatePresentation({ release: hazardFinalSettle.settle, stress: hazardFinalSettleBudget.stress, critical: hazard.id === primaryTelegraphHazardId }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash), hazardSecondaryRecoveryGateBudget = secondaryRecoveryGateBudgetPresentation({ criticalCount: hazard.id === primaryTelegraphHazardId ? 1 : 0, stress: hazardFinalSettleBudget.stress, release: hazardFinalSettle.settle }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
             const hazardFocusTransfer = hazardFocusTransferCoherencePresentation({ incomingFocus: hazardFinalSettle.settle, outgoingFocus: Math.max(hazard.telegraph > 0 ? 1 : 0, hazardLaneProximity), stress: hazardSecondaryRecoveryGateBudget.hold, critical: hazard.id === primaryTelegraphHazardId }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash), hazardFocusTransferBudget = focusTransferCoherenceBudgetPresentation({ criticalCount: hazard.id === primaryTelegraphHazardId ? 1 : 0, stress: hazardFinalSettleBudget.stress, incomingFocus: hazardFinalSettle.settle, outgoingFocus: Math.max(hazard.telegraph > 0 ? 1 : 0, hazardLaneProximity) }, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash);
@@ -7164,7 +7321,8 @@ export class Game {
             ctx.globalAlpha = hazard.telegraph > 0 ? hazardBaseAlpha * hazardTelegraphDepth.telegraphEdgeAlphaScale * hazardDepthRelease.telegraphEdgeAlphaScale * hazardStackOrder.edgeAlphaScale * hazardUnifiedStack.bossTelegraphEdgeAlphaScale * hazardSafeLaneSeparation.telegraphEdgeAlphaScale * hazardSpatialSeparationBudget.bossTelegraphEdgeAlphaScale : hazardFillAlpha;
             ctx.fillStyle = color;
             ctx.strokeStyle = color;
-            ctx.lineWidth = hazard.telegraph > 0 ? 4 : 2;
+            ctx.filter = hazard.telegraph > 0 ? 'none' : valueChromaFilter(hazardReadabilityContrast.valueScale * hazardFinalSettle.valueScale * hazardReadabilityContrastBudget.secondaryValueScale, hazardReadabilityContrast.chromaScale * hazardFinalSettle.chromaScale * hazardReadabilityContrastBudget.secondaryChromaScale);
+            ctx.lineWidth = (hazard.telegraph > 0 ? 4 : 2) * hazardReadabilityContrast.strokeWidthScale * (hazard.telegraph > 0 ? 1 : hazardFinalSettle.strokeWidthScale * hazardReadabilityContrastBudget.secondaryStrokeWidthScale);
             const shape = hazard.geometryShape;
             if (shape === 'corridor' || shape === 'cross') {
                 ctx.translate(hazard.pos.x, hazard.pos.y);
@@ -7245,7 +7403,7 @@ export class Game {
                 ctx.globalAlpha = .24 * hazardResidueRelease.clearedGroundAlphaScale * hazardGroundResolution.clearedGroundAlphaScale;
                 ctx.strokeStyle = color;
                 ctx.lineWidth = 1.4;
-                ctx.setLineDash([3, 7]);
+                ctx.setLineDash([3, 7 * hazardDashGapScale * hazardFinalSettle.dashGapScale]);
                 ctx.beginPath();
                 ctx.arc(hazard.pos.x, hazard.pos.y, Math.max(12, hazard.radius * 1.04), 0, Math.PI * 2);
                 ctx.stroke();

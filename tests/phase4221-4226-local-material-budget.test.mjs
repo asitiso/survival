@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import * as dense from '../dist/game/threat-impact-dense-arbitration-rendering.js';
+import * as local from '../dist/game/threat-impact-local-material-budget-rendering.js';
+
+test('Phase 4221 dense projectile trail yields to canonical body in lane footprint',()=>{const p=dense.denseProjectileArbitrationPresentation({projectileCount:24,indexFromNewest:14,critical:false,laneProximity:1});assert.equal(p.bodyAlphaScale,1);assert.ok(p.trailAlphaScale<=.38);});
+test('Phase 4222 dense impact fill yields near hero critical corridor footprint',()=>{const p=dense.denseImpactArbitrationPresentation({impactCount:20,indexFromNewest:12,heroProximity:1,critical:false});assert.equal(p.canonicalAlphaScale,1);assert.ok(p.fillAlphaScale<=.3);});
+test('Phase 4223 dense hazard fill yields to telegraph edge and safe-lane footprint',()=>{const p=dense.denseHazardArbitrationPresentation({hazardCount:20,indexFromNewest:8,telegraph:true,critical:false,laneProximity:1});assert.equal(p.edgeAlphaScale,.98);assert.ok(p.fillAlphaScale<=.34);});
+test('Phase 4224 dense safe-lane local budget reserves path before secondary material',()=>{const p=dense.denseSafeLaneArbitrationPresentation({hazardCount:16,projectileCount:16,confidence:1,critical:true});assert.ok(p.pathAlphaFloor>=.94);assert.ok(p.safeLaneAlphaScale>=1);assert.ok(p.secondaryAlphaScale<=.5);});
+test('Phase 4225 dense silhouette recovery trail yields to canonical body',()=>{const p=dense.denseSilhouetteArbitrationPresentation({silhouetteCount:16,indexFromNewest:8,owner:'recovery',critical:false});assert.equal(p.bodyAlphaScale,1);assert.ok(p.trailAlphaScale<=.46);});
+test('Phase 4226 unified local material budget preserves protected owners at extreme density',()=>{const p=local.localMaterialBudgetPresentation({stress:1,criticalCount:3,safeLaneVisible:true,bossTelegraphActive:true},true,true);assert.equal(p.criticalScale,1);assert.equal(p.canonicalBodyScale,1);assert.equal(p.bossTelegraphEdgeScale,1);assert.equal(p.safeLaneScale,1);assert.ok(p.secondaryCeiling<=.48);const live=dense.denseBattlefieldArbitrationPresentation({criticalCount:3,hazardCount:20,projectileCount:20,impactCount:15,silhouetteCount:12,safeLaneVisible:true});assert.ok(live.secondaryAlphaScale<=.5);});

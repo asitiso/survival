@@ -10,6 +10,7 @@ import type { FusionId } from './spell-fusions.js';
 import { composeFusionSpellModifiers, type FusionSpellModifiers } from './fusion-integration.js';
 import { chooseSpellTarget } from './auto-targeting.js';
 import { autoWeakpointAimPoint } from './auto-weakpoint-aim.js';
+import { manualWeakpointAssistAimPoint } from './manual-weakpoint-assist.js';
 import type { BossEncounterNode } from './boss-encounters.js';
 import { ultimateChoreographyDescriptor, type UltimateChoreographyDescriptor } from './spell-vfx.js';
 import type { ResidualCombatMotionPolicy } from './combat-cue-priority.js';
@@ -52,6 +53,9 @@ import { bossImpactReengagementLockPresentation, criticalReengagementBudgetPrese
 import { effectiveAlphaFloorBudgetPresentation, impactEffectiveAlphaFloorPresentation } from './threat-impact-effective-alpha-floor-rendering.js';
 import { impactSecondaryCeilingPresentation, secondaryCeilingBudgetPresentation } from './threat-impact-secondary-ceiling-rendering.js';
 import { impactReadabilityContrastPresentation, readabilityContrastBudgetPresentation } from './threat-impact-readability-contrast-rendering.js';
+import { valueChromaFilter } from './threat-impact-value-chroma-ownership-rendering.js';
+import { glowOwnershipPresentation } from './threat-impact-glow-ownership-rendering.js';
+import { denseGlowFamilyPresentation } from './threat-impact-dense-halo-budget-rendering.js';
 import { finalReadabilitySettleBudgetPresentation, impactFinalReadabilitySettlePresentation } from './threat-impact-final-readability-settle-rendering.js';
 import { impactSecondaryRecoveryGatePresentation, secondaryRecoveryGateBudgetPresentation } from './threat-impact-secondary-recovery-gate-rendering.js';
 import { focusTransferCoherenceBudgetPresentation, impactFocusTransferCoherencePresentation } from './threat-impact-focus-transfer-coherence-rendering.js';
@@ -233,6 +237,7 @@ export interface SpellWorld {
   fusions?: readonly FusionId[];
   autoAim?: boolean;
   preferredAutoTargetId?: number | null;
+  preferredAutoWeakpointId?: number | null;
   preferredManualTargetId?: number | null;
   weakpointAim?: { activeBossId:number|null; nodes:readonly BossEncounterNode[] } | undefined;
   visualBodyOffset?: Vec2 | undefined;
@@ -260,6 +265,11 @@ const ACTION_TO_SPELL: Partial<Record<ActionId, SpellId>> = {
 };
 
 export class SpellSystem {
+  private hitMagicTarget(world:SpellWorld,pos:Vec2,strength:number,source?:Vec2):void {
+    const result=world.magicTargets?.hitMagic(pos,strength);
+    if(!result?.hit)return;
+    world.feedback?.addActionResult?.(pos,result.destroyed?'weakpointBreak':'weakpointHit',source??world.hero.pos);
+  }
   readonly levels: Record<SpellId, number> = {
     fireBolt: 1,
     chainLightning: 1,
@@ -493,8 +503,9 @@ export class SpellSystem {
       const travelBudget=heroTravelBridgeDensityBudgetPresentation({activeCount:activeHeroTravelBridges.length,indexFromNewest:heroTravelBridgeRank.get(projectile)??activeHeroTravelBridges.length,life:(projectile.visualLaunchTravelTtl??0)/Math.max(.001,projectile.visualLaunchTravelMaxTtl??.13),evolutionTier:projectile.evolutionTier},reducedMotion,reducedFlash);
       if(travelHandoff&&travelHandoff.visible&&travelBudget.visible){ctx.save();ctx.globalAlpha=Math.min(travel?.alpha??0,travelHandoff.alpha)*travelBudget.alphaScale*travelThreatCarry.alphaScale*threatOwnership.travelAlphaScale;ctx.strokeStyle=projectile.secondary;ctx.lineWidth=Math.max(1.1,projectile.radius*.12);ctx.beginPath();ctx.moveTo(travelHandoff.start.x,travelHandoff.start.y);ctx.lineTo(travelHandoff.end.x,travelHandoff.end.y);ctx.stroke();ctx.restore();}
       if(trail.owner==='launch'){ctx.save();ctx.globalAlpha=trail.alpha*threatOwnership.launchAlphaScale;ctx.strokeStyle=projectile.secondary;ctx.lineWidth=Math.max(1.4,projectile.radius*.18);ctx.beginPath();ctx.moveTo(trail.tail.x,trail.tail.y);ctx.lineTo(trail.head.x,trail.head.y);ctx.stroke();ctx.restore();}
+      const heroProjectileGlow=glowOwnershipPresentation({family:'projectile',crowd:Math.min(1,this.projectiles.length/12),critical:projectile.evolutionTier>=2,bossProtected:false,safeLaneVisible:false},reducedMotion,reducedFlash),denseHeroProjectileGlow=denseGlowFamilyPresentation({family:'projectile',crowd:Math.min(1,this.projectiles.length/12),critical:projectile.evolutionTier>=2,bossProtected:false,safeLaneVisible:false},reducedMotion,reducedFlash);
       ctx.save();
-      ctx.shadowColor = projectile.secondary; ctx.shadowBlur = 18;
+      ctx.shadowColor = projectile.secondary; ctx.shadowBlur = 18 * heroProjectileGlow.glowBlurScale*denseHeroProjectileGlow.glowBlurScale;
       ctx.fillStyle = projectile.primary; ctx.globalAlpha = heroProjectileAtlasReady ? 0.28 : 1; ctx.beginPath(); ctx.arc(projectile.pos.x, projectile.pos.y, projectile.radius, 0, Math.PI * 2); ctx.fill();
       if (heroProjectileAtlasReady && heroProjectileAtlasImage) {
         const sprite = heroProjectileVfxSprite(projectile.heroId);
@@ -579,7 +590,7 @@ export class SpellSystem {
         ctx.save(); ctx.globalAlpha = Math.max(0, 1 - progress) * 0.9 * arrivalContinuity.fillAlphaScale * reactionCarry.spriteAlphaScale * arrivalSettleRecovery.spriteAlphaScale * impactRetirement.spriteAlphaScale * impactDamageSourceAftermathHandoff.impactSpriteAlphaScale * impactDamageSourceReaction.impactSpriteAlphaScale * impactDamageSourceReactionHandoff.impactSpriteAlphaScale * (impactDamageSourceReactionDensity?.impactSpriteAlphaScale??1) * (impact.alphaScale??1) * (budget?.alphaScale??1) * impactDepth.fillAlphaScale * telegraphDepth.impactFillAlphaScale * impactDepthBudget.secondaryAlphaScale * impactDepthHandoff.fillAlphaScale * telegraphDepthRelease.impactFillAlphaScale * impactRecoveryBudget.secondaryRecoveryScale * impactStackRetirement.fillAlphaScale * impactUnifiedStack.secondaryAlphaScale * impactCorridorSeparation.fillAlphaScale * impactSpatialSeparationBudget.secondaryAlphaScale * impactCorridorRelease.fillAlphaScale * impactSpatialRecoveryBudget.secondaryRecoveryScale * impactDenseArbitration.fillAlphaScale * impactDenseBattlefield.secondaryAlphaScale * impactCanonicalReacquisition.fillAlphaScale * impactCanonicalReacquisitionBudget.staleDecorationScale * impactCriticalReengagement.fillAlphaScale * impactCriticalReengagementBudget.secondaryScale * impactSecondaryCeiling.fillScale * impactSecondaryCeilingBudget.secondaryScale * impactReadabilityContrast.fillScale * impactReadabilityContrastBudget.secondaryScale * impactFinalSettle.secondaryScale * impactFinalSettleBudget.secondaryScale * impactSecondaryRecoveryGate.secondaryScale * impactSecondaryRecoveryGateBudget.secondaryScale * impactFocusTransfer.secondaryScale * impactFocusTransferBudget.secondaryScale*impactRhythm.secondaryScale*impactRhythmBudget.secondaryScale*impactRhythmRecovery.secondaryScale*impactRhythmRecoveryBudget.secondaryScale*impactDenseRhythm.secondaryScale*impactDenseRhythmBudget.secondaryScale;
         ctx.drawImage(heroProjectileAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, impactVisualPos.x - size / 2, impactVisualPos.y - size / 2, size, size);
         ctx.restore();
-        ctx.save();ctx.globalAlpha=Math.max(impactEffectiveFloor.edgeAlphaFloor*impactEffectiveFloorBudget.canonicalFloorScale,impactReadabilityContrast.edgeAlphaFloor*impactReadabilityContrastBudget.primaryScale,impactFinalSettle.primaryFloor,.38*arrivalContinuity.edgeAlphaScale*reactionCarry.aftermathAlphaScale*arrivalSettleRecovery.footprintAlphaScale*impactRetirement.footprintAlphaScale*impactResolutionBudget.effectStrength*impactSpatial.edgeAlphaScale*impactTemporal.edgeAlphaScale*impactPriority.impactAlphaScale*impactThreatBudget.impactDecorationScale*impactSpatial.fillAlphaScale*impactTemporal.decorationAlphaScale*impactTemporalBudget.secondaryAlphaScale*(impact.alphaScale??1)*(budget?.alphaScale??1)*impactDepth.edgeAlphaScale*telegraphDepth.impactEdgeAlphaScale*impactDepthHandoff.edgeAlphaScale*telegraphDepthRelease.impactEdgeAlphaScale*impactStackRetirement.edgeAlphaScale*impactCorridorSeparation.edgeAlphaScale*impactCorridorRelease.edgeAlphaScale*impactDenseArbitration.edgeAlphaScale*impactDepthPlane.edgeAlphaScale*impactDepthReentry.edgeAlphaScale*bossImpactFocus.edgeAlphaScale*impactCanonicalReacquisition.edgeAlphaScale*impactCanonicalReacquisitionBudget.criticalEdgeScale*impactCriticalReengagement.edgeAlphaScale*impactCriticalReengagementBudget.telegraphEdgeScale);ctx.strokeStyle=impact.secondaryKind==='splash'?'#ffd6a3':'#bcecff';ctx.lineWidth=1.4;ctx.beginPath();ctx.arc(impactVisualPos.x,impactVisualPos.y,Math.max(7,size*.34)*impactSpatial.radiusScale,0,Math.PI*2);ctx.stroke();ctx.restore();
+        ctx.save();ctx.globalAlpha=Math.max(impactEffectiveFloor.edgeAlphaFloor*impactEffectiveFloorBudget.canonicalFloorScale,impactReadabilityContrast.edgeAlphaFloor*impactReadabilityContrastBudget.primaryScale,impactFinalSettle.primaryFloor,.38*arrivalContinuity.edgeAlphaScale*reactionCarry.aftermathAlphaScale*arrivalSettleRecovery.footprintAlphaScale*impactRetirement.footprintAlphaScale*impactResolutionBudget.effectStrength*impactSpatial.edgeAlphaScale*impactTemporal.edgeAlphaScale*impactPriority.impactAlphaScale*impactThreatBudget.impactDecorationScale*impactSpatial.fillAlphaScale*impactTemporal.decorationAlphaScale*impactTemporalBudget.secondaryAlphaScale*(impact.alphaScale??1)*(budget?.alphaScale??1)*impactDepth.edgeAlphaScale*telegraphDepth.impactEdgeAlphaScale*impactDepthHandoff.edgeAlphaScale*telegraphDepthRelease.impactEdgeAlphaScale*impactStackRetirement.edgeAlphaScale*impactCorridorSeparation.edgeAlphaScale*impactCorridorRelease.edgeAlphaScale*impactDenseArbitration.edgeAlphaScale*impactDepthPlane.edgeAlphaScale*impactDepthReentry.edgeAlphaScale*bossImpactFocus.edgeAlphaScale*impactCanonicalReacquisition.edgeAlphaScale*impactCanonicalReacquisitionBudget.criticalEdgeScale*impactCriticalReengagement.edgeAlphaScale*impactCriticalReengagementBudget.telegraphEdgeScale);ctx.strokeStyle=impact.secondaryKind==='splash'?'#ffd6a3':'#bcecff';ctx.filter=valueChromaFilter(impactReadabilityContrast.valueScale*impactFinalSettle.valueScale*impactReadabilityContrastBudget.secondaryValueScale,impactReadabilityContrast.chromaScale*impactFinalSettle.chromaScale*impactReadabilityContrastBudget.secondaryChromaScale);ctx.lineWidth=1.4*impactReadabilityContrast.strokeWidthScale*impactFinalSettle.strokeWidthScale*impactReadabilityContrastBudget.secondaryStrokeWidthScale;ctx.beginPath();ctx.arc(impactVisualPos.x,impactVisualPos.y,Math.max(7,size*.34)*impactSpatial.radiusScale,0,Math.PI*2);ctx.stroke();ctx.restore();
       }
       const secondaryOccupied:Vec2[]=[],secondaryPriority=secondaryImpactLineageLabelPriorityOrder([...secondaryLineageLabels].map(([lineageKey,meta])=>({lineageKey,heldCount:meta.heldCount,ttl:meta.ttl,budgetVisible:meta.budgetVisible}))),secondaryCapacity=secondaryImpactLineageLabelCapacityBudget(secondaryPriority.map(entry=>entry.lineageKey),presentationQuality),secondaryCapacityKeys=new Set(secondaryCapacity.visibleLineageKeys),secondaryConnectorCapacity=secondaryImpactLineageLabelConnectorCapacityBudget(presentationQuality);let secondaryConnectorCount=0;
       for(const [lineagePriorityIndex,priority] of secondaryPriority.entries()){if(!secondaryCapacityKeys.has(priority.lineageKey))continue;const lineageKey=priority.lineageKey,labelMeta=secondaryLineageLabels.get(lineageKey)!,lineageParentKey=lineageKey.endsWith(':splash')?lineageKey.slice(0,-7):lineageKey,lineageOwner=projectileImpactLineageOwnerHandoffPresentation({sourceActive:primaryImpactLineageKeys.has(lineageParentKey),secondaryActive:true,ttl:labelMeta.ttl,maxTtl:labelMeta.maxTtl},reducedMotion),lineageDensityBudget=projectileImpactLineageDensityBudgetPresentation({activeLineageCount:secondaryPriority.length,indexFromNewest:lineagePriorityIndex,owner:lineageOwner.owner,heldCount:labelMeta.heldCount},reducedMotion);if(lineageOwner.owner==='retired'||!lineageDensityBudget.visible)continue;const anchor=secondaryImpactActiveLineageAnchorFor(this.secondaryImpactClusterSplitLineage,lineageKey),label=secondaryImpactLineageLabelPresentation({lineageKey,anchor:anchor?.pos,heldCount:labelMeta.heldCount,ttl:labelMeta.ttl,maxTtl:labelMeta.maxTtl,budgetVisible:labelMeta.budgetVisible},reducedFlash);if(!label.visible||!anchor)continue;const fallbackPlacement=secondaryImpactLineageLabelPlacement({anchor:anchor.pos,blockers:primaryProjectileLabelBlockers,occupied:secondaryOccupied,width:LOGICAL_WIDTH,height:LOGICAL_HEIGHT}),held=secondaryImpactLineageHeldPlacement(this.secondaryImpactLineageLabelPlacementHold,lineageKey,fallbackPlacement,primaryProjectileLabelBlockers,secondaryOccupied,LOGICAL_WIDTH,LOGICAL_HEIGHT);this.secondaryImpactLineageLabelPlacementHold=held.memory;const placement=held.placement;if(!placement.visible){const retired=secondaryImpactLineageLabelMotionSettle(this.secondaryImpactLineageLabelMotionMemory,lineageKey,placement.pos,false,reducedMotion);this.secondaryImpactLineageLabelMotionMemory=retired.memory;continue;}const edgeBiased=secondaryImpactLineageLabelEdgeBias({pos:placement.pos,blockers:primaryProjectileLabelBlockers,occupied:secondaryOccupied,width:LOGICAL_WIDTH,height:LOGICAL_HEIGHT});const settled=secondaryImpactLineageLabelMotionSettle(this.secondaryImpactLineageLabelMotionMemory,lineageKey,edgeBiased.pos,true,reducedMotion);this.secondaryImpactLineageLabelMotionMemory=settled.memory;const connector=secondaryImpactLineageLabelConnectorPresentation({anchor:anchor.pos,labelPos:settled.presentation.pos,visible:settled.presentation.visible,biasApplied:edgeBiased.biasApplied,settled:settled.presentation.settled},reducedFlash);if(connector.visible&&secondaryConnectorCount<secondaryConnectorCapacity.maxVisible){secondaryConnectorCount++;ctx.save();ctx.globalAlpha=connector.alpha;ctx.strokeStyle='#bcecff';ctx.lineWidth=connector.lineWidth;ctx.beginPath();ctx.moveTo(connector.from.x,connector.from.y);ctx.lineTo(connector.to.x,connector.to.y);ctx.stroke();ctx.restore();}const emphasis=secondaryImpactLineageLabelCountEmphasis(this.secondaryImpactLineageLabelCountMemory,lineageKey,labelMeta.heldCount,true,reducedFlash);this.secondaryImpactLineageLabelCountMemory=emphasis.memory;const renderPos=settled.presentation.pos;secondaryOccupied.push(renderPos);ctx.save();ctx.globalAlpha=label.alpha*lineageOwner.alphaScale*lineageDensityBudget.alphaScale;ctx.fillStyle='#f7f4ff';ctx.font='800 10px system-ui';ctx.textAlign='center';ctx.shadowColor='rgba(16,10,28,.82)';ctx.shadowBlur=5;ctx.translate(renderPos.x,renderPos.y);ctx.scale(emphasis.presentation.scale,emphasis.presentation.scale);ctx.fillText(label.text,0,0);ctx.restore();}
@@ -588,7 +599,8 @@ export class SpellSystem {
     for (const arc of this.arcs) {
       const alpha = Math.max(0, arc.ttl / 0.18);
       const visualFirst=arc.visualStart??arc.points[0];
-      ctx.save(); ctx.globalAlpha = alpha; ctx.strokeStyle = arc.color; ctx.lineWidth = 6; ctx.shadowColor = arc.color; ctx.shadowBlur = 15;
+      const spellGlow=glowOwnershipPresentation({family:'spell',crowd:Math.min(1,this.arcs.length/6),critical:false,bossProtected:false,safeLaneVisible:false},reducedMotion,reducedFlash),denseSpellGlow=denseGlowFamilyPresentation({family:'spell',crowd:Math.min(1,this.arcs.length/6),critical:false,bossProtected:false,safeLaneVisible:false},reducedMotion,reducedFlash);
+      ctx.save(); ctx.globalAlpha = alpha; ctx.strokeStyle = arc.color; ctx.lineWidth = 6; ctx.shadowColor = arc.color; ctx.shadowBlur = 15*spellGlow.glowBlurScale*denseSpellGlow.glowBlurScale;
       ctx.beginPath();
       if(visualFirst)ctx.moveTo(visualFirst.x,visualFirst.y);
       for(let i=1;i<arc.points.length;i++){const p=arc.points[i]!;ctx.lineTo(p.x,p.y);}
@@ -697,10 +709,10 @@ export class SpellSystem {
       points.push({ ...current.pos });
       const impactPos=this.targetAimPoint(world,current)??current.pos,impactResponse=projectileImpactResponseAt(world,impactPos,current);
       const chainKilled=world.enemies.damage(current, tuning.damage * world.hero.spellPower * world.hero.equipmentSpellPower * identity.damageMultiplier * evolution.damageMultiplier * fusion.damageMultiplier * Math.pow(0.86, i), hitSource);
-      if (identity.chainSlowFactor < 1) world.enemies.applySlow(current, Math.max(0.24, identity.chainSlowFactor * evolution.slowFactorMultiplier), identity.chainSlowDuration * evolution.slowDurationMultiplier * fusion.slowDurationMultiplier);
+      if (identity.chainSlowFactor < 1) world.enemies.applySlow(current, Math.max(0.24, identity.chainSlowFactor * evolution.slowFactorMultiplier), identity.chainSlowDuration * evolution.slowDurationMultiplier * fusion.slowDurationMultiplier, 'impact');
       if(i>0){const secondary=secondaryImpactCanonicalPresentation('chain',impactPos,world.reducedFlash??false),lineage=projectileImpactLineageTransferPresentation({sourceLineageKey:visualImpactLineageId,impactIndex:i,secondaryKind:'chain',continues:Boolean(current)},world.reducedMotion??false);this.projectileImpactVisuals.push({pos:secondary.pos,entryOffset:secondary.entryOffset,alphaScale:secondary.alphaScale,secondaryKind:'chain',impactLineageKey:lineage.lineageKey,impactDirection:{x:impactPos.x-hitSource.x,y:impactPos.y-hitSource.y},impactResponseOwner:impactResponse.owner,impactResponseStrength:impactResponse.strength,enemyReactionOwner:chainKilled?'death':'hit',heroId:world.hero.profileId,ttl:.14,maxTtl:.14,size:54*secondary.sizeScale});if(this.projectileImpactVisuals.length>32)this.projectileImpactVisuals.splice(0,this.projectileImpactVisuals.length-32);}
       world.terrain?.hitByMagic(current.pos, 1);
-      world.magicTargets?.hitMagic(impactPos, tuning.damage * 0.72);
+      this.hitMagicTarget(world,impactPos,tuning.damage * 0.72,hitSource);
       const from = current.pos;
       let next: Enemy | null = null;
       let best = 180;
@@ -725,11 +737,11 @@ export class SpellSystem {
       if (!enemy.alive || distance(world.hero.pos, enemy.pos) > radius + enemy.radius) continue;
       const seria = world.hero.profileId === 'seria';
       world.enemies.damage(enemy, tuning.damage * world.hero.spellPower * world.hero.equipmentSpellPower * identity.novaDamageMultiplier * evolution.damageMultiplier * fusion.damageMultiplier * (seria ? 1.06 : 1), world.hero.pos, 'freeze');
-      world.enemies.applySlow(enemy, Math.max(0.20, (seria ? 0.42 : 0.53) * evolution.slowFactorMultiplier), tuning.duration * evolution.durationMultiplier * evolution.slowDurationMultiplier * fusion.slowDurationMultiplier * (seria ? 1.25 : 1));
+      world.enemies.applySlow(enemy, Math.max(0.20, (seria ? 0.42 : 0.53) * evolution.slowFactorMultiplier), tuning.duration * evolution.durationMultiplier * evolution.slowDurationMultiplier * fusion.slowDurationMultiplier * (seria ? 1.25 : 1), 'frost');
       if (identity.knockback > 0) world.enemies.pushAway(enemy, world.hero.pos, identity.knockback * evolution.knockbackMultiplier);
     }
     world.terrain?.hitByMagic(world.hero.pos, 1);
-    world.magicTargets?.hitMagic(world.hero.pos, tuning.damage);
+    this.hitMagicTarget(world,world.hero.pos,tuning.damage,world.hero.pos);
     this.novas.push({ pos: { ...world.hero.pos }, heroId: world.hero.profileId, radius, ttl: 0.34, color: identity.primary, spriteId: 'frostNova' });
     if (evolution.tier > 0) world.feedback?.addImpact(world.hero.pos, evolution.tier === 2 ? 'final' : 'awakened');
   }
@@ -745,7 +757,7 @@ export class SpellSystem {
     const aim=this.targetAimPoint(world,target);
     const pos = identity.fieldAtCore && world.core ? { ...world.core.pos } : aim ? { ...aim } : fallback;
     world.terrain?.hitByMagic(pos, 1);
-    world.magicTargets?.hitMagic(pos, tuning.damage * 0.8);
+    this.hitMagicTarget(world,pos,tuning.damage * 0.8,world.hero.pos);
     this.fields.push({ spriteId: 'flameField', heroId: world.hero.profileId, pos, radius: tuning.radius * world.hero.equipmentAreaMultiplier * identity.areaMultiplier * evolution.areaMultiplier * fusion.areaMultiplier, damage: tuning.damage * world.hero.spellPower * world.hero.equipmentSpellPower * identity.fieldDamageMultiplier * evolution.damageMultiplier * fusion.damageMultiplier, ttl: tuning.duration * evolution.durationMultiplier, maxTtl: tuning.duration * evolution.durationMultiplier, tick: 0.38 / identity.fieldTickMultiplier / evolution.tickMultiplier / fusion.tickMultiplier, tickTimer: 0, primary: identity.primary, secondary: identity.secondary, slowFactor: Math.max(0.22, identity.fieldSlowFactor * evolution.slowFactorMultiplier), slowDuration: identity.fieldSlowDuration * evolution.slowDurationMultiplier * fusion.slowDurationMultiplier, evolutionTier: evolution.tier });
     if (evolution.tier === 2) world.feedback?.addImpact(pos, 'final');
   }
@@ -795,7 +807,7 @@ export class SpellSystem {
 
   private targetAimPoint(world:SpellWorld,target:Enemy|null):Vec2|null{
     if(!target)return null;
-    return autoWeakpointAimPoint({autoAim:world.autoAim===true,target,heroPos:world.hero.pos,activeBossId:world.weakpointAim?.activeBossId??null,nodes:world.weakpointAim?.nodes??[]});
+    return world.autoAim===true?autoWeakpointAimPoint({autoAim:true,target,heroPos:world.hero.pos,activeBossId:world.weakpointAim?.activeBossId??null,nodes:world.weakpointAim?.nodes??[],preferredNodeId:world.preferredAutoWeakpointId??null}):manualWeakpointAssistAimPoint({target,heroPos:world.hero.pos,activeBossId:world.weakpointAim?.activeBossId??null,nodes:world.weakpointAim?.nodes??[]});
   }
 
   private updateProjectiles(dt: number, world: SpellWorld): void {
@@ -806,7 +818,7 @@ export class SpellSystem {
       if(p.visualImpactHandoffTtl!==undefined)p.visualImpactHandoffTtl=Math.max(0,p.visualImpactHandoffTtl-dt);
       p.pos.x += p.vel.x * dt;
       p.pos.y += p.vel.y * dt;
-      world.magicTargets?.hitMagic(p.pos, p.damage * Math.min(0.28, dt * 4));
+      this.hitMagicTarget(world,p.pos,p.damage * Math.min(0.28,dt * 4),p.visualLaunchWorldOrigin??world.hero.pos);
       for (const enemy of world.enemies.enemies) {
         if (!enemy.alive || p.hitIds.has(enemy.id)) continue;
         if (distance(p.pos, enemy.pos) > p.radius + enemy.radius) continue;
@@ -818,7 +830,7 @@ export class SpellSystem {
         this.projectileImpactVisuals.push({ pos:{...p.pos}, entryOffset, impactLineageKey:lineage.lineageKey, impactDirection:{x:p.vel.x,y:p.vel.y}, impactResponseOwner:impactResponse.owner, impactResponseStrength:impactResponse.strength, enemyReactionOwner:killedByImpact?'death':'hit', heroId:p.heroId, ttl:0.18, maxTtl:0.18, size:Math.max(48,p.radius*5.2) });
         if(impactHandoff.retireLaunchOwner){delete p.visualLaunchOffset;delete p.visualLaunchTtl;delete p.visualLaunchMaxTtl;}if(impactHandoff.retireTravelOwner){delete p.visualLaunchWorldOrigin;delete p.visualLaunchTravelTtl;delete p.visualLaunchTravelMaxTtl;if(continues){const handoffMax=world.reducedMotion?.05:.08;p.visualImpactHandoffTtl=handoffMax;p.visualImpactHandoffMaxTtl=handoffMax;}}
         if (p.evolutionTier === 2) world.feedback?.addImpact(p.pos, 'final');
-        if (p.slowFactor < 1) world.enemies.applySlow(enemy, p.slowFactor, p.slowDuration);
+        if (p.slowFactor < 1) world.enemies.applySlow(enemy, p.slowFactor, p.slowDuration, 'impact');
         if (p.splashRadius > 0 && p.splashDamage > 0) {
           for (const nearby of world.enemies.enemies) {
             if (!nearby.alive || nearby.id === enemy.id) continue;
@@ -839,11 +851,11 @@ export class SpellSystem {
       field.tickTimer -= dt;
       if (field.tickTimer > 0) continue;
       field.tickTimer += field.tick;
-      world.magicTargets?.hitMagic(field.pos, field.damage * 0.55);
+      this.hitMagicTarget(world,field.pos,field.damage * 0.55,field.pos);
       for (const enemy of world.enemies.enemies) {
         if (enemy.alive && distance(field.pos, enemy.pos) <= field.radius + enemy.radius) {
           world.enemies.damage(enemy, field.damage, field.pos);
-          if (field.slowFactor < 1) world.enemies.applySlow(enemy, field.slowFactor, field.slowDuration);
+          if (field.slowFactor < 1) world.enemies.applySlow(enemy, field.slowFactor, field.slowDuration, 'generic');
         }
       }
     }
@@ -859,13 +871,13 @@ export class SpellSystem {
           meteor.exploded = true;
           meteor.flash = 0.26;
           world.terrain?.hitByMagic(meteor.pos, 3);
-          world.magicTargets?.hitMagic(meteor.pos, meteor.damage * 0.8);
+          this.hitMagicTarget(world,meteor.pos,meteor.damage * 0.8,world.hero.pos);
           world.feedback?.addImpact(meteor.pos, meteor.evolutionTier === 2 ? 'final' : 'ultimate');
           this.queueUltimatePostImpactResidue(meteor.heroId,'meteorStorm',meteor.pos,meteor.radius,.48);
           for (const enemy of world.enemies.enemies) {
             if (enemy.alive && distance(meteor.pos, enemy.pos) <= meteor.radius + enemy.radius) {
               world.enemies.damage(enemy, meteor.damage, meteor.pos, 'ultimate');
-              if (meteor.slowFactor < 1) world.enemies.applySlow(enemy, meteor.slowFactor, meteor.slowDuration);
+              if (meteor.slowFactor < 1) world.enemies.applySlow(enemy, meteor.slowFactor, meteor.slowDuration, 'impact');
             }
           }
         }
@@ -888,11 +900,11 @@ export class SpellSystem {
         enemy.pos.y += dir.y * pull;
         if (hole.tickTimer <= 0) {
           world.enemies.damage(enemy, hole.damage, hole.pos, 'ultimate');
-          if (hole.slowFactor < 1) world.enemies.applySlow(enemy, hole.slowFactor, hole.slowDuration);
+          if (hole.slowFactor < 1) world.enemies.applySlow(enemy, hole.slowFactor, hole.slowDuration, 'gravity');
         }
       }
       if (hole.tickTimer <= 0) {
-        world.magicTargets?.hitMagic(hole.pos, hole.damage * 0.55);
+        this.hitMagicTarget(world,hole.pos,hole.damage * 0.55,hole.pos);
         hole.tickTimer += hole.tickInterval;
       }
     }

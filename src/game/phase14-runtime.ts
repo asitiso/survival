@@ -9,6 +9,8 @@ export interface ExistingEnemyPressure {
 }
 
 export interface ThreatComposedPressure extends ExistingEnemyPressure {
+  projectileSpeedMultiplier: number;
+  bossSpecialCadenceMultiplier: number;
   bossVariantBonus: 0 | 1 | 2;
 }
 
@@ -17,6 +19,8 @@ export function composeThreatPressure(base: ExistingEnemyPressure, threat: Threa
     enemySpeedMultiplier: base.enemySpeedMultiplier * threat.enemySpeedMultiplier,
     spawnPressureMultiplier: base.spawnPressureMultiplier * threat.spawnPressureMultiplier,
     eliteIntervalMultiplier: base.eliteIntervalMultiplier * threat.eliteIntervalMultiplier,
+    projectileSpeedMultiplier: threat.projectileSpeedMultiplier,
+    bossSpecialCadenceMultiplier: threat.bossSpecialCadenceMultiplier,
     ...(base.regularWeights ? { regularWeights: base.regularWeights } : {}),
     bossVariantBonus: threat.bossVariantBonus,
   };

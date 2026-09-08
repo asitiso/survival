@@ -79,7 +79,7 @@ test('phase 4825 a spatially resolved intent is consumed once and cannot leak in
   const first = consumeRenderedAttackOutcomeNear('core', 'explosion', { x: 102, y: 100 });
   const second = consumeRenderedAttackOutcomeNear('core', 'explosion', { x: 102, y: 100 });
   assert.equal(first?.enemyId, 81);
-  assert.equal(second?.enemyId, 82, 'the consumed nearest intent must be gone; only the remaining rendered warning may resolve');
+  assert.equal(second, null, 'a distant remaining warning must not inherit the already-resolved damage origin');
 });
 
 test('phase 4826 core damage passes its real origin into attribution while preserving the existing resolution handoff path', () => {

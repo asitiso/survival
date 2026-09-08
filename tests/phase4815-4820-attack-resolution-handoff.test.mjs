@@ -32,11 +32,14 @@ test('phase 4816 a freshly resolved telegraph is smaller and quieter than an unr
   const { createAttackResolutionHandoffState, recordAttackResolutionHandoff, attackResolutionHandoffPresentation } = api();
   const state = recordAttackResolutionHandoff(createAttackResolutionHandoffState(), outcome(), 10);
   const presentation = attackResolutionHandoffPresentation(state, '91:boss:hero:contact', 10.09, false, false);
+  const reduced = attackResolutionHandoffPresentation(state, '91:boss:hero:contact', 10.09, true, true);
   assert.equal(presentation.resolved, true);
   assert.ok(presentation.alphaScale < 0.7);
   assert.ok(presentation.sizeScale < 0.9);
   assert.ok(presentation.alphaScale > 0);
   assert.ok(presentation.sizeScale > 0.6);
+  assert.ok(reduced.alphaScale <= presentation.alphaScale);
+  assert.ok(reduced.sizeScale >= presentation.sizeScale);
 });
 
 test('phase 4817 handoff expires after 180ms so a later attack can present normally again', () => {

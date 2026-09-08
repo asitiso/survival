@@ -11,7 +11,9 @@ import {
 } from './elite-affix-response-arbitration.js';
 import {
   advanceEliteAffixResponseCrossAffixHandoff,
+  eliteAffixResponseCrossAffixHandoffHoldActive,
   eliteAffixResponseCrossAffixHandoffRole,
+  eliteAffixResponseCrossAffixOutgoingPresent,
   type EliteAffixResponseCrossAffixHandoffRole,
   type EliteAffixResponseCrossAffixHandoffState,
 } from './elite-affix-response-handoff.js';
@@ -61,6 +63,7 @@ interface CrossAffixDecision {
   primaryImportant: boolean;
   handoffRole: EliteAffixResponseCrossAffixHandoffRole;
   handoffProgress: number;
+  handoffHasOutgoing: boolean;
 }
 
 let installed = false;
@@ -176,7 +179,8 @@ function crossAffixResponseDecisions(
       ? [...group].reverse().find((candidate) => candidate.affixId === previousOwner && Number.isFinite(candidate.ttl) && candidate.ttl > 0)
       : undefined;
     const holdActive = previousCue
-      ? eliteAffixResponseLifeRatio(previousCue.ttl, previousCue.maxTtl) >= 0.80
+      ? eliteAffixResponseLifeRatio(previousCue.ttl, previousCue.maxTtl) >= 0.80 ||
+        eliteAffixResponseCrossAffixHandoffHoldActive(previousState, true)
       : false;
     const ownership = eliteAffixResponseCrossAffixOwnership(
       group.map((cue) => ({
@@ -203,6 +207,10 @@ function crossAffixResponseDecisions(
       primaryCue.ttl,
     );
     ownerByEnemy.set(enemyId, handoffState);
+    const handoffHasOutgoing = eliteAffixResponseCrossAffixOutgoingPresent(
+      handoffState,
+      group.map((cue) => cue.affixId),
+    );
 
     for (let index = 0; index < group.length; index += 1) {
       const cue = group[index]!;
@@ -212,6 +220,7 @@ function crossAffixResponseDecisions(
         primaryImportant: ownership.primaryImportant,
         handoffRole: eliteAffixResponseCrossAffixHandoffRole(handoffState, cue.affixId, primary),
         handoffProgress: handoffState.progress,
+        handoffHasOutgoing,
       });
     }
   }
@@ -280,6 +289,7 @@ function renderFrozenEliteAffixResponses(
       primaryImportant: responsePresentation.importantEvent,
       handoffRole: 'none' as EliteAffixResponseCrossAffixHandoffRole,
       handoffProgress: 1,
+      handoffHasOutgoing: true,
     };
     const crossPresentation = eliteAffixResponseCrossAffixPresentation({
       primary: crossDecision.primary,
@@ -292,6 +302,7 @@ function renderFrozenEliteAffixResponses(
       reducedFlash,
       handoffRole: crossDecision.handoffRole,
       handoffProgress: crossDecision.handoffProgress,
+      handoffHasOutgoing: crossDecision.handoffHasOutgoing,
     });
     if (!crossPresentation.visible) continue;
 

@@ -1,5 +1,8 @@
 import type { EliteAffixId } from './elite-affixes.js';
-import type { EliteAffixResponseCrossAffixHandoffRole } from './elite-affix-response-handoff.js';
+import {
+  eliteAffixResponseCrossAffixIncomingStart,
+  type EliteAffixResponseCrossAffixHandoffRole,
+} from './elite-affix-response-handoff.js';
 
 export interface EliteAffixResponseCrossAffixCandidate {
   affixId: EliteAffixId;
@@ -26,6 +29,7 @@ export interface EliteAffixResponseCrossAffixPresentationInput {
   reducedFlash: boolean;
   handoffRole?: EliteAffixResponseCrossAffixHandoffRole;
   handoffProgress?: number;
+  handoffHasOutgoing?: boolean;
 }
 
 export interface EliteAffixResponseCrossAffixPresentation {
@@ -129,7 +133,10 @@ export function eliteAffixResponseCrossAffixPresentation(
   if (input.primary) {
     const primaryBase = input.reducedFlash ? Math.min(0.72, baseAlpha) : baseAlpha;
     if (handoffRole === 'incoming' && handoffProgress < 1) {
-      const start = input.importantEvent ? 0.90 : 0.68;
+      const start = eliteAffixResponseCrossAffixIncomingStart(
+        input.importantEvent,
+        input.handoffHasOutgoing ?? true,
+      );
       const handoffScale = start + (1 - start) * handoffProgress;
       return { visible: true, alphaScale: clamp01(primaryBase * handoffScale) };
     }

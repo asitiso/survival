@@ -71,3 +71,41 @@ export function eliteAffixResponseCrossAffixHandoffRole(
   if (!primary && affixId === state.fromAffixId) return 'outgoing';
   return 'none';
 }
+
+export function eliteAffixResponseCrossAffixHandoffHoldActive(
+  state: EliteAffixResponseCrossAffixHandoffState | undefined,
+  currentOwnerActive: boolean,
+): boolean {
+  return Boolean(
+    state &&
+    currentOwnerActive &&
+    state.fromAffixId &&
+    Number.isFinite(state.progress) &&
+    state.progress >= 0 &&
+    state.progress < 1,
+  );
+}
+
+export function eliteAffixResponseCrossAffixOutgoingPresent(
+  state: EliteAffixResponseCrossAffixHandoffState | undefined,
+  activeAffixIds: readonly EliteAffixId[],
+): boolean {
+  if (
+    !state ||
+    !state.fromAffixId ||
+    !Number.isFinite(state.progress) ||
+    state.progress < 0 ||
+    state.progress >= 1
+  ) {
+    return false;
+  }
+  return activeAffixIds.includes(state.fromAffixId);
+}
+
+export function eliteAffixResponseCrossAffixIncomingStart(
+  importantEvent: boolean,
+  outgoingPresent: boolean,
+): number {
+  if (importantEvent) return outgoingPresent ? 0.90 : 0.96;
+  return outgoingPresent ? 0.68 : 0.82;
+}

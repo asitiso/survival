@@ -36,13 +36,13 @@ export function enemyDeathCue(type: EnemyType): EnemyDeathCue {
   return {radius,particles,duration:type==='siegeGolem'?.42:type==='brute'?.34:.28,color:id.color,motif:id.motif,rayCount:rays,glowAlpha:Math.min(.22,.08+id.weight*.08)};
 }
 
-function telegraphAttackIntent(enemy:{id:number;type:EnemyType;target?:AttackOutcomeTarget},source:AttackOutcomeSource):AttackOutcomeMetadata|undefined{
+function telegraphAttackIntent(enemy:{id:number;type:EnemyType;target?:AttackOutcomeTarget;pos?:{x:number;y:number}},source:AttackOutcomeSource):AttackOutcomeMetadata|undefined{
   if(enemy.target!=='hero'&&enemy.target!=='core')return undefined;
   const identity={enemyId:enemy.id,enemyType:enemy.type,target:enemy.target,source};
-  return{key:attackIntentKey(identity),...identity};
+  return{key:attackIntentKey(identity),...identity,...(enemy.pos?{origin:{x:enemy.pos.x,y:enemy.pos.y}}:{})};
 }
 
-export function enemyThreatTelegraph(enemy: { id: number; type: EnemyType; radius: number; target?:AttackOutcomeTarget; specialTimer?: number | undefined }): EnemyThreatTelegraph | null {
+export function enemyThreatTelegraph(enemy: { id: number; type: EnemyType; radius: number; target?:AttackOutcomeTarget; specialTimer?: number | undefined; pos?:{x:number;y:number} }): EnemyThreatTelegraph | null {
   if (enemy.type === 'boss') {
     const attackIntent=telegraphAttackIntent(enemy,'contact');
     return { enemyId: enemy.id, type: enemy.type, radius: enemy.radius + 54, priority: 100, color: '#ff5768', style: 'boss-ring', ...(attackIntent?{attackIntent}:{}) };

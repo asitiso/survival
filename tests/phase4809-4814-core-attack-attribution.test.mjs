@@ -72,7 +72,7 @@ test('phase 4813 hero-target intent cannot be consumed by guardian-core attribut
 
 test('phase 4814 guardian-core damage flow carries attribution into the existing coreHit presentation path', () => {
   const source = readFileSync(new URL('../src/game/game.ts', import.meta.url), 'utf8');
-  assert.match(source, /consumeCoreAttackAttribution\(source\)/);
+  assert.match(source, /consumeCoreAttackAttribution\(source,origin\)/);
   assert.match(source, /queueSurvivalResponseVfx\('coreHit',[\s\S]*coreAttackAttribution/);
   assert.match(source, /attackerLabel/);
 });

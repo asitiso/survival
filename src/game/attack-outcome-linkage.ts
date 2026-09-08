@@ -1,6 +1,11 @@
 export type AttackOutcomeTarget = 'hero' | 'core';
 export type AttackOutcomeSource = 'contact' | 'projectile' | 'explosion' | 'arena' | 'strain' | string;
 
+export interface AttackOutcomeOrigin {
+  x: number;
+  y: number;
+}
+
 export interface AttackIntentIdentity {
   enemyId: number;
   enemyType: string;
@@ -20,6 +25,7 @@ export interface AttackIntentRecord extends AttackIntentIdentity {
 
 export interface AttackOutcomeMetadata extends AttackIntentIdentity {
   key: string;
+  origin?: AttackOutcomeOrigin;
 }
 
 export interface AttackOutcomeLinkageState {
@@ -34,6 +40,8 @@ export interface AttackOutcomeLookup {
 }
 
 const MAX_ATTACK_INTENTS = 24;
+const SPATIAL_MATCH_MAX_DISTANCE = 160;
+const SPATIAL_AMBIGUITY_MARGIN = 24;
 
 export function attackIntentKey(intent: AttackIntentIdentity): string {
   return `${intent.enemyId}:${intent.enemyType}:${intent.target}:${intent.source}`;
@@ -103,6 +111,11 @@ export function replaceRenderedAttackIntents(intents: readonly AttackOutcomeMeta
   renderedAttackIntents = [...unique.values()];
 }
 
+function consumeRenderedMatch(matched: AttackOutcomeMetadata): AttackOutcomeMetadata {
+  renderedAttackIntents = renderedAttackIntents.filter((intent) => intent.key !== matched.key);
+  return matched;
+}
+
 export function consumeRenderedAttackOutcome(
   target: AttackOutcomeTarget,
   source: AttackOutcomeSource,
@@ -110,7 +123,29 @@ export function consumeRenderedAttackOutcome(
   const matches = renderedAttackIntents.filter((intent) => intent.target === target && intent.source === source);
   if (matches.length !== 1) return null;
   const matched = matches[0];
-  if (!matched) return null;
-  renderedAttackIntents = renderedAttackIntents.filter((intent) => intent.key !== matched.key);
-  return matched;
+  return matched ? consumeRenderedMatch(matched) : null;
+}
+
+export function consumeRenderedAttackOutcomeNear(
+  target: AttackOutcomeTarget,
+  source: AttackOutcomeSource,
+  origin: AttackOutcomeOrigin,
+): AttackOutcomeMetadata | null {
+  const matches = renderedAttackIntents.filter((intent) => intent.target === target && intent.source === source);
+  if (matches.length === 0) return null;
+
+  const scored = matches.flatMap((intent) => intent.origin ? [{
+    intent,
+    distance: Math.hypot(intent.origin.x - origin.x, intent.origin.y - origin.y),
+  }] : []);
+
+  if (scored.length === 0) return matches.length === 1 ? consumeRenderedMatch(matches[0]!) : null;
+  if (scored.length !== matches.length) return null;
+
+  scored.sort((a, b) => a.distance - b.distance || a.intent.key.localeCompare(b.intent.key));
+  const nearest = scored[0];
+  if (!nearest || nearest.distance > SPATIAL_MATCH_MAX_DISTANCE) return null;
+  const runnerUp = scored[1];
+  if (runnerUp && runnerUp.distance - nearest.distance < SPATIAL_AMBIGUITY_MARGIN) return null;
+  return consumeRenderedMatch(nearest.intent);
 }

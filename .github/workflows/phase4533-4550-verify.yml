@@ -1,0 +1,33 @@
+name: Phase 4533-4550 Verification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - work/phase4533-4550-elite-affix-cue-arbitration
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Full regression
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Raster gate
+        run: npm run verify:raster
+      - name: Release gate
+        run: npm run verify:release
+      - name: Candidate gate
+        run: npm run verify:candidate

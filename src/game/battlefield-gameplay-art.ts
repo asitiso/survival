@@ -8,12 +8,12 @@ export type BattlefieldGameplayPropKind =
 
 export const BATTLEFIELD_GAMEPLAY_ART = {
   backdrop: {
-    src: './assets/arena/battlefield-gameplay-backdrop.jpg',
-    width: 1280,
-    height: 720,
+    src: './assets/arena/battlefield-gameplay-backdrop.svg',
+    width: 1600,
+    height: 900,
   },
   props: {
-    src: './assets/arena/battlefield-gameplay-props.png',
+    src: './assets/arena/battlefield-gameplay-props.svg',
     columns: 3,
     rows: 2,
     cellSize: 192,

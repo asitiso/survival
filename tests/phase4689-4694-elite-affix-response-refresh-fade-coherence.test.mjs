@@ -35,8 +35,8 @@ test('phase 4693 invalid lifetime inputs produce a finite safe ratio', () => {
   assert.ok(ratio >= 0 && ratio <= 1);
 });
 
-test('phase 4694 runtime applies dedup, lifetime refresh, and one shared life-ratio helper before snapshot rendering', async () => {
-  const runtimeSource = await readFile(new URL('../src/game/elite-affix-response-lane-runtime.ts', import.meta.url), 'utf8');
+test('phase 4694 lifecycle runtime applies dedup, lifetime refresh, and one shared life-ratio helper before snapshot rendering', async () => {
+  const runtimeSource = await readFile(new URL('../src/game/elite-affix-response-lifecycle-runtime.ts', import.meta.url), 'utf8');
   assert.match(runtimeSource, /eliteAffixResponseDuplicateResolution/);
   assert.match(runtimeSource, /refreshEliteAffixResponseLifetime/);
   assert.match(runtimeSource, /eliteAffixResponseLifeRatio/);

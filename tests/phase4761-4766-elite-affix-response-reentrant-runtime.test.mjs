@@ -85,5 +85,6 @@ test('phase 4765 a reentrant handoff exposes exactly one outgoing role and one i
 
 test('phase 4766 response runtime passes the active affix group into reentrant handoff advancement', async () => {
   const runtimeSource = await readFile(new URL('../src/game/elite-affix-response-lane-runtime.ts', import.meta.url), 'utf8');
-  assert.match(runtimeSource, /advanceEliteAffixResponseCrossAffixHandoff\([\s\S]*group\.map\(\(cue\) => cue\.affixId\)/);
+  assert.match(runtimeSource, /const activeAffixIds = group\.map\(\(cue\) => cue\.affixId\);/);
+  assert.match(runtimeSource, /advanceEliteAffixResponseCrossAffixHandoff\([\s\S]*?primaryCue\.ttl,\s*activeAffixIds,\s*\);/);
 });

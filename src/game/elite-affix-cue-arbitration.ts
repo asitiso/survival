@@ -19,8 +19,8 @@ export interface EliteAffixCueOwnershipInput {
   affixes: readonly EliteAffixId[];
   dt: number;
   event?: EliteAffixCueEvent | null;
-  swiftPhase?: SwiftCadencePhase | null;
-  frenziedPhase?: FrenziedThresholdPhase | null;
+  swiftPhase?: SwiftCadencePhase | null | undefined;
+  frenziedPhase?: FrenziedThresholdPhase | null | undefined;
   manaShieldActive?: boolean;
   regeneratingActive?: boolean;
   commanderActive?: boolean;

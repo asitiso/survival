@@ -166,6 +166,7 @@ import { BUILD_OVERDRIVE_EFFECT_ATLAS, buildOverdriveEffectIdentityIcon } from '
 import { buildOverdriveActivationToastLabel, buildOverdriveEffectProjectionHint, projectBuildOverdriveEffects, type BuildOverdriveEffectProjection } from './build-overdrive-effect-projection.js';
 import { FINAL_FORM_IDENTITY_ATLAS, finalFormIdentityIcon } from './final-form-identity-assets.js';
 import { BATTLEFIELD_ENVIRONMENT_ATLAS, battlefieldEnvironmentSprite } from './battlefield-environment-assets.js';
+import { BATTLEFIELD_GAMEPLAY_ART, BATTLEFIELD_DECORATION_ANCHORS, battlefieldGameplayArtProfile, battlefieldGameplayPropSprite } from './battlefield-gameplay-art.js';
 import { BATTLEFIELD_ATMOSPHERE_VFX_ATLAS, battlefieldAtmosphereVfxSprite } from './battlefield-atmosphere-vfx-assets.js';
 import { BATTLEFIELD_DEPTH_OVERLAY_ATLAS, battlefieldDepthOverlaySprite } from './battlefield-depth-overlay-assets.js';
 import { BATTLEFIELD_ENVIRONMENT_REACTION_VFX_ATLAS, battlefieldEnvironmentReactionVfxSprite, type BattlefieldEnvironmentReactionKind } from './battlefield-environment-reaction-vfx-assets.js';
@@ -899,6 +900,10 @@ export class Game {
   private activeWorldVfxOccupancyPolicy:WorldVfxOccupancyResult=resolveWorldVfxOccupancy({quality:'high',combatPrimary:'normal',viewportArea:LOGICAL_WIDTH*LOGICAL_HEIGHT,candidates:[]});
   private battlefieldEnvironmentAtlasImage: HTMLImageElement | null = null;
   private battlefieldEnvironmentAtlasReady = false;
+  private battlefieldGameplayBackdropImage: HTMLImageElement | null = null;
+  private battlefieldGameplayBackdropReady = false;
+  private battlefieldGameplayPropsImage: HTMLImageElement | null = null;
+  private battlefieldGameplayPropsReady = false;
   private battlefieldAtmosphereVfxAtlasImage: HTMLImageElement | null = null;
   private battlefieldAtmosphereVfxAtlasReady = false;
   private battlefieldDepthOverlayAtlasImage: HTMLImageElement | null = null;
@@ -1055,6 +1060,7 @@ export class Game {
     this.initializeFieldEventLifecycleWorldVfxAtlas();
     this.initializeElitePackApproachFormationVfxAtlas();
     this.initializeBattlefieldEnvironmentAtlas();
+    this.initializeBattlefieldGameplayArt();
     this.initializeBattlefieldAtmosphereVfxAtlas();
     this.initializeBattlefieldDepthOverlayAtlas();
     this.initializeBattlefieldEnvironmentReactionVfxAtlas();
@@ -1963,6 +1969,22 @@ export class Game {
   private initializeObjectiveFailureDissolveVfxAtlas(): void { if(typeof Image==='undefined')return;const image=new Image();image.decoding='async';image.onload=()=>{this.objectiveFailureDissolveVfxAtlasReady=true;};image.onerror=()=>{this.objectiveFailureDissolveVfxAtlasReady=false;};image.src=OBJECTIVE_FAILURE_DISSOLVE_VFX_ATLAS.src;this.objectiveFailureDissolveVfxAtlasImage=image; }
   private initializeFieldEventLifecycleWorldVfxAtlas(): void { if(typeof Image==='undefined')return;const image=new Image();image.decoding='async';image.onload=()=>{this.fieldEventLifecycleWorldVfxAtlasReady=true;};image.onerror=()=>{this.fieldEventLifecycleWorldVfxAtlasReady=false;};image.src=FIELD_EVENT_LIFECYCLE_WORLD_VFX_ATLAS.src;this.fieldEventLifecycleWorldVfxAtlasImage=image; }
   private initializeElitePackApproachFormationVfxAtlas(): void { if(typeof Image==='undefined')return;const image=new Image();image.decoding='async';image.onload=()=>{this.elitePackApproachFormationVfxAtlasReady=true;};image.onerror=()=>{this.elitePackApproachFormationVfxAtlasReady=false;};image.src=ELITE_PACK_APPROACH_FORMATION_VFX_ATLAS.src;this.elitePackApproachFormationVfxAtlasImage=image; }
+
+  private initializeBattlefieldGameplayArt(): void {
+    if (typeof Image === 'undefined') return;
+    const backdrop = new Image();
+    backdrop.decoding = 'async';
+    backdrop.onload = () => { this.battlefieldGameplayBackdropReady = true; };
+    backdrop.onerror = () => { this.battlefieldGameplayBackdropReady = false; };
+    backdrop.src = BATTLEFIELD_GAMEPLAY_ART.backdrop.src;
+    this.battlefieldGameplayBackdropImage = backdrop;
+    const props = new Image();
+    props.decoding = 'async';
+    props.onload = () => { this.battlefieldGameplayPropsReady = true; };
+    props.onerror = () => { this.battlefieldGameplayPropsReady = false; };
+    props.src = BATTLEFIELD_GAMEPLAY_ART.props.src;
+    this.battlefieldGameplayPropsImage = props;
+  }
 
   private initializeBattlefieldEnvironmentAtlas(): void {
     if (typeof Image === 'undefined') return;
@@ -3447,6 +3469,7 @@ export class Game {
     this.drawBattlefieldDepthOverlays(ctx);
     this.terrain.render(ctx, residualMotion);
     this.drawTerrainSpriteOverlays(ctx, residualMotion);
+    this.drawBattlefieldGameplayProps(ctx);
     this.drawMapCombatBoundaryWarnings(ctx);
     this.drawBattlefieldEnvironmentReactionVfx(ctx);
     this.drawMapEvolutionAftermathVfx(ctx);
@@ -4100,6 +4123,31 @@ export class Game {
     for(const cue of this.battlefieldEnvironmentReactionVfx){const sprite=battlefieldEnvironmentReactionVfxSprite(cue.mapId,cue.kind);const t=Math.max(0,Math.min(1,cue.ttl/cue.maxTtl));ctx.save();ctx.globalAlpha=Math.min(this.presentationSettings.reducedFlash?.52:.78,.18+t*.62);ctx.drawImage(this.battlefieldEnvironmentReactionVfxAtlasImage,sprite.sx,sprite.sy,sprite.sw,sprite.sh,cue.x-cue.size/2,cue.y-cue.size/2,cue.size,cue.size);ctx.restore();}
   }
 
+  private drawBattlefieldGameplayProps(ctx: CanvasRenderingContext2D): void {
+    if (!this.battlefieldGameplayPropsReady || !this.battlefieldGameplayPropsImage) return;
+    const criticalThreat = this.hero.hp <= this.hero.maxHp * .30 || this.core.hp <= this.core.maxHp * .30;
+    const profile = battlefieldGameplayArtProfile(this.presentationSettings.reducedFlash, criticalThreat);
+    if (profile.propAlpha <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = profile.propAlpha;
+    for (const anchor of BATTLEFIELD_DECORATION_ANCHORS) {
+      const sprite = battlefieldGameplayPropSprite(anchor.kind);
+      const x = anchor.x * LOGICAL_WIDTH;
+      const y = anchor.y * LOGICAL_HEIGHT;
+      const size = anchor.size;
+      if (anchor.mirror) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(-1, 1);
+        ctx.drawImage(this.battlefieldGameplayPropsImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, -size / 2, -size / 2, size, size);
+        ctx.restore();
+      } else {
+        ctx.drawImage(this.battlefieldGameplayPropsImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, x - size / 2, y - size / 2, size, size);
+      }
+    }
+    ctx.restore();
+  }
+
   private drawBattlefieldAtmosphereVfx(ctx:CanvasRenderingContext2D):void {
     const layerAlpha=this.worldVfxLayerAlpha('decorative');if(layerAlpha<=0)return;
     if(!this.battlefieldAtmosphereVfxAtlasReady||!this.battlefieldAtmosphereVfxAtlasImage)return;
@@ -4321,6 +4369,23 @@ export class Game {
     grad.addColorStop(1, palette.edge);
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+
+    const gameplayArtCritical = this.hero.hp <= this.hero.maxHp * .30 || this.core.hp <= this.core.maxHp * .30;
+    const gameplayArtProfile = battlefieldGameplayArtProfile(this.presentationSettings.reducedFlash, gameplayArtCritical);
+    if (this.battlefieldGameplayBackdropReady && this.battlefieldGameplayBackdropImage) {
+      ctx.save();
+      ctx.globalAlpha = gameplayArtProfile.backdropAlpha;
+      ctx.filter = `saturate(${gameplayArtProfile.backdropSaturation})`;
+      ctx.drawImage(this.battlefieldGameplayBackdropImage, 0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+      ctx.filter = 'none';
+      const vignette = ctx.createRadialGradient(LOGICAL_WIDTH * .5, LOGICAL_HEIGHT * .5, LOGICAL_HEIGHT * .18, LOGICAL_WIDTH * .5, LOGICAL_HEIGHT * .5, LOGICAL_WIDTH * .62);
+      vignette.addColorStop(0, 'rgba(5,12,18,0)');
+      vignette.addColorStop(1, `rgba(5,12,18,${gameplayArtProfile.vignetteAlpha})`);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = vignette;
+      ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+      ctx.restore();
+    }
 
     if (this.battlefieldEnvironmentAtlasReady && this.battlefieldEnvironmentAtlasImage) {
       const sprite = battlefieldEnvironmentSprite(this.terrain.currentLayout.id, this.terrain.evolutionStage);

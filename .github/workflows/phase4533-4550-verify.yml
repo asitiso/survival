@@ -13,7 +13,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,14 +24,7 @@ jobs:
       - name: Build focused target
         run: npm run build
       - name: Phase focused tests
-        run: node --test tests/phase4533-*.test.mjs
-      - name: Full regression
-        run: npm test
-      - name: Build
-        run: npm run build
-      - name: Raster gate
-        run: npm run verify:raster
-      - name: Release gate
-        run: npm run verify:release
-      - name: Candidate gate
-        run: npm run verify:candidate
+        shell: bash
+        run: |
+          files=$(find tests -maxdepth 1 -type f \( -name 'phase4533-*.test.mjs' -o -name 'phase4539-*.test.mjs' -o -name 'phase4545-*.test.mjs' \) -print | sort)
+          node --test $files

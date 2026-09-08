@@ -8,12 +8,12 @@ on:
       - work/phase4533-4550-elite-affix-cue-arbitration
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,23 +21,25 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Apply bounded EnemyManager integration
-        run: node scripts/apply-phase4533-4550-integration-v2.mjs
-      - name: Build focused target
+      - name: Compile focused test target
         run: npm run build
-      - name: Phase focused tests
+      - name: Phase 4533-4550 focused TDD bundles
         shell: bash
         run: |
           files=$(find tests -maxdepth 1 -type f \( -name 'phase4533-*.test.mjs' -o -name 'phase4539-*.test.mjs' -o -name 'phase4545-*.test.mjs' \) -print | sort)
           node --test $files
-      - name: Commit generated integration
-        if: github.event_name == 'push'
+      - name: Related elite affix regression
         shell: bash
         run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/game/enemies.ts
-          if ! git diff --cached --quiet; then
-            git commit -m 'feat: integrate elite multi-affix cue arbitration'
-            git push origin HEAD:work/phase4533-4550-elite-affix-cue-arbitration
-          fi
+          files=$(find tests -maxdepth 1 -type f \( -name '*swift*.test.mjs' -o -name '*frenzied*.test.mjs' -o -name '*elite-affix*.test.mjs' \) -print | grep -vE 'phase4533-|phase4539-|phase4545-' | sort)
+          if [ -n "$files" ]; then node --test $files; fi
+      - name: Full regression
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Raster gate
+        run: npm run verify:raster
+      - name: Release gate
+        run: npm run verify:release
+      - name: Candidate gate
+        run: npm run verify:candidate

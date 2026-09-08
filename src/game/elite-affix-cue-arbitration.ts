@@ -53,6 +53,10 @@ const RESPONSE_RELEASE_SECONDS = 0.06;
 const PASSIVE_HOLD_SECONDS = 0.08;
 const PASSIVE_RELEASE_SECONDS = 0.06;
 
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
+}
+
 function eventPriority(kind: EliteAffixCueEventKind): 2 | 3 {
   return kind === 'strike' || kind === 'shieldBreak' || kind === 'thresholdEntry' ? 3 : 2;
 }
@@ -137,13 +141,41 @@ export function eliteAffixCueLayerPresentation(
   input: EliteAffixCueLayerInput,
 ): EliteAffixCueLayerPresentation {
   const primary = state?.owner === affixId;
-  const flashScale = input.reducedFlash ? 0.72 : 1;
-  const alphaScale = (primary ? 1 : 0.42) * flashScale;
+  const stress = clamp01(input.battlefieldStress);
+  const importantOwner = primary && state?.eventPriority === 3 && ((state.holdTtl ?? 0) > 0 || (state.releaseTtl ?? 0) > 0);
+  const activeCount = Math.max(1, Math.floor(Number.isFinite(input.activeEliteCount) ? input.activeEliteCount : 1));
+  const priorityIndex = Math.max(0, Math.floor(Number.isFinite(input.indexFromPriority) ? input.indexFromPriority : activeCount));
+  const visibleSlots = Math.max(1, Math.round(4 - stress * 3));
+  const distantPassive = activeCount >= 4 && stress >= 0.68 && !input.priorityTarget && !input.activeAttack && priorityIndex >= visibleSlots;
+  const routineYield = input.higherPriorityCue && !importantOwner;
+  const visible = importantOwner || (!routineYield && !distantPassive);
+
+  let alphaScale: number;
+  if (!visible) {
+    alphaScale = primary ? 0.14 : 0.08;
+  } else if (importantOwner) {
+    alphaScale = Math.max(0.58, 1 - stress * 0.22);
+    if (input.higherPriorityCue) alphaScale = Math.min(alphaScale, 0.50);
+  } else if (primary && (input.priorityTarget || input.activeAttack)) {
+    alphaScale = Math.max(0.52, 1 - stress * 0.44);
+  } else if (primary) {
+    alphaScale = Math.max(0.38, 0.76 - stress * 0.30);
+  } else {
+    alphaScale = Math.max(0.20, 0.42 - stress * 0.18);
+  }
+
+  if (input.reducedFlash) alphaScale *= 0.72;
+  const motionScale = input.reducedMotion || !visible
+    ? 0
+    : primary
+      ? importantOwner ? 0.86 : 0.72 + (input.activeAttack ? 0.28 : 0)
+      : Math.max(0.12, 0.36 - stress * 0.18);
+
   return {
-    visible: true,
+    visible,
     primary,
     alphaScale,
-    motionScale: input.reducedMotion ? 0 : primary ? 1 : 0.36,
+    motionScale,
     responseAlphaScale: alphaScale,
   };
 }

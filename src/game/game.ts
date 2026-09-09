@@ -173,7 +173,7 @@ import { BATTLEFIELD_DEPTH_OVERLAY_ATLAS, battlefieldDepthOverlaySprite } from '
 import { BATTLEFIELD_ENVIRONMENT_REACTION_VFX_ATLAS, battlefieldEnvironmentReactionVfxSprite, type BattlefieldEnvironmentReactionKind } from './battlefield-environment-reaction-vfx-assets.js';
 import { BATTLEFIELD_PROP_VFX_ATLAS, battlefieldPropSprite } from './battlefield-props-vfx-assets.js';
 import { BATTLEFIELD_OBSTACLE_STATE_VFX_ATLAS, battlefieldObstacleStateForEvolution, battlefieldObstacleStateVfxSprite } from './battlefield-obstacle-state-vfx-assets.js';
-import { terrainForegroundOcclusionPresentation } from './terrain-foreground-occlusion.js';
+import { terrainForegroundOcclusionPresentation, terrainForegroundSpriteRegistration } from './terrain-foreground-occlusion.js';
 import { criticalThreatOcclusionArbitrationPresentation, criticalThreatWallCapOverlap } from './critical-threat-occlusion-arbitration.js';
 import { BATTLEFIELD_INTERACTION_VFX_ATLAS, battlefieldCoreVisualState, battlefieldInteractionSprite } from './battlefield-interaction-vfx-assets.js';
 import { PICKUP_FLOW_VFX_ATLAS } from './pickup-flow-vfx-assets.js';
@@ -4549,14 +4549,21 @@ export class Game {
         battlefieldStress,
         reducedFlash: this.presentationSettings.reducedFlash,
       });
+      const registration = terrainForegroundSpriteRegistration({
+        wallX: wall.x,
+        wallY: wall.y,
+        wallWidth: wall.w,
+        wallHeight: wall.h,
+        spriteCropRatio: foreground.spriteCropRatio,
+      });
       let criticalThreatOcclusion = criticalThreatOcclusionArbitrationPresentation({ threatClass: 'none', overlap: 0 });
       for (const enemy of criticalThreats) {
         const threatClass = criticalThreatClassFor(enemy);
         const overlap = criticalThreatWallCapOverlap({
-          wallX: wall.x - 4,
-          wallY: wall.y - 3,
-          wallWidth: wall.w + 8,
-          capHeight: foreground.capHeight + 4,
+          wallX: registration.capDrawX,
+          wallY: registration.capDrawY,
+          wallWidth: registration.capDrawWidth,
+          capHeight: registration.capDrawHeight,
           threatX: enemy.pos.x,
           threatY: enemy.pos.y,
           threatRadius: enemy.radius,
@@ -4565,10 +4572,6 @@ export class Game {
         const candidate = criticalThreatOcclusionArbitrationPresentation({ threatClass, overlap });
         if (candidate.capAlphaScale < criticalThreatOcclusion.capAlphaScale) criticalThreatOcclusion = candidate;
       }
-      const destinationHeight = foreground.capHeight + 4;
-      const destinationX = wall.x - 4;
-      const destinationY = wall.y - 3;
-      const destinationWidth = wall.w + 8;
       const atlasImage = this.battlefieldObstacleStateVfxAtlasReady && this.battlefieldObstacleStateVfxAtlasImage
         ? this.battlefieldObstacleStateVfxAtlasImage
         : this.battlefieldPropVfxAtlasReady && this.battlefieldPropVfxAtlasImage
@@ -4578,7 +4581,7 @@ export class Game {
 
       ctx.save();
       if (atlasImage) {
-        const sourceHeight = Math.max(1, Math.round(sprite.sh * foreground.spriteCropRatio));
+        const sourceHeight = Math.max(1, sprite.sh * foreground.spriteCropRatio);
         ctx.globalAlpha = foreground.capAlpha * criticalThreatOcclusion.capAlphaScale;
         ctx.drawImage(
           atlasImage,
@@ -4586,22 +4589,22 @@ export class Game {
           sprite.sy,
           sprite.sw,
           sourceHeight,
-          destinationX,
-          destinationY,
-          destinationWidth,
-          destinationHeight,
+          registration.capDrawX,
+          registration.capDrawY,
+          registration.capDrawWidth,
+          registration.capDrawHeight,
         );
       } else {
         ctx.globalAlpha = foreground.capAlpha * 0.48 * criticalThreatOcclusion.capAlphaScale;
         ctx.fillStyle = this.terrain.currentLayout.palette.border;
-        ctx.fillRect(wall.x, wall.y, wall.w, foreground.capHeight);
+        ctx.fillRect(registration.capDrawX, registration.capDrawY, registration.capDrawWidth, registration.capDrawHeight);
       }
       ctx.globalAlpha = foreground.edgeAlpha * criticalThreatOcclusion.edgeAlphaScale;
       ctx.strokeStyle = '#f4fbff';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(wall.x + 2, wall.y + 1);
-      ctx.lineTo(wall.x + Math.max(2, wall.w - 2), wall.y + 1);
+      ctx.moveTo(registration.capDrawX + 2, registration.capDrawY + 1);
+      ctx.lineTo(registration.capDrawX + Math.max(2, registration.capDrawWidth - 2), registration.capDrawY + 1);
       ctx.stroke();
       ctx.restore();
     }
@@ -4616,10 +4619,14 @@ export class Game {
     const crystalSprite = battlefieldPropSprite(mapId, 'crystal');
 
     for (const wall of this.terrain.walls) {
-      const drawWidth = Math.max(wall.w + 18, 72);
-      const drawHeight = Math.max(wall.h + 18, 72);
-      const dx = wall.x + wall.w / 2 - drawWidth / 2;
-      const dy = wall.y + wall.h / 2 - drawHeight / 2;
+      const registration = terrainForegroundSpriteRegistration({
+        wallX: wall.x,
+        wallY: wall.y,
+        wallWidth: wall.w,
+        wallHeight: wall.h,
+        spriteCropRatio: 0,
+      });
+      const { drawX: dx, drawY: dy, drawWidth, drawHeight } = registration;
       ctx.save();
       ctx.globalAlpha = 0.92;
       if (this.battlefieldObstacleStateVfxAtlasReady && this.battlefieldObstacleStateVfxAtlasImage) {

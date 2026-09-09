@@ -44,6 +44,7 @@ import { enemyTargetPressureClassForEnemyType, enemyTargetPressureVfxSprite, ene
 import { specialistReactionLifecycleVfxSprite } from './specialist-reaction-lifecycle-vfx-assets.js';
 import { advanceEnemyMotionRenderState, enemyMotionRenderPresentation, type EnemyMotionRenderState } from './enemy-motion-rendering.js';
 import { enemyAttackMotionPresentation } from './enemy-attack-motion-rendering.js';
+import { enemySpriteActionPresentation } from './enemy-sprite-action-readability.js';
 import { advanceEnemyAttackResolveState, enemyAttackResolvePresentation, type EnemyAttackResolveState } from './enemy-attack-resolve-rendering.js';
 import { bossLocomotionWeightPresentation } from './boss-locomotion-weight-rendering.js';
 import { advanceSpecialistLocomotionSignatureState, specialistLocomotionSignaturePresentation, type SpecialistLocomotionSignatureState } from './specialist-locomotion-signature-rendering.js';
@@ -943,6 +944,7 @@ export class EnemyManager {
       const genericRecoilScale=(bossHeavyHitStagger?.genericRecoilScale??1)*(bossStaggerRecoveryArbitration?.genericRecoilScale??1);
       const hitRecoil={...baseHitRecoil,intensity:baseHitRecoil.intensity*genericRecoilScale,offsetX:baseHitRecoil.offsetX*genericRecoilScale,offsetY:baseHitRecoil.offsetY*genericRecoilScale,rotation:baseHitRecoil.rotation*genericRecoilScale,maxDisplacement:baseHitRecoil.maxDisplacement*genericRecoilScale};
       const enemyHitStagger=enemy.type!=='boss'?enemyHitStaggerPresentation(enemy.type,enemy.hitFlash,enemy.hitImpactTier??'normal',enemy.hitDirectionX??-renderFacingX,enemy.hitDirectionY??-renderFacingY,enemy.renderMotion,reducedMotion):null;
+      const spriteActionPresentation=enemySpriteActionPresentation(enemy.type,{motionBlend:enemy.renderMotion?.motionBlend??0,stride:enemy.renderMotion?.stride??0,facingX:renderFacingX,facingY:renderFacingY,turn:enemy.renderMotion?.turn??0,pullback:attackMotion.pullback,lunge:attackMotion.lunge,hitStagger:enemy.type==='boss'?(bossHeavyHitStagger?.stagger??0):(enemyHitStagger?.stagger??0),hitOffsetX:enemy.type==='boss'?(bossHeavyHitStagger?.offsetX??0):(enemyHitStagger?.offsetX??0),hitOffsetY:enemy.type==='boss'?(bossHeavyHitStagger?.offsetY??0):(enemyHitStagger?.offsetY??0)},reducedMotion);
       const specialistAttackHitArbitration = isSpecialistEnemyType(enemy.type) ? specialistAttackHitArbitrationPresentation(enemy.type,{pullback:attackMotion.pullback,lunge:attackMotion.lunge,resolve:attackResolve.resolve,hitStagger:enemyHitStagger?.stagger??0,tier:enemy.hitImpactTier??'normal',fatal:false},reducedMotion) : null;
       const specialistRecoveryHandoff = isSpecialistEnemyType(enemy.type) ? specialistRecoveryHitHandoffPresentation({pullback:attackMotion.pullback,lunge:attackMotion.lunge,resolve:attackResolve.resolve,hitStagger:enemyHitStagger?.stagger??0,tier:enemy.hitImpactTier??'normal'},reducedMotion) : null;
       const bossRecoveryStaggerHandoff = enemy.type==='boss' ? bossRecoveryStaggerHandoffPresentation({recovery:enemy.bossSpecialRecovery?.recovery??0,stagger:enemy.bossHeavyHitStagger?.stagger??0,tier:enemy.bossHeavyHitStagger?.tier??null,specialTimer:enemy.specialTimer??99},reducedMotion) : null;
@@ -1162,6 +1164,9 @@ export class EnemyManager {
         const sprite = enemySpriteRect(enemy.type);
         const size = spritePresentation.drawSize;
         ctx.save();
+        ctx.translate(spriteActionPresentation.offsetX,spriteActionPresentation.offsetY);
+        ctx.rotate(spriteActionPresentation.rotation);
+        ctx.scale(spriteActionPresentation.scaleX,spriteActionPresentation.scaleY);
         ctx.shadowColor='rgba(6,10,16,.72)';
         ctx.shadowBlur=spritePresentation.imageShadowBlur;
         ctx.drawImage(spriteAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, -size / 2, -size / 2, size, size);
@@ -1175,6 +1180,9 @@ export class EnemyManager {
         const sprite = bossSpriteRect(bossArchetype);
         const size = bossPresentation.drawSize;
         ctx.save();
+        ctx.translate(spriteActionPresentation.offsetX,spriteActionPresentation.offsetY);
+        ctx.rotate(spriteActionPresentation.rotation);
+        ctx.scale(spriteActionPresentation.scaleX,spriteActionPresentation.scaleY);
         ctx.shadowColor='rgba(20,8,18,.78)';
         ctx.shadowBlur=bossPresentation.imageShadowBlur;
         ctx.drawImage(bossSpriteAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, -size / 2, -size / 2, size, size);

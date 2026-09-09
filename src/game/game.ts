@@ -173,6 +173,7 @@ import { BATTLEFIELD_DEPTH_OVERLAY_ATLAS, battlefieldDepthOverlaySprite } from '
 import { BATTLEFIELD_ENVIRONMENT_REACTION_VFX_ATLAS, battlefieldEnvironmentReactionVfxSprite, type BattlefieldEnvironmentReactionKind } from './battlefield-environment-reaction-vfx-assets.js';
 import { BATTLEFIELD_PROP_VFX_ATLAS, battlefieldPropSprite } from './battlefield-props-vfx-assets.js';
 import { BATTLEFIELD_OBSTACLE_STATE_VFX_ATLAS, battlefieldObstacleStateForEvolution, battlefieldObstacleStateVfxSprite } from './battlefield-obstacle-state-vfx-assets.js';
+import { terrainForegroundOcclusionPresentation } from './terrain-foreground-occlusion.js';
 import { BATTLEFIELD_INTERACTION_VFX_ATLAS, battlefieldCoreVisualState, battlefieldInteractionSprite } from './battlefield-interaction-vfx-assets.js';
 import { PICKUP_FLOW_VFX_ATLAS } from './pickup-flow-vfx-assets.js';
 import { SPAWN_PRESSURE_VFX_ATLAS } from './spawn-pressure-vfx-assets.js';
@@ -3495,6 +3496,7 @@ export class Game {
     this.drawEnemySpawnLaneReadability(ctx);
     this.enemies.renderEnemies(ctx, this.enemySpriteAtlasImage, this.enemySpriteAtlasReady, this.bossSpriteAtlasImage, this.bossSpriteAtlasReady, residualMotion, this.eliteAffixIdentityAtlasImage, this.eliteAffixIdentityAtlasReady, this.specialistIntentAtlasImage, this.specialistIntentAtlasReady, this.hero.pos, this.specialistCombatVfxAtlasImage, this.specialistCombatVfxAtlasReady, this.bossPhaseOverlayVfxAtlasImage, this.bossPhaseOverlayVfxAtlasReady, this.battlefieldInteractionVfxAtlasImage, this.battlefieldInteractionVfxAtlasReady, this.spawnPressureVfxAtlasImage, this.spawnPressureVfxAtlasReady, this.regularEnemyActionVfxAtlasImage, this.regularEnemyActionVfxAtlasReady, this.eliteAffixLifecycleVfxAtlasImage, this.eliteAffixLifecycleVfxAtlasReady, this.enemyTargetPressureVfxAtlasImage, this.enemyTargetPressureVfxAtlasReady, this.core.pos, this.specialistReactionLifecycleVfxAtlasImage, this.specialistReactionLifecycleVfxAtlasReady, this.presentationSettings.reducedFlash, this.presentationSettings.reducedMotion, Math.min(1,this.bossArena.hazards.length/6));
     this.drawEnemyDefeatBodyTransitions(ctx);
+    this.drawTerrainForegroundOcclusion(ctx);
     this.drawElitePackApproachFormationVfx(ctx);
     this.drawEnemyCombatImageVfx(ctx);
     this.drawEnemyFinisherVfx(ctx);
@@ -4523,6 +4525,66 @@ export class Game {
     ctx.globalAlpha = Math.min(this.presentationSettings.reducedFlash ? 0.42 : 0.62, 0.22 + strength * 0.42);
     ctx.drawImage(this.bossSignatureVfxAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, -size / 2, -size / 2, size, size);
     ctx.restore();
+  }
+
+  private drawTerrainForegroundOcclusion(ctx: CanvasRenderingContext2D): void {
+    const liveActorCount = this.enemies.enemies.reduce((count, enemy) => count + (enemy.alive ? 1 : 0), 0);
+    const battlefieldStress = Math.max(
+      Math.min(1, this.bossArena.hazards.length / 6),
+      Math.min(1, Math.max(0, liveActorCount - 8) / 22),
+    );
+    const mapId = this.terrain.currentLayout.id;
+    const obstacleState = battlefieldObstacleStateForEvolution(this.terrain.evolutionStage);
+    const obstacleSprite = battlefieldObstacleStateVfxSprite(mapId, obstacleState);
+    const wallSprite = battlefieldPropSprite(mapId, 'wall');
+
+    for (const wall of this.terrain.walls) {
+      const foreground = terrainForegroundOcclusionPresentation({
+        wallWidth: wall.w,
+        wallHeight: wall.h,
+        battlefieldStress,
+        reducedFlash: this.presentationSettings.reducedFlash,
+      });
+      const destinationHeight = foreground.capHeight + 4;
+      const destinationX = wall.x - 4;
+      const destinationY = wall.y - 3;
+      const destinationWidth = wall.w + 8;
+      const atlasImage = this.battlefieldObstacleStateVfxAtlasReady && this.battlefieldObstacleStateVfxAtlasImage
+        ? this.battlefieldObstacleStateVfxAtlasImage
+        : this.battlefieldPropVfxAtlasReady && this.battlefieldPropVfxAtlasImage
+          ? this.battlefieldPropVfxAtlasImage
+          : null;
+      const sprite = atlasImage === this.battlefieldObstacleStateVfxAtlasImage ? obstacleSprite : wallSprite;
+
+      ctx.save();
+      if (atlasImage) {
+        const sourceHeight = Math.max(1, Math.round(sprite.sh * foreground.spriteCropRatio));
+        ctx.globalAlpha = foreground.capAlpha;
+        ctx.drawImage(
+          atlasImage,
+          sprite.sx,
+          sprite.sy,
+          sprite.sw,
+          sourceHeight,
+          destinationX,
+          destinationY,
+          destinationWidth,
+          destinationHeight,
+        );
+      } else {
+        ctx.globalAlpha = foreground.capAlpha * 0.48;
+        ctx.fillStyle = this.terrain.currentLayout.palette.border;
+        ctx.fillRect(wall.x, wall.y, wall.w, foreground.capHeight);
+      }
+      ctx.globalAlpha = foreground.edgeAlpha;
+      ctx.strokeStyle = '#f4fbff';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(wall.x + 2, wall.y + 1);
+      ctx.lineTo(wall.x + Math.max(2, wall.w - 2), wall.y + 1);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
   private drawTerrainSpriteOverlays(ctx: CanvasRenderingContext2D, motion: ResidualCombatMotionPolicy): void {

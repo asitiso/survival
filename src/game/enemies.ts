@@ -45,6 +45,7 @@ import { specialistReactionLifecycleVfxSprite } from './specialist-reaction-life
 import { advanceEnemyMotionRenderState, enemyMotionRenderPresentation, type EnemyMotionRenderState } from './enemy-motion-rendering.js';
 import { enemyAttackMotionPresentation } from './enemy-attack-motion-rendering.js';
 import { enemySpriteActionPresentation } from './enemy-sprite-action-readability.js';
+import { enemyActorDepthOrdered } from './enemy-actor-depth-ordering.js';
 import { advanceEnemyAttackResolveState, enemyAttackResolvePresentation, type EnemyAttackResolveState } from './enemy-attack-resolve-rendering.js';
 import { bossLocomotionWeightPresentation } from './boss-locomotion-weight-rendering.js';
 import { advanceSpecialistLocomotionSignatureState, specialistLocomotionSignaturePresentation, type SpecialistLocomotionSignatureState } from './specialist-locomotion-signature-rendering.js';
@@ -913,7 +914,7 @@ export class EnemyManager {
     const actorGroundingBattlefieldStress=Math.max(Math.max(0,Math.min(1,hazardPressure)),Math.min(1,Math.max(0,liveActorCount-8)/22));
     const eliteAffixLayerFor=(enemy:Enemy,affixId:EliteAffixId)=>{const target=enemy.target==='core'?corePos:heroPos;const d=target?distance(enemy.pos,target):9999;const activeAttack=enemy.swiftCadencePresentation?.phase==='strike'||(enemy.attackResolveMotion?.resolve??0)>.12||(enemy.attackTimer>0&&enemy.attackTimer<=Math.min(.18,enemy.attackInterval*.3));return eliteAffixCueLayerPresentation(enemy.eliteAffixCueOwnership,affixId,{activeEliteCount:activeAffixElites.length,indexFromPriority:eliteAffixCuePriorityRank.get(enemy)??activeAffixElites.length,priorityTarget:enemy.target==='core'||d<=120||enemy.hitFlash>0,activeAttack,higherPriorityCue:hazardPressure>=.72,battlefieldStress:eliteAffixBattlefieldStress,reducedMotion,reducedFlash});};
     const eliteAffixCueLaneFor=(enemy:Enemy)=>eliteAffixCueLanePresentation(enemy.eliteAffixCueLane,{enemyRadius:enemy.radius,battlefieldStress:eliteAffixBattlefieldStress,higherPriorityCue:hazardPressure>=.72,reducedMotion,reducedFlash});
-    for (const enemy of this.enemies) {
+    for (const enemy of enemyActorDepthOrdered(this.enemies)) {
       ctx.save();
       ctx.translate(enemy.pos.x, enemy.pos.y);
       const targetPos = enemy.target === 'core' ? corePos : heroPos;

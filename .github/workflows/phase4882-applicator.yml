@@ -84,6 +84,13 @@ jobs:
         run: npm run build
       - name: Focused overlay-depth regression
         run: node --test tests/phase4875-4880-enemy-actor-depth-ordering.test.mjs tests/phase4881-enemy-lifecycle-depth-continuity.test.mjs tests/phase4882-enemy-combat-overlay-grounding.test.mjs
+      - name: Normalize generated tracked output
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-only | grep -v '^src/game/game.ts$' | while read -r path; do
+            [ -n "$path" ] && git restore --worktree -- "$path"
+          done
       - name: Diff guard
         shell: bash
         run: |

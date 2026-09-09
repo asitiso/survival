@@ -101,6 +101,7 @@ import { coreContactGuardMemoryPresentation } from './core-contact-guard-memory-
 import { advanceCoreMixedPressureGuardArbitration, coreMixedPressureGuardArbitrationPresentation, createCoreMixedPressureGuardArbitrationState, type CoreMixedPressureGuardArbitrationState } from './core-mixed-pressure-guard-arbitration-rendering.js';
 import { bossSpecialLaunchOriginPresentation } from './boss-special-launch-origin-rendering.js';
 import { characterGroundContactPresentation, characterHitRecoilPresentation } from './character-contact-recoil-rendering.js';
+import { actorGroundingDepthPresentation } from './actor-grounding-depth-separation.js';
 import { characterMotionLayerBudgetPresentation } from './character-motion-layer-budget-rendering.js';
 import { characterSilhouetteDirectionOwnerPresentation } from './character-silhouette-direction-owner-rendering.js';
 import { characterSilhouetteDirectionPivotPresentation } from './character-silhouette-direction-pivot-rendering.js';
@@ -908,6 +909,8 @@ export class EnemyManager {
     const eliteAffixCuePriority=[...activeAffixElites].sort((a,b)=>{const score=(enemy:Enemy)=>{const target=enemy.target==='core'?corePos:heroPos;const d=target?distance(enemy.pos,target):9999;const activeAttack=enemy.swiftCadencePresentation?.phase==='strike'||(enemy.attackResolveMotion?.resolve??0)>.12||(enemy.attackTimer>0&&enemy.attackTimer<=Math.min(.18,enemy.attackInterval*.3));return (enemy.target==='core'?5:0)+(d<=120?4:0)+(enemy.hitFlash>0?3:0)+(activeAttack?2:0);};return score(b)-score(a);});
     const eliteAffixCuePriorityRank=new Map(eliteAffixCuePriority.map((enemy,index)=>[enemy,index]));
     const eliteAffixBattlefieldStress=Math.max(Math.max(0,Math.min(1,hazardPressure)),Math.min(1,Math.max(0,activeAffixElites.length-3)/5));
+    const liveActorCount=this.enemies.reduce((count,enemy)=>count+(enemy.alive?1:0),0);
+    const actorGroundingBattlefieldStress=Math.max(Math.max(0,Math.min(1,hazardPressure)),Math.min(1,Math.max(0,liveActorCount-8)/22));
     const eliteAffixLayerFor=(enemy:Enemy,affixId:EliteAffixId)=>{const target=enemy.target==='core'?corePos:heroPos;const d=target?distance(enemy.pos,target):9999;const activeAttack=enemy.swiftCadencePresentation?.phase==='strike'||(enemy.attackResolveMotion?.resolve??0)>.12||(enemy.attackTimer>0&&enemy.attackTimer<=Math.min(.18,enemy.attackInterval*.3));return eliteAffixCueLayerPresentation(enemy.eliteAffixCueOwnership,affixId,{activeEliteCount:activeAffixElites.length,indexFromPriority:eliteAffixCuePriorityRank.get(enemy)??activeAffixElites.length,priorityTarget:enemy.target==='core'||d<=120||enemy.hitFlash>0,activeAttack,higherPriorityCue:hazardPressure>=.72,battlefieldStress:eliteAffixBattlefieldStress,reducedMotion,reducedFlash});};
     const eliteAffixCueLaneFor=(enemy:Enemy)=>eliteAffixCueLanePresentation(enemy.eliteAffixCueLane,{enemyRadius:enemy.radius,battlefieldStress:eliteAffixBattlefieldStress,higherPriorityCue:hazardPressure>=.72,reducedMotion,reducedFlash});
     for (const enemy of this.enemies) {
@@ -1044,23 +1047,25 @@ export class EnemyManager {
       const spritePresentation = enemySpritePresentation(enemy.type, enemy.radius, spriteAtlasReady);
       const bossArchetype = enemy.type === 'boss' ? (enemy.bossArchetype ?? bossArchetypeForOrdinal(enemy.bossOrdinal ?? 0)) : null;
       const bossPresentation = bossArchetype ? bossSpritePresentation(bossArchetype, enemy.radius, bossSpriteAtlasReady) : null;
+      const actorGroundingClass = enemy.type === 'boss' ? 'boss' : enemy.type === 'elite' || Boolean(enemy.eliteAffixes?.length) ? 'elite' : enemy.type === 'brute' || enemy.type === 'shieldbearer' || enemy.type === 'siegeGolem' ? 'heavy' : enemy.type === 'hound' || enemy.type === 'assassin' || enemy.type === 'golden' ? 'agile' : 'regular';
+      const actorGrounding = actorGroundingDepthPresentation({ actorClass: actorGroundingClass, battlefieldStress: actorGroundingBattlefieldStress, reducedMotion, reducedFlash });
       const imagePresenceShadowScale=bossPresentation?.visible?bossPresentation.groundShadowScale:spritePresentation.groundShadowScale;
       const imagePresenceShadowAlphaBoost=bossPresentation?.visible?bossPresentation.groundShadowAlphaBoost:spritePresentation.groundShadowAlphaBoost;
       const shadowBaseWidth=enemy.radius*1.12,shadowBaseHeight=enemy.radius*.48;
-      const ownedShadowWidth=(shadowBaseWidth+(motionPresentation.shadowWidth-shadowBaseWidth)*shadowMotionScale)*spawnGroundMaterialize.shadowWidthScale*imagePresenceShadowScale;
-      const ownedShadowHeight=(shadowBaseHeight+(motionPresentation.shadowHeight-shadowBaseHeight)*shadowMotionScale)*imagePresenceShadowScale;
+      const ownedShadowWidth=(shadowBaseWidth+(motionPresentation.shadowWidth-shadowBaseWidth)*shadowMotionScale)*spawnGroundMaterialize.shadowWidthScale*imagePresenceShadowScale*actorGrounding.shadowWidthScale;
+      const ownedShadowHeight=(shadowBaseHeight+(motionPresentation.shadowHeight-shadowBaseHeight)*shadowMotionScale)*imagePresenceShadowScale*actorGrounding.shadowHeightScale;
       const locomotionShadowBoost=bossLocomotion.shadowBoost*(bossGroundCue ? bossGroundCue.locomotionShadowBoostScale : 1);
       const recoveryShadowBoost=(bossSpecialRecovery?.shadowBoost??0)*recoveryScale*bossRecoveryShadowBoostScale;
       ctx.save();
       const specialOriginGroundOffsetX=enemy.type==='boss'?0:bossSpecialOriginHandoff.groundOffsetX,specialOriginGroundOffsetY=enemy.type==='boss'?0:bossSpecialOriginHandoff.groundOffsetY;
       ctx.translate(groundContact.offsetX * shadowMotionScale - motionPresentation.shadowOffsetX * shadowMotionScale + specialistGroundFollowX + bossGroundRebase.groundOffsetX + specialOriginGroundOffsetX, groundContact.offsetY * 0.35 + attackWeightSettle * attackScale + bossGroundRebase.groundOffsetY + specialOriginGroundOffsetY + spawnGroundMaterialize.groundOffsetY);
-      ctx.fillStyle = `rgba(8,12,18,${Math.min(0.46, (groundContact.alpha + locomotionShadowBoost + recoveryShadowBoost + imagePresenceShadowAlphaBoost)*bossSpecialOriginHandoff.shadowAlphaScale*spawnGroundMaterialize.shadowAlphaScale)})`;
+      ctx.fillStyle = `rgba(8,12,18,${Math.min(0.46, (groundContact.alpha + locomotionShadowBoost + recoveryShadowBoost + imagePresenceShadowAlphaBoost)*bossSpecialOriginHandoff.shadowAlphaScale*spawnGroundMaterialize.shadowAlphaScale*actorGrounding.shadowAlphaScale)})`;
       ctx.beginPath();
       ctx.ellipse(motionPresentation.shadowOffsetX * shadowMotionScale, enemy.radius + 8 + motionPresentation.shadowOffsetY * shadowMotionScale, Math.max(ownedShadowWidth, groundContact.width), Math.max(ownedShadowHeight, groundContact.height), 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
       if (bossLocomotion.showContactPulse && bossContactPulseScale > .01) {
-        const bossContactAlpha=bossLocomotion.contactAlpha*bossContactPulseScale;
+        const bossContactAlpha=bossLocomotion.contactAlpha*bossContactPulseScale*actorGrounding.contactPulseScale;
         ctx.save();
         ctx.translate(bossAftermath.originOffsetX,bossAftermath.originOffsetY);
         ctx.globalAlpha = reducedFlash ? Math.min(0.14, bossContactAlpha*bossAftermath.aftermathAlphaScale) : bossContactAlpha*bossAftermath.aftermathAlphaScale;
@@ -1072,7 +1077,7 @@ export class EnemyManager {
         ctx.restore();
       }
       if (specialistLocomotionSignature && specialistLocomotionSignature.groundPulseAlpha > 0.01 && specialistGroundPulseScale > .01) {
-        const specialistPulseAlpha=specialistLocomotionSignature.groundPulseAlpha*specialistGroundPulseScale;
+        const specialistPulseAlpha=specialistLocomotionSignature.groundPulseAlpha*specialistGroundPulseScale*actorGrounding.contactPulseScale;
         ctx.save();
         ctx.translate(specialistGroundFollowX,0);
         ctx.globalAlpha = reducedFlash ? Math.min(0.10, specialistPulseAlpha) : specialistPulseAlpha;

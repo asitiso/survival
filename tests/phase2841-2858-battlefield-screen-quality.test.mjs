@@ -28,7 +28,7 @@ test('phase 2842-2846 game loads and draws battlefield depth overlays between at
   assert.match(gameSource, /drawBattlefieldDepthOverlays/);
   assert.match(gameSource, /battlefieldDepthOverlaySprite/);
   assert.match(gameSource, /this\.presentationSettings\.reducedMotion/);
-  assert.match(gameSource, /this\.drawArena\(ctx\);[\s\S]*this\.drawBattlefieldAtmosphereVfx\(ctx\);[\s\S]*this\.drawBattlefieldDepthOverlays\(ctx\);[\s\S]*this\.terrain\.render\(ctx, residualMotion\);/);
+  assert.match(gameSource, /this\.drawArena\(ctx\);[\s\S]*this\.drawBattlefieldAtmosphereVfx\(ctx\);[\s\S]*this\.drawBattlefieldDepthOverlays\(ctx\);[\s\S]*this\.terrain\.render\(ctx, residualMotion\b/);
   assert.match(gameSource, /globalCompositeOperation='screen'/);
 });
 

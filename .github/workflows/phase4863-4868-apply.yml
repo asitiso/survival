@@ -1,0 +1,75 @@
+name: Phase 4863-4868 Applicator
+
+on:
+  push:
+    branches:
+      - work/phase4863-4868-critical-threat-occlusion-arbitration
+    paths:
+      - .github/workflows/phase4863-4868-apply.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply bounded critical threat occlusion integration
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/game/game.ts')
+          source = path.read_text()
+
+          import_marker = "import { terrainForegroundOcclusionPresentation } from './terrain-foreground-occlusion.js';"
+          import_line = "import { criticalThreatOcclusionArbitrationPresentation, criticalThreatWallCapOverlap } from './critical-threat-occlusion-arbitration.js';"
+          if import_line not in source:
+              if import_marker not in source:
+                  raise SystemExit('terrain foreground occlusion import marker not found')
+              source = source.replace(import_marker, import_marker + "\n" + import_line, 1)
+
+          loop_marker = "    for (const wall of this.terrain.walls) {\n      const foreground = terrainForegroundOcclusionPresentation({"
+          loop_replacement = "    const criticalThreatClassFor = (enemy: Enemy): 'none' | 'specialist' | 'elite' | 'boss' => enemy.type === 'boss' ? 'boss' : enemy.type === 'elite' ? 'elite' : enemy.type === 'shieldbearer' || enemy.type === 'assassin' || enemy.type === 'siegeGolem' || enemy.type === 'nullifier' ? 'specialist' : 'none';\n    const criticalThreats = this.enemies.enemies.filter((enemy) => enemy.alive && criticalThreatClassFor(enemy) !== 'none');\n\n    for (const wall of this.terrain.walls) {\n      const foreground = terrainForegroundOcclusionPresentation({"
+          if "const criticalThreatClassFor =" not in source:
+              if loop_marker not in source:
+                  raise SystemExit('foreground wall loop marker not found')
+              source = source.replace(loop_marker, loop_replacement, 1)
+
+          foreground_marker = "      const foreground = terrainForegroundOcclusionPresentation({\n        wallWidth: wall.w,\n        wallHeight: wall.h,\n        battlefieldStress,\n        reducedFlash: this.presentationSettings.reducedFlash,\n      });\n      const destinationHeight = foreground.capHeight + 4;"
+          foreground_replacement = "      const foreground = terrainForegroundOcclusionPresentation({\n        wallWidth: wall.w,\n        wallHeight: wall.h,\n        battlefieldStress,\n        reducedFlash: this.presentationSettings.reducedFlash,\n      });\n      let criticalThreatOcclusion = criticalThreatOcclusionArbitrationPresentation({ threatClass: 'none', overlap: 0 });\n      for (const enemy of criticalThreats) {\n        const threatClass = criticalThreatClassFor(enemy);\n        const overlap = criticalThreatWallCapOverlap({\n          wallX: wall.x - 4,\n          wallY: wall.y - 3,\n          wallWidth: wall.w + 8,\n          capHeight: foreground.capHeight + 4,\n          threatX: enemy.pos.x,\n          threatY: enemy.pos.y,\n          threatRadius: enemy.radius,\n        });\n        if (overlap <= 0) continue;\n        const candidate = criticalThreatOcclusionArbitrationPresentation({ threatClass, overlap });\n        if (candidate.capAlphaScale < criticalThreatOcclusion.capAlphaScale) criticalThreatOcclusion = candidate;\n      }\n      const destinationHeight = foreground.capHeight + 4;"
+          if "criticalThreatWallCapOverlap({" not in source:
+              if foreground_marker not in source:
+                  raise SystemExit('foreground presentation marker not found')
+              source = source.replace(foreground_marker, foreground_replacement, 1)
+
+          source = source.replace("        ctx.globalAlpha = foreground.capAlpha;", "        ctx.globalAlpha = foreground.capAlpha * criticalThreatOcclusion.capAlphaScale;", 1)
+          source = source.replace("        ctx.globalAlpha = foreground.capAlpha * 0.48;", "        ctx.globalAlpha = foreground.capAlpha * 0.48 * criticalThreatOcclusion.capAlphaScale;", 1)
+          source = source.replace("      ctx.globalAlpha = foreground.edgeAlpha;", "      ctx.globalAlpha = foreground.edgeAlpha * criticalThreatOcclusion.edgeAlphaScale;", 1)
+
+          path.write_text(source)
+          PY
+      - name: Build and focused verification
+        run: |
+          npm ci
+          npm run build
+          node --test tests/phase4863-4868-critical-threat-occlusion-arbitration.test.mjs
+          git diff --check
+      - name: Commit bounded integration and remove applicator
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/phase4863-4868-apply.yml
+          git add src/game/game.ts
+          if git diff --cached --quiet; then
+            echo "No bounded integration changes to commit."
+            exit 0
+          fi
+          git commit -m "feat: integrate critical threat occlusion arbitration"
+          git push origin HEAD:work/phase4863-4868-critical-threat-occlusion-arbitration

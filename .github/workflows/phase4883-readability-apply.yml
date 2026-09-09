@@ -1,0 +1,53 @@
+name: Phase 4883 Readability Applicator
+
+on:
+  push:
+    branches:
+      - work/phase4883-persistent-spell-grounding
+    paths:
+      - .github/workflows/phase4883-readability-apply.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/phase4883-persistent-spell-grounding
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply bounded Phase 4883 split
+        run: node scripts/apply-phase4883-readability-layer.mjs
+      - name: Diff guard
+        run: |
+          git diff --check
+          changed="$(git diff --name-only | sort)"
+          printf '%s\n' "$changed"
+          test "$changed" = $'src/game/game.ts\nsrc/game/persistent-spell-ground-ordering.ts\nsrc/game/spells.ts'
+      - name: Build
+        run: npm run build
+      - name: Focused Phase 4883 regression
+        run: |
+          node --test \
+            tests/phase1895-1900-residual-combat-motion.test.mjs \
+            tests/phase2841-2858-battlefield-screen-quality.test.mjs \
+            tests/phase4875-4880-enemy-actor-depth-ordering.test.mjs \
+            tests/phase4881-enemy-lifecycle-depth-continuity.test.mjs \
+            tests/phase4882-enemy-combat-overlay-grounding.test.mjs \
+            tests/phase4883-persistent-spell-grounding.test.mjs
+      - name: Commit verified production change and remove applicator
+        run: |
+          rm .github/workflows/phase4883-readability-apply.yml scripts/apply-phase4883-readability-layer.mjs
+          git add src/game/game.ts src/game/persistent-spell-ground-ordering.ts src/game/spells.ts .github/workflows/phase4883-readability-apply.yml scripts/apply-phase4883-readability-layer.mjs
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix: preserve Phase 4883 persistent spell readability layering'
+          git push origin HEAD:work/phase4883-persistent-spell-grounding

@@ -26,28 +26,15 @@ jobs:
       - run: npm ci
       - name: Build once
         run: npm run build
-      - name: Changed phase TDD
+      - name: Focused + directly coupled regression
         shell: bash
         run: |
           base="origin/${{ github.base_ref }}"
-          files=$(git diff --name-only "$base"...HEAD -- 'tests/*.test.mjs' | sort)
-          if [ -z "$files" ]; then
-            echo 'No changed test files.'
+          mapfile -t files < <(node scripts/fast-gate-select.mjs "$base")
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo 'No focused or directly coupled tests selected.'
             exit 0
           fi
-          node --test $files
-      - name: Related elite-affix regression
-        shell: bash
-        run: |
-          base="origin/${{ github.base_ref }}"
-          changed=$(git diff --name-only "$base"...HEAD)
-          if ! printf '%s\n' "$changed" | grep -Eq '^src/game/(elite-affix|enemies\.ts)'; then
-            echo 'Elite-affix source unchanged; related regression skipped.'
-            exit 0
-          fi
-          files=$(find tests -maxdepth 1 -type f \( -name '*swift*.test.mjs' -o -name '*frenzied*.test.mjs' -o -name '*elite-affix*.test.mjs' \) -print | sort)
-          if [ -z "$files" ]; then
-            echo 'No related elite-affix tests found.'
-            exit 0
-          fi
-          node --test $files
+          printf 'Selected tests (%s):\n' "${#files[@]}"
+          printf '  %s\n' "${files[@]}"
+          node --test "${files[@]}"

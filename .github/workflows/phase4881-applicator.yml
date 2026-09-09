@@ -1,0 +1,108 @@
+name: Phase 4881 Applicator
+
+on:
+  push:
+    branches:
+      - work/phase4881-enemy-lifecycle-depth-continuity
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase4881-applicator
+  cancel-in-progress: true
+
+jobs:
+  apply-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/phase4881-enemy-lifecycle-depth-continuity
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply bounded Phase 4881 patch
+        shell: python
+        run: |
+          from pathlib import Path
+
+          helper = Path('src/game/enemy-actor-depth-ordering.ts')
+          helper.write_text("""export interface EnemyActorDepthLike {
+            pos: {
+              y: number;
+            };
+          }
+
+          interface IndexedDepthItem<T> {
+            item: T;
+            index: number;
+            depthY: number;
+            finiteDepth: boolean;
+          }
+
+          export function stableWorldYDepthOrdered<T>(
+            items: readonly T[],
+            depthYFor: (item: T) => number,
+          ): T[] {
+            return items
+              .map<IndexedDepthItem<T>>((item, index) => {
+                const depthY = depthYFor(item);
+                return {
+                  item,
+                  index,
+                  depthY,
+                  finiteDepth: Number.isFinite(depthY),
+                };
+              })
+              .sort((a, b) => {
+                if (a.finiteDepth !== b.finiteDepth) return a.finiteDepth ? -1 : 1;
+                if (a.finiteDepth && b.finiteDepth && a.depthY !== b.depthY) return a.depthY - b.depthY;
+                return a.index - b.index;
+              })
+              .map(({ item }) => item);
+          }
+
+          export function enemyActorDepthOrdered<T extends EnemyActorDepthLike>(actors: readonly T[]): T[] {
+            return stableWorldYDepthOrdered(actors, (actor) => actor.pos.y);
+          }
+          """.replace('          ', ''), encoding='utf-8')
+
+          game = Path('src/game/game.ts')
+          text = game.read_text(encoding='utf-8')
+          import_anchor = "import { enemyDeathTransitionPresentation, enemyFinisherDeathAfterglowContinuityPresentation, enemyFinisherDeathAfterglowHandoffPresentation, enemyFinisherDeathAfterglowDensityBudgetPresentation } from './enemy-hit-death-transition-rendering.js';"
+          new_import = import_anchor + "\nimport { stableWorldYDepthOrdered } from './enemy-actor-depth-ordering.js';"
+          if text.count(import_anchor) != 1:
+            raise SystemExit(f'import anchor count={text.count(import_anchor)}')
+          text = text.replace(import_anchor, new_import, 1)
+
+          loop_anchor = 'for(const cue of this.enemyDefeatBodyTransitions){'
+          loop_new = 'for(const cue of stableWorldYDepthOrdered(this.enemyDefeatBodyTransitions, (cue)=>cue.death.y)){' 
+          if text.count(loop_anchor) != 1:
+            raise SystemExit(f'defeat loop anchor count={text.count(loop_anchor)}')
+          text = text.replace(loop_anchor, loop_new, 1)
+          game.write_text(text, encoding='utf-8')
+      - name: Build
+        run: npm run build
+      - name: Focused lifecycle depth regression
+        run: node --test tests/phase4875-4880-enemy-actor-depth-ordering.test.mjs tests/phase4881-enemy-lifecycle-depth-continuity.test.mjs
+      - name: Diff guard
+        shell: bash
+        run: |
+          git diff --check
+          git diff --name-only
+          test "$(git diff --name-only | grep -E '^(src/game/enemy-actor-depth-ordering\.ts|src/game/game\.ts)$' | wc -l)" -eq 2
+      - name: Commit final production patch and remove applicator
+        shell: bash
+        run: |
+          rm .github/workflows/phase4881-applicator.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/game/enemy-actor-depth-ordering.ts src/game/game.ts .github/workflows/phase4881-applicator.yml
+          git commit -m 'feat: complete phase 4881 lifecycle depth continuity'
+          git push origin HEAD:work/phase4881-enemy-lifecycle-depth-continuity

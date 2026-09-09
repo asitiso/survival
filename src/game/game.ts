@@ -4581,7 +4581,7 @@ export class Game {
 
       ctx.save();
       if (atlasImage) {
-        const sourceHeight = Math.max(1, Math.round(sprite.sh * foreground.spriteCropRatio));
+        const sourceHeight = Math.max(1, sprite.sh * foreground.spriteCropRatio);
         ctx.globalAlpha = foreground.capAlpha * criticalThreatOcclusion.capAlphaScale;
         ctx.drawImage(
           atlasImage,

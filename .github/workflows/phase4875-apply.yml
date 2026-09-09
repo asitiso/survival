@@ -1,0 +1,67 @@
+name: Phase 4875 Apply
+
+on:
+  push:
+    branches:
+      - work/phase4875-4880-enemy-actor-depth-ordering
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/phase4875-4880-enemy-actor-depth-ordering
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Integrate stable enemy depth ordering
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/game/enemies.ts')
+          source = path.read_text()
+
+          import_anchor = "import { enemySpriteActionPresentation } from './enemy-sprite-action-readability.js';\n"
+          depth_import = "import { enemyActorDepthOrdered } from './enemy-actor-depth-ordering.js';\n"
+          if depth_import not in source:
+              if import_anchor not in source:
+                  raise SystemExit('enemy sprite action import anchor missing')
+              source = source.replace(import_anchor, import_anchor + depth_import, 1)
+
+          method_index = source.find('  renderEnemies(')
+          if method_index < 0:
+              raise SystemExit('renderEnemies method missing')
+          old_loop = '    for (const enemy of this.enemies) {'
+          loop_index = source.find(old_loop, method_index)
+          if loop_index < 0:
+              raise SystemExit('renderEnemies enemy loop missing')
+          new_loop = '    for (const enemy of enemyActorDepthOrdered(this.enemies)) {'
+          source = source[:loop_index] + new_loop + source[loop_index + len(old_loop):]
+
+          path.write_text(source)
+          PY
+      - run: npm ci
+      - run: npm run build
+      - name: Focused Phase 4875-4880 test
+        run: node --test tests/phase4875-4880-enemy-actor-depth-ordering.test.mjs
+      - name: Related actor readability regression
+        run: node --test tests/phase4833-4838-enemy-image-presence.test.mjs tests/phase4839-4844-enemy-sprite-action-readability.test.mjs tests/phase4851-4856-actor-grounding-depth-separation.test.mjs
+      - name: Diff guard
+        run: |
+          git diff --check
+          git diff -- src/game/enemies.ts src/game/enemy-actor-depth-ordering.ts tests/phase4875-4880-enemy-actor-depth-ordering.test.mjs
+      - name: Commit verified integration and remove applicator
+        run: |
+          rm .github/workflows/phase4875-apply.yml
+          git config user.name "asitiso"
+          git config user.email "asitiso.woo@gmail.com"
+          git add src/game/enemies.ts .github/workflows/phase4875-apply.yml
+          git commit -m "feat: depth-order enemy actors for battlefield readability"
+          git push origin HEAD:work/phase4875-4880-enemy-actor-depth-ordering

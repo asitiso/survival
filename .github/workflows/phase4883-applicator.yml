@@ -35,12 +35,14 @@ jobs:
         run: |
           set -euo pipefail
           rm -f .git/index.lock
+          changed="$(git diff --name-only)"
           while IFS= read -r path; do
+            [ -n "$path" ] || continue
             case "$path" in
               src/game/game.ts|src/game/spells.ts|src/game/persistent-spell-ground-ordering.ts) ;;
               *) git checkout -- "$path" ;;
             esac
-          done < <(git diff --name-only)
+          done <<< "$changed"
       - name: Diff guard
         shell: bash
         run: |

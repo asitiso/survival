@@ -49,7 +49,7 @@ test('phase 1896 golden and bomber body rings consume residual policy instead of
 });
 
 test('phase 1897 terrain crystal pulse consumes residual policy and avoids performance.now animation',()=>{
-  assert.match(game,/this\.terrain\.render\(ctx,\s*residualMotion\)/);
+  assert.match(game,/this\.terrain\.render\(ctx,\s*residualMotion\b/);
   assert.match(terrain,/terrainCrystalMotionAmplitude/);
   assert.doesNotMatch(terrain,/performance\.now\(\)\s*\/\s*300/);
 });

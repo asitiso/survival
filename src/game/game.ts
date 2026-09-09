@@ -166,6 +166,7 @@ import { BUILD_OVERDRIVE_EFFECT_ATLAS, buildOverdriveEffectIdentityIcon } from '
 import { buildOverdriveActivationToastLabel, buildOverdriveEffectProjectionHint, projectBuildOverdriveEffects, type BuildOverdriveEffectProjection } from './build-overdrive-effect-projection.js';
 import { FINAL_FORM_IDENTITY_ATLAS, finalFormIdentityIcon } from './final-form-identity-assets.js';
 import { BATTLEFIELD_ENVIRONMENT_ATLAS, battlefieldEnvironmentSprite } from './battlefield-environment-assets.js';
+import { battlefieldDepthTerrainPresentation, type BattlefieldDepthTerrainPresentation } from './battlefield-depth-terrain-readability.js';
 import { BATTLEFIELD_GAMEPLAY_ART, BATTLEFIELD_DECORATION_ANCHORS, battlefieldGameplayArtProfile, battlefieldGameplayPropSprite } from './battlefield-gameplay-art.js';
 import { BATTLEFIELD_ATMOSPHERE_VFX_ATLAS, battlefieldAtmosphereVfxSprite } from './battlefield-atmosphere-vfx-assets.js';
 import { BATTLEFIELD_DEPTH_OVERLAY_ATLAS, battlefieldDepthOverlaySprite } from './battlefield-depth-overlay-assets.js';
@@ -3467,7 +3468,8 @@ export class Game {
     this.drawArena(ctx);
     this.drawBattlefieldAtmosphereVfx(ctx);
     this.drawBattlefieldDepthOverlays(ctx);
-    this.terrain.render(ctx, residualMotion);
+    const battlefieldTerrainReadability = this.drawBattlefieldTerrainReadability(ctx);
+    this.terrain.render(ctx, residualMotion, battlefieldTerrainReadability);
     this.drawTerrainSpriteOverlays(ctx, residualMotion);
     this.drawBattlefieldGameplayProps(ctx);
     this.drawMapCombatBoundaryWarnings(ctx);
@@ -4173,6 +4175,74 @@ export class Game {
     ctx.globalAlpha=Math.min(this.presentationSettings.reducedFlash?.08:baseAlpha*.65+stageBoost*.5,.15)*layerAlpha;
     ctx.drawImage(this.battlefieldDepthOverlayAtlasImage,sprite.sx,sprite.sy,sprite.sw,sprite.sh,-6+driftX*.55,-4+driftY*.45,LOGICAL_WIDTH+12,LOGICAL_HEIGHT+8);
     ctx.restore();
+  }
+
+  private drawBattlefieldTerrainReadability(ctx: CanvasRenderingContext2D): BattlefieldDepthTerrainPresentation {
+    const liveEnemyCount = this.enemies.enemies.reduce((count, enemy) => count + (enemy.alive ? 1 : 0), 0);
+    const battlefieldStress = Math.max(0, Math.min(1, (liveEnemyCount + this.bossArena.hazards.length * 2 - 8) / 22));
+    const readability = battlefieldDepthTerrainPresentation({
+      battlefieldStress,
+      evolutionStage: this.terrain.evolutionStage,
+      reducedMotion: this.presentationSettings.reducedMotion,
+      reducedFlash: this.presentationSettings.reducedFlash,
+    });
+    const palette = this.terrain.currentLayout.palette;
+    const arenaTop = ARENA_MARGIN + 38;
+    const arenaWidth = LOGICAL_WIDTH - ARENA_MARGIN * 2;
+    const arenaHeight = LOGICAL_HEIGHT - ARENA_MARGIN * 2 - 38;
+
+    ctx.save();
+    const groundDepth = ctx.createRadialGradient(
+      LOGICAL_WIDTH / 2, LOGICAL_HEIGHT / 2, LOGICAL_HEIGHT * 0.14,
+      LOGICAL_WIDTH / 2, LOGICAL_HEIGHT / 2, LOGICAL_WIDTH * 0.5 * readability.ground.radiusScale,
+    );
+    groundDepth.addColorStop(0, `rgba(5,9,16,${readability.ground.centerAlpha.toFixed(3)})`);
+    groundDepth.addColorStop(1, `rgba(5,9,16,${readability.ground.edgeAlpha.toFixed(3)})`);
+    ctx.fillStyle = groundDepth;
+    ctx.fillRect(ARENA_MARGIN, arenaTop, arenaWidth, arenaHeight);
+
+    const lanePulse = 1 + Math.sin(this.elapsed * 0.72) * readability.lane.pulseAmplitude;
+    ctx.globalAlpha = readability.lane.alpha * lanePulse;
+    ctx.strokeStyle = palette.border;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([readability.lane.segmentLength, readability.lane.gapLength]);
+    ctx.lineDashOffset = -this.elapsed * 4 * readability.lane.pulseAmplitude;
+    const approachAnchors = [
+      { x: ARENA_MARGIN + 18, y: LOGICAL_HEIGHT * 0.32 },
+      { x: LOGICAL_WIDTH - ARENA_MARGIN - 18, y: LOGICAL_HEIGHT * 0.68 },
+      { x: LOGICAL_WIDTH * 0.34, y: arenaTop + 12 },
+      { x: LOGICAL_WIDTH * 0.66, y: LOGICAL_HEIGHT - ARENA_MARGIN - 12 },
+    ];
+    for (const anchor of approachAnchors) {
+      ctx.beginPath();
+      ctx.moveTo(anchor.x, anchor.y);
+      ctx.lineTo(this.core.pos.x, this.core.pos.y);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    const foundation = ctx.createRadialGradient(
+      this.core.pos.x, this.core.pos.y + 8, 10,
+      this.core.pos.x, this.core.pos.y + 8, readability.core.foundationRadius,
+    );
+    foundation.addColorStop(0, 'rgba(6,11,18,.72)');
+    foundation.addColorStop(0.58, 'rgba(6,11,18,.30)');
+    foundation.addColorStop(1, 'rgba(6,11,18,0)');
+    ctx.globalAlpha = readability.core.foundationAlpha;
+    ctx.fillStyle = foundation;
+    ctx.beginPath();
+    ctx.ellipse(this.core.pos.x, this.core.pos.y + 10, readability.core.foundationRadius, readability.core.foundationRadius * 0.42, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    const corePulse = 1 + Math.sin(this.elapsed * 1.9) * readability.core.pulseAmplitude;
+    ctx.globalAlpha = readability.core.ringAlpha;
+    ctx.strokeStyle = palette.accent;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(this.core.pos.x, this.core.pos.y + 5, readability.core.ringRadius * corePulse, readability.core.ringRadius * 0.46 * corePulse, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    return readability;
   }
 
   private drawBossHealthPressure(ctx:CanvasRenderingContext2D):void {

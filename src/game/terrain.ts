@@ -5,6 +5,7 @@ import { MAP_LAYOUTS, selectMapLayout, type MapLayout } from './map-layouts.js';
 import { evolveMapLayout, mapEvolutionStage, type MapEvolutionStage } from './map-evolution.js';
 import type { ResidualCombatMotionPolicy } from './combat-cue-priority.js';
 import { battlefieldTerrainMaterial } from './battlefield-environment-assets.js';
+import type { BattlefieldDepthTerrainPresentation } from './battlefield-depth-terrain-readability.js';
 
 export interface Rect { x: number; y: number; w: number; h: number; }
 export interface TerrainPresentationEvent { kind:'crystalBlast'; x:number; y:number; radius:number; }
@@ -109,8 +110,9 @@ export class TerrainSystem {
     }
   }
 
-  render(ctx: CanvasRenderingContext2D, motion?: ResidualCombatMotionPolicy): void {
+  render(ctx: CanvasRenderingContext2D, motion?: ResidualCombatMotionPolicy, readability?: BattlefieldDepthTerrainPresentation): void {
     const material = battlefieldTerrainMaterial(this.currentLayout.id);
+    const obstacleReadability = readability?.obstacle ?? { contactShadowAlpha: 0.20, edgeAlpha: 0.18, shadowOffsetY: 12 };
     const crystalAmplitude = motion?.terrainCrystalMotionAmplitude ?? 0.08;
     const poolRipple = crystalAmplitude * 0.75;
     const stageBoost = this.evolutionStage === 2 ? 1 : this.evolutionStage === 1 ? 0.65 : 0.35;
@@ -156,10 +158,10 @@ export class TerrainSystem {
 
     for (const wall of this.walls) {
       const wallShadow = ctx.createLinearGradient(wall.x, wall.y, wall.x + wall.w, wall.y + wall.h + 26);
-      wallShadow.addColorStop(0, 'rgba(5,9,16,.14)');
+      wallShadow.addColorStop(0, `rgba(5,9,16,${obstacleReadability.contactShadowAlpha.toFixed(3)})`);
       wallShadow.addColorStop(1, 'rgba(5,9,16,0)');
       ctx.fillStyle = wallShadow;
-      ctx.fillRect(wall.x + 9, wall.y + 12, wall.w, wall.h + 20);
+      ctx.fillRect(wall.x + 9, wall.y + obstacleReadability.shadowOffsetY, wall.w, wall.h + 20);
 
       const wallFill = ctx.createLinearGradient(wall.x, wall.y, wall.x, wall.y + wall.h);
       wallFill.addColorStop(0, material.wallHighlight);
@@ -173,6 +175,12 @@ export class TerrainSystem {
       ctx.strokeStyle = this.currentLayout.palette.border;
       ctx.lineWidth = 3;
       ctx.strokeRect(wall.x, wall.y, wall.w, wall.h);
+      ctx.save();
+      ctx.globalAlpha = obstacleReadability.edgeAlpha;
+      ctx.strokeStyle = '#f4fbff';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(wall.x + 1, wall.y + 1, Math.max(0, wall.w - 2), Math.max(0, wall.h - 2));
+      ctx.restore();
       ctx.fillStyle = material.wallHighlight;
       ctx.fillRect(wall.x + 5, wall.y + 5, Math.max(0, wall.w - 10), 5);
     }

@@ -1,0 +1,103 @@
+name: Phase 4882 Applicator
+
+on:
+  push:
+    branches:
+      - work/phase4882-enemy-combat-overlay-grounding
+    paths:
+      - .github/workflows/phase4882-applicator.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/phase4882-enemy-combat-overlay-grounding
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply bounded Phase 4882 patch
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('src/game/game.ts')
+          source = path.read_text()
+
+          old_order = '''    this.drawEnemyDefeatBodyTransitions(ctx);\n    this.drawTerrainForegroundOcclusion(ctx);\n    this.drawElitePackApproachFormationVfx(ctx);\n    this.drawEnemyCombatImageVfx(ctx);\n    this.drawEnemyFinisherVfx(ctx);\n    this.drawFreezeShatterVfx(ctx);\n    this.drawGoldenGoblinEventResponseIdentity(ctx);'''
+          new_order = '''    this.drawEnemyDefeatBodyTransitions(ctx);\n    this.drawEnemyCombatImageVfx(ctx);\n    this.drawEnemyFinisherVfx(ctx);\n    this.drawFreezeShatterVfx(ctx);\n    this.drawTerrainForegroundOcclusion(ctx);\n    this.drawElitePackApproachFormationVfx(ctx);\n    this.drawGoldenGoblinEventResponseIdentity(ctx);'''
+          if source.count(old_order) != 1:
+              raise SystemExit(f'render-order anchor count was {source.count(old_order)}, expected 1')
+          source = source.replace(old_order, new_order, 1)
+
+          def replace_in_method(text, start_marker, end_marker, old, new):
+              start = text.find(start_marker)
+              if start < 0:
+                  raise SystemExit(f'missing method start: {start_marker}')
+              end = text.find(end_marker, start + len(start_marker))
+              if end < 0:
+                  raise SystemExit(f'missing method end: {end_marker}')
+              segment = text[start:end]
+              if segment.count(old) != 1:
+                  raise SystemExit(f'anchor count in {start_marker} was {segment.count(old)}, expected 1: {old}')
+              segment = segment.replace(old, new, 1)
+              return text[:start] + segment + text[end:]
+
+          source = replace_in_method(
+              source,
+              '  private drawEnemyCombatImageVfx(ctx: CanvasRenderingContext2D): void {',
+              '  private ',
+              'for (const enemy of this.enemies.enemies) {',
+              'for (const enemy of stableWorldYDepthOrdered(this.enemies.enemies, (enemy) => enemy.pos.y)) {',
+          )
+          source = replace_in_method(
+              source,
+              '  private drawEnemyCombatImageVfx(ctx: CanvasRenderingContext2D): void {',
+              '  private ',
+              'for (const burst of this.enemyDeathImageBursts) {',
+              'for (const burst of stableWorldYDepthOrdered(this.enemyDeathImageBursts, (burst) => burst.y)) {',
+          )
+          source = replace_in_method(
+              source,
+              '  private drawEnemyFinisherVfx(ctx:CanvasRenderingContext2D):void{',
+              '  private ',
+              'for(const cue of this.enemyFinisherVfx){',
+              'for(const cue of stableWorldYDepthOrdered(this.enemyFinisherVfx,(cue)=>cue.y)){',
+          )
+          source = replace_in_method(
+              source,
+              '  private drawFreezeShatterVfx(ctx:CanvasRenderingContext2D):void{',
+              '  private ',
+              'for(const cue of this.freezeShatterVfx){',
+              'for(const cue of stableWorldYDepthOrdered(this.freezeShatterVfx,(cue)=>cue.y)){',
+          )
+
+          path.write_text(source)
+      - name: Build
+        run: npm run build
+      - name: Focused overlay-depth regression
+        run: node --test tests/phase4875-4880-enemy-actor-depth-ordering.test.mjs tests/phase4881-enemy-lifecycle-depth-continuity.test.mjs tests/phase4882-enemy-combat-overlay-grounding.test.mjs
+      - name: Diff guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed="$(git diff --name-only)"
+          printf '%s\n' "$changed"
+          test "$changed" = "src/game/game.ts"
+      - name: Commit final production patch and remove applicator
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/game/game.ts
+          git rm .github/workflows/phase4882-applicator.yml
+          git commit -m "feat: ground enemy combat overlays below foreground"
+          git push origin HEAD:work/phase4882-enemy-combat-overlay-grounding

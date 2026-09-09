@@ -66,7 +66,7 @@ test('phase 4872 minimum sprite size registration remains centered for small obs
   assert.equal(registration.drawHeight, 72);
   assert.equal(registration.drawX, 14);
   assert.equal(registration.drawY, 34);
-  assert.equal(registration.capDrawHeight, 21.6);
+  assert.ok(Math.abs(registration.capDrawHeight - 21.6) < 1e-9);
 });
 
 test('phase 4873 malformed registration inputs stay finite and bounded', async () => {

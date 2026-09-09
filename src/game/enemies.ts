@@ -1042,15 +1042,17 @@ export class EnemyManager {
       const spritePresentation = enemySpritePresentation(enemy.type, enemy.radius, spriteAtlasReady);
       const bossArchetype = enemy.type === 'boss' ? (enemy.bossArchetype ?? bossArchetypeForOrdinal(enemy.bossOrdinal ?? 0)) : null;
       const bossPresentation = bossArchetype ? bossSpritePresentation(bossArchetype, enemy.radius, bossSpriteAtlasReady) : null;
+      const imagePresenceShadowScale=bossPresentation?.visible?bossPresentation.groundShadowScale:spritePresentation.groundShadowScale;
+      const imagePresenceShadowAlphaBoost=bossPresentation?.visible?bossPresentation.groundShadowAlphaBoost:spritePresentation.groundShadowAlphaBoost;
       const shadowBaseWidth=enemy.radius*1.12,shadowBaseHeight=enemy.radius*.48;
-      const ownedShadowWidth=(shadowBaseWidth+(motionPresentation.shadowWidth-shadowBaseWidth)*shadowMotionScale)*spawnGroundMaterialize.shadowWidthScale;
-      const ownedShadowHeight=shadowBaseHeight+(motionPresentation.shadowHeight-shadowBaseHeight)*shadowMotionScale;
+      const ownedShadowWidth=(shadowBaseWidth+(motionPresentation.shadowWidth-shadowBaseWidth)*shadowMotionScale)*spawnGroundMaterialize.shadowWidthScale*imagePresenceShadowScale;
+      const ownedShadowHeight=(shadowBaseHeight+(motionPresentation.shadowHeight-shadowBaseHeight)*shadowMotionScale)*imagePresenceShadowScale;
       const locomotionShadowBoost=bossLocomotion.shadowBoost*(bossGroundCue ? bossGroundCue.locomotionShadowBoostScale : 1);
       const recoveryShadowBoost=(bossSpecialRecovery?.shadowBoost??0)*recoveryScale*bossRecoveryShadowBoostScale;
       ctx.save();
       const specialOriginGroundOffsetX=enemy.type==='boss'?0:bossSpecialOriginHandoff.groundOffsetX,specialOriginGroundOffsetY=enemy.type==='boss'?0:bossSpecialOriginHandoff.groundOffsetY;
       ctx.translate(groundContact.offsetX * shadowMotionScale - motionPresentation.shadowOffsetX * shadowMotionScale + specialistGroundFollowX + bossGroundRebase.groundOffsetX + specialOriginGroundOffsetX, groundContact.offsetY * 0.35 + attackWeightSettle * attackScale + bossGroundRebase.groundOffsetY + specialOriginGroundOffsetY + spawnGroundMaterialize.groundOffsetY);
-      ctx.fillStyle = `rgba(8,12,18,${Math.min(0.42, (groundContact.alpha + locomotionShadowBoost + recoveryShadowBoost)*bossSpecialOriginHandoff.shadowAlphaScale*spawnGroundMaterialize.shadowAlphaScale)})`;
+      ctx.fillStyle = `rgba(8,12,18,${Math.min(0.46, (groundContact.alpha + locomotionShadowBoost + recoveryShadowBoost + imagePresenceShadowAlphaBoost)*bossSpecialOriginHandoff.shadowAlphaScale*spawnGroundMaterialize.shadowAlphaScale)})`;
       ctx.beginPath();
       ctx.ellipse(motionPresentation.shadowOffsetX * shadowMotionScale, enemy.radius + 8 + motionPresentation.shadowOffsetY * shadowMotionScale, Math.max(ownedShadowWidth, groundContact.width), Math.max(ownedShadowHeight, groundContact.height), 0, 0, Math.PI * 2);
       ctx.fill();
@@ -1151,7 +1153,7 @@ export class EnemyManager {
         ctx.restore();
       }
       ctx.save();
-      ctx.globalAlpha = spritePresentation.visible || bossPresentation?.visible ? 0.22 : 1;
+      ctx.globalAlpha = bossPresentation?.visible ? bossPresentation.bodyAlpha : spritePresentation.bodyAlpha;
       ctx.fillStyle = enemy.hitFlash > 0 ? '#ffffff' : enemy.color;
       ctx.beginPath(); ctx.arc(0, 0, enemy.radius, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = enemy.target === 'core' ? '#76dbff' : 'rgba(18,23,31,.9)'; ctx.lineWidth = 3; ctx.stroke();
@@ -1159,7 +1161,11 @@ export class EnemyManager {
       if (spritePresentation.visible && spriteAtlasImage && isEnemySpriteType(enemy.type)) {
         const sprite = enemySpriteRect(enemy.type);
         const size = spritePresentation.drawSize;
+        ctx.save();
+        ctx.shadowColor='rgba(6,10,16,.72)';
+        ctx.shadowBlur=spritePresentation.imageShadowBlur;
         ctx.drawImage(spriteAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, -size / 2, -size / 2, size, size);
+        ctx.restore();
         if (enemy.hitFlash > 0) {
           ctx.save(); ctx.globalAlpha = 0.38; ctx.fillStyle = '#ffffff';
           ctx.beginPath(); ctx.arc(0, 0, enemy.radius * 0.82, 0, Math.PI * 2); ctx.fill(); ctx.restore();
@@ -1168,7 +1174,11 @@ export class EnemyManager {
       if (bossPresentation?.visible && bossSpriteAtlasImage && bossArchetype) {
         const sprite = bossSpriteRect(bossArchetype);
         const size = bossPresentation.drawSize;
+        ctx.save();
+        ctx.shadowColor='rgba(20,8,18,.78)';
+        ctx.shadowBlur=bossPresentation.imageShadowBlur;
         ctx.drawImage(bossSpriteAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, -size / 2, -size / 2, size, size);
+        ctx.restore();
         if (enemy.hitFlash > 0) {
           ctx.save(); ctx.globalAlpha = 0.34; ctx.fillStyle = '#ffffff';
           ctx.beginPath(); ctx.arc(0, 0, enemy.radius * 0.86, 0, Math.PI * 2); ctx.fill(); ctx.restore();

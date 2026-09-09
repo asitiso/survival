@@ -61,10 +61,15 @@ test('phase 4849 dense combat suppresses decorative terrain while preserving obs
   const { battlefieldDepthTerrainPresentation } = api();
   const calmView = battlefieldDepthTerrainPresentation(calm);
   const denseView = battlefieldDepthTerrainPresentation({ ...calm, battlefieldStress: 1 });
+  const overDenseView = battlefieldDepthTerrainPresentation({ ...calm, battlefieldStress: 99 });
+  const belowCalmView = battlefieldDepthTerrainPresentation({ ...calm, battlefieldStress: -5 });
   assert.ok(denseView.ground.edgeAlpha <= calmView.ground.edgeAlpha * 0.50 + 1e-6);
   assert.ok(denseView.lane.alpha <= calmView.lane.alpha * 0.50 + 1e-6);
   assert.ok(denseView.obstacle.edgeAlpha >= calmView.obstacle.edgeAlpha * 0.70);
   assert.ok(denseView.core.foundationAlpha >= calmView.core.foundationAlpha * 0.70);
+  assert.equal(overDenseView.ground.edgeAlpha, denseView.ground.edgeAlpha);
+  assert.equal(overDenseView.core.foundationAlpha, denseView.core.foundationAlpha);
+  assert.equal(belowCalmView.ground.edgeAlpha, calmView.ground.edgeAlpha);
 });
 
 test('phase 4850 accessibility removes environmental pulse and live integration stays presentation-only', () => {
@@ -84,10 +89,14 @@ test('phase 4850 accessibility removes environmental pulse and live integration 
 
   const terrainSource = readFileSync(new URL('../src/game/terrain.ts', import.meta.url), 'utf8');
   const gameSource = readFileSync(new URL('../src/game/game.ts', import.meta.url), 'utf8');
-  assert.match(terrainSource, /battlefieldDepthTerrainPresentation|BattlefieldDepthTerrainPresentation/);
+  assert.match(terrainSource, /render\(ctx: CanvasRenderingContext2D, motion\?: ResidualCombatMotionPolicy, readability\?: BattlefieldDepthTerrainPresentation\)/);
   assert.match(terrainSource, /contactShadowAlpha/);
   assert.match(gameSource, /battlefieldDepthTerrainPresentation/);
   assert.match(gameSource, /drawBattlefieldTerrainReadability/);
   assert.match(gameSource, /foundationRadius/);
+  const renderIndex = terrainSource.indexOf('render(ctx: CanvasRenderingContext2D');
+  assert.ok(renderIndex > 0);
+  const gameplayCollisionSlice = terrainSource.slice(0, renderIndex);
+  assert.doesNotMatch(gameplayCollisionSlice, /contactShadowAlpha|foundationRadius|ringRadius/);
   assert.doesNotMatch(gameSource, /this\.(hero|core)\.(pos|radius)\s*=.*battlefieldDepthTerrainPresentation/);
 });

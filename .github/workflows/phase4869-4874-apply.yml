@@ -34,84 +34,47 @@ jobs:
           elif new_import not in source:
               raise SystemExit('terrain foreground import marker not found')
 
-          old_foreground = """      const foreground = terrainForegroundOcclusionPresentation({
-        wallWidth: wall.w,
-        wallHeight: wall.h,
-        battlefieldStress,
-        reducedFlash: this.presentationSettings.reducedFlash,
-      });
-      let criticalThreatOcclusion = criticalThreatOcclusionArbitrationPresentation({ threatClass: 'none', overlap: 0 });
-"""
-          new_foreground = """      const foreground = terrainForegroundOcclusionPresentation({
-        wallWidth: wall.w,
-        wallHeight: wall.h,
-        battlefieldStress,
-        reducedFlash: this.presentationSettings.reducedFlash,
-      });
-      const registration = terrainForegroundSpriteRegistration({
-        wallX: wall.x,
-        wallY: wall.y,
-        wallWidth: wall.w,
-        wallHeight: wall.h,
-        spriteCropRatio: foreground.spriteCropRatio,
-      });
-      let criticalThreatOcclusion = criticalThreatOcclusionArbitrationPresentation({ threatClass: 'none', overlap: 0 });
-"""
+          old_foreground = "      const foreground = terrainForegroundOcclusionPresentation({\n        wallWidth: wall.w,\n        wallHeight: wall.h,\n        battlefieldStress,\n        reducedFlash: this.presentationSettings.reducedFlash,\n      });\n      let criticalThreatOcclusion = criticalThreatOcclusionArbitrationPresentation({ threatClass: 'none', overlap: 0 });\n"
+          new_foreground = "      const foreground = terrainForegroundOcclusionPresentation({\n        wallWidth: wall.w,\n        wallHeight: wall.h,\n        battlefieldStress,\n        reducedFlash: this.presentationSettings.reducedFlash,\n      });\n      const registration = terrainForegroundSpriteRegistration({\n        wallX: wall.x,\n        wallY: wall.y,\n        wallWidth: wall.w,\n        wallHeight: wall.h,\n        spriteCropRatio: foreground.spriteCropRatio,\n      });\n      let criticalThreatOcclusion = criticalThreatOcclusionArbitrationPresentation({ threatClass: 'none', overlap: 0 });\n"
           if old_foreground in source:
               source = source.replace(old_foreground, new_foreground, 1)
           elif new_foreground not in source:
               raise SystemExit('foreground registration insertion marker not found')
 
-          old_overlap = """          wallX: wall.x - 4,
-          wallY: wall.y - 3,
-          wallWidth: wall.w + 8,
-          capHeight: foreground.capHeight + 4,
-"""
-          new_overlap = """          wallX: registration.capDrawX,
-          wallY: registration.capDrawY,
-          wallWidth: registration.capDrawWidth,
-          capHeight: registration.capDrawHeight,
-"""
+          old_overlap = "          wallX: wall.x - 4,\n          wallY: wall.y - 3,\n          wallWidth: wall.w + 8,\n          capHeight: foreground.capHeight + 4,\n"
+          new_overlap = "          wallX: registration.capDrawX,\n          wallY: registration.capDrawY,\n          wallWidth: registration.capDrawWidth,\n          capHeight: registration.capDrawHeight,\n"
           if old_overlap in source:
               source = source.replace(old_overlap, new_overlap, 1)
           elif new_overlap not in source:
               raise SystemExit('critical overlap registration marker not found')
 
-          old_destination = """      const destinationHeight = foreground.capHeight + 4;
-      const destinationX = wall.x - 4;
-      const destinationY = wall.y - 3;
-      const destinationWidth = wall.w + 8;
-"""
+          old_destination = "      const destinationHeight = foreground.capHeight + 4;\n      const destinationX = wall.x - 4;\n      const destinationY = wall.y - 3;\n      const destinationWidth = wall.w + 8;\n"
           if old_destination in source:
               source = source.replace(old_destination, '', 1)
 
-          replacements = {
-              "          destinationX,\n          destinationY,\n          destinationWidth,\n          destinationHeight,": "          registration.capDrawX,\n          registration.capDrawY,\n          registration.capDrawWidth,\n          registration.capDrawHeight,",
-              "        ctx.fillRect(wall.x, wall.y, wall.w, foreground.capHeight);": "        ctx.fillRect(registration.capDrawX, registration.capDrawY, registration.capDrawWidth, registration.capDrawHeight);",
-              "      ctx.moveTo(wall.x + 2, wall.y + 1);\n      ctx.lineTo(wall.x + Math.max(2, wall.w - 2), wall.y + 1);": "      ctx.moveTo(registration.capDrawX + 2, registration.capDrawY + 1);\n      ctx.lineTo(registration.capDrawX + Math.max(2, registration.capDrawWidth - 2), registration.capDrawY + 1);",
-          }
-          for old, new in replacements.items():
-              if old in source:
-                  source = source.replace(old, new, 1)
-              elif new not in source:
-                  raise SystemExit(f'registration draw marker not found: {old[:40]}')
+          old_draw = "          destinationX,\n          destinationY,\n          destinationWidth,\n          destinationHeight,"
+          new_draw = "          registration.capDrawX,\n          registration.capDrawY,\n          registration.capDrawWidth,\n          registration.capDrawHeight,"
+          if old_draw in source:
+              source = source.replace(old_draw, new_draw, 1)
+          elif new_draw not in source:
+              raise SystemExit('foreground draw registration marker not found')
 
-          old_overlay = """    for (const wall of this.terrain.walls) {
-      const drawWidth = Math.max(wall.w + 18, 72);
-      const drawHeight = Math.max(wall.h + 18, 72);
-      const dx = wall.x + wall.w / 2 - drawWidth / 2;
-      const dy = wall.y + wall.h / 2 - drawHeight / 2;
-"""
-          new_overlay = """    for (const wall of this.terrain.walls) {
-      const registration = terrainForegroundSpriteRegistration({
-        wallX: wall.x,
-        wallY: wall.y,
-        wallWidth: wall.w,
-        wallHeight: wall.h,
-        spriteCropRatio: 0,
-      });
-      const { drawX: dx, drawY: dy, drawWidth, drawHeight } = registration;
-"""
+          old_fallback = "        ctx.fillRect(wall.x, wall.y, wall.w, foreground.capHeight);"
+          new_fallback = "        ctx.fillRect(registration.capDrawX, registration.capDrawY, registration.capDrawWidth, registration.capDrawHeight);"
+          if old_fallback in source:
+              source = source.replace(old_fallback, new_fallback, 1)
+          elif new_fallback not in source:
+              raise SystemExit('foreground fallback registration marker not found')
+
+          old_edge = "      ctx.moveTo(wall.x + 2, wall.y + 1);\n      ctx.lineTo(wall.x + Math.max(2, wall.w - 2), wall.y + 1);"
+          new_edge = "      ctx.moveTo(registration.capDrawX + 2, registration.capDrawY + 1);\n      ctx.lineTo(registration.capDrawX + Math.max(2, registration.capDrawWidth - 2), registration.capDrawY + 1);"
+          if old_edge in source:
+              source = source.replace(old_edge, new_edge, 1)
+          elif new_edge not in source:
+              raise SystemExit('foreground edge registration marker not found')
+
+          old_overlay = "    for (const wall of this.terrain.walls) {\n      const drawWidth = Math.max(wall.w + 18, 72);\n      const drawHeight = Math.max(wall.h + 18, 72);\n      const dx = wall.x + wall.w / 2 - drawWidth / 2;\n      const dy = wall.y + wall.h / 2 - drawHeight / 2;\n"
+          new_overlay = "    for (const wall of this.terrain.walls) {\n      const registration = terrainForegroundSpriteRegistration({\n        wallX: wall.x,\n        wallY: wall.y,\n        wallWidth: wall.w,\n        wallHeight: wall.h,\n        spriteCropRatio: 0,\n      });\n      const { drawX: dx, drawY: dy, drawWidth, drawHeight } = registration;\n"
           if old_overlay in source:
               source = source.replace(old_overlay, new_overlay, 1)
           elif new_overlay not in source:

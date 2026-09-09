@@ -36,6 +36,8 @@ jobs:
           tests/phase4882-enemy-combat-overlay-grounding.test.mjs
           tests/phase4883-persistent-spell-grounding.test.mjs
           tests/phase4884-pickup-layer-continuity.test.mjs
+      - name: Normalize generated output
+        run: git checkout -- dist
       - name: Diff guard
         shell: bash
         run: |

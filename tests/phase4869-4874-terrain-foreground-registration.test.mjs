@@ -95,6 +95,8 @@ test('phase 4874 full obstacle overlay foreground cap and critical overlap share
   assert.match(gameSource, /wallY:\s*registration\.capDrawY/);
   assert.match(gameSource, /wallWidth:\s*registration\.capDrawWidth/);
   assert.match(gameSource, /capHeight:\s*registration\.capDrawHeight/);
+  assert.match(gameSource, /const sourceHeight = Math\.max\(1, sprite\.sh \* foreground\.spriteCropRatio\);/);
+  assert.doesNotMatch(gameSource, /Math\.round\(sprite\.sh \* foreground\.spriteCropRatio\)/);
   assert.doesNotMatch(gameSource, /const destinationX = wall\.x - 4/);
   assert.doesNotMatch(gameSource, /const destinationWidth = wall\.w \+ 8/);
 });

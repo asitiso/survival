@@ -95,6 +95,7 @@ import { bossHazardActivationDensityBudgetPresentation, bossHazardFootprintDensi
 import { bossClearedGroundSafeLaneRecoveryCoherencePresentation, bossClearedGroundSafeLaneRecoveryHandoffPresentation, bossClearedGroundSafeLaneRecoveryDensityBudgetPresentation, bossHazardAftermathDensityBudgetPresentation, bossHazardAftermathOwnerArbitrationPresentation, bossHazardEndAftermathOwnershipPresentation, bossHazardExpirationGroundStateDensityBudgetPresentation, bossHazardExpirationGroundStateHandoffPresentation, bossHazardLifecycleOwnerPresentation, bossHazardPersistentExpirationGroundStatePresentation, bossHazardRespawnGroundCoherencePresentation, bossHazardRespawnGroundDensityBudgetPresentation, bossHazardRespawnGroundHandoffPresentation, bossHazardRespawnMaterializationDensityBudgetPresentation, bossHazardRespawnMaterializationOwnershipPresentation, bossHazardRespawnMaterializationSettlePresentation } from './boss-hazard-lifecycle-owner-rendering.js';
 import { bossGroundOriginRebasePresentation } from './boss-ground-origin-rebase-rendering.js';
 import { enemyDeathTransitionPresentation, enemyFinisherDeathAfterglowContinuityPresentation, enemyFinisherDeathAfterglowHandoffPresentation, enemyFinisherDeathAfterglowDensityBudgetPresentation } from './enemy-hit-death-transition-rendering.js';
+import { stableWorldYDepthOrdered } from './enemy-actor-depth-ordering.js';
 import { specialistDefeatGroundRetirementPresentation } from './specialist-defeat-ground-retirement-rendering.js';
 import { regularDefeatGroundRetirementPresentation, type RegularDefeatGroundType } from './regular-defeat-ground-retirement-rendering.js';
 import { characterGroundContactPresentation, characterHitRecoilPresentation } from './character-contact-recoil-rendering.js';
@@ -3827,7 +3828,7 @@ export class Game {
 
   private drawEnemyDefeatBodyTransitions(ctx:CanvasRenderingContext2D):void{
     this.enemyDefeatBodyTransitions=this.enemyDefeatBodyTransitions.filter((cue)=>cue.until>this.elapsed);
-    for(const cue of this.enemyDefeatBodyTransitions){
+    for(const cue of stableWorldYDepthOrdered(this.enemyDefeatBodyTransitions, (cue)=>cue.death.y)){
       const pose=cue.death.deathPose;if(!pose||!isEnemySpriteType(cue.death.type))continue;
       const duration=Math.max(.001,cue.until-cue.startedAt),progress=Math.max(0,Math.min(1,(this.elapsed-cue.startedAt)/duration));
       const body=enemyDeathTransitionPresentation(cue.death.type,pose,progress,this.presentationSettings.reducedMotion);

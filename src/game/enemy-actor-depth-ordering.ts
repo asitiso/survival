@@ -4,19 +4,22 @@ export interface EnemyActorDepthLike {
   };
 }
 
-interface IndexedActor<T extends EnemyActorDepthLike> {
-  actor: T;
+interface IndexedDepthItem<T> {
+  item: T;
   index: number;
   depthY: number;
   finiteDepth: boolean;
 }
 
-export function enemyActorDepthOrdered<T extends EnemyActorDepthLike>(actors: readonly T[]): T[] {
-  return actors
-    .map<IndexedActor<T>>((actor, index) => {
-      const depthY = actor.pos.y;
+export function stableWorldYDepthOrdered<T>(
+  items: readonly T[],
+  depthYFor: (item: T) => number,
+): T[] {
+  return items
+    .map<IndexedDepthItem<T>>((item, index) => {
+      const depthY = depthYFor(item);
       return {
-        actor,
+        item,
         index,
         depthY,
         finiteDepth: Number.isFinite(depthY),
@@ -27,5 +30,9 @@ export function enemyActorDepthOrdered<T extends EnemyActorDepthLike>(actors: re
       if (a.finiteDepth && b.finiteDepth && a.depthY !== b.depthY) return a.depthY - b.depthY;
       return a.index - b.index;
     })
-    .map(({ actor }) => actor);
+    .map(({ item }) => item);
+}
+
+export function enemyActorDepthOrdered<T extends EnemyActorDepthLike>(actors: readonly T[]): T[] {
+  return stableWorldYDepthOrdered(actors, (actor) => actor.pos.y);
 }

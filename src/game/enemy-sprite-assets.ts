@@ -24,9 +24,9 @@ const CELL_BY_TYPE: Readonly<Record<EnemySpriteType, readonly [column: number, r
 };
 
 const SIZE_SCALE: Readonly<Record<EnemySpriteType, number>> = {
-  grunt: 2.55, hound: 2.85, brute: 2.35, archer: 2.65,
-  bomber: 2.6, shaman: 2.55, shieldbearer: 2.5, assassin: 2.78,
-  siegeGolem: 2.3, nullifier: 2.5, golden: 2.62, elite: 2.25,
+  grunt: 2.78, hound: 3.05, brute: 2.55, archer: 2.85,
+  bomber: 2.82, shaman: 2.75, shieldbearer: 2.70, assassin: 3.00,
+  siegeGolem: 2.52, nullifier: 2.72, golden: 2.84, elite: 3.00,
 };
 
 export interface EnemySpriteRect { sx: number; sy: number; sw: number; sh: number; }
@@ -36,6 +36,10 @@ export interface EnemySpritePresentation {
   motionAmplitude: 0;
   drawSize: number;
   fallbackBodyVisible: true;
+  bodyAlpha: number;
+  groundShadowScale: number;
+  groundShadowAlphaBoost: number;
+  imageShadowBlur: number;
 }
 
 export function isEnemySpriteType(type: EnemyType): type is EnemySpriteType { return type !== 'boss'; }
@@ -48,12 +52,18 @@ export function enemySpriteRect(type: EnemySpriteType): EnemySpriteRect {
 export function enemySpritePresentation(type: EnemyType, radius: number, atlasReady: boolean): EnemySpritePresentation {
   const spriteType = isEnemySpriteType(type) ? type : null;
   const safeRadius = Math.max(12, Math.min(40, Number.isFinite(radius) ? radius : 18));
+  const visible = Boolean(spriteType && atlasReady);
+  const elite = spriteType === 'elite';
   return {
-    visible: Boolean(spriteType && atlasReady),
+    visible,
     animated: false,
     motionAmplitude: 0,
     drawSize: spriteType ? Math.round(safeRadius * SIZE_SCALE[spriteType]) : 0,
     fallbackBodyVisible: true,
+    bodyAlpha: visible ? (elite ? 0.12 : 0.16) : 1,
+    groundShadowScale: visible ? (elite ? 1.14 : 1.06) : 1,
+    groundShadowAlphaBoost: visible ? (elite ? 0.08 : 0.03) : 0,
+    imageShadowBlur: visible ? (elite ? 9 : 5) : 0,
   };
 }
 

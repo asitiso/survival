@@ -1,4 +1,4 @@
-name: Phase 4869-4874 Applicator
+name: Phase 4869-4874 Applicator Retry
 
 on:
   push:

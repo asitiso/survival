@@ -1,0 +1,202 @@
+from pathlib import Path
+
+helper = Path('src/game/persistent-spell-ground-ordering.ts')
+helper.write_text("""import { stableWorldYDepthOrdered } from './enemy-actor-depth-ordering.js';
+
+export interface PersistentSpellGroundPositioned {
+  pos: { y: number };
+}
+
+export type PersistentSpellGroundCue<F, H, E, R> =
+  | { kind: 'field'; value: F; y: number }
+  | { kind: 'hole'; value: H; y: number }
+  | { kind: 'expire'; value: E; y: number }
+  | { kind: 'residue'; value: R; y: number };
+
+export function persistentSpellGroundLayerCues<
+  F extends PersistentSpellGroundPositioned,
+  H extends PersistentSpellGroundPositioned,
+  E extends PersistentSpellGroundPositioned,
+  R extends PersistentSpellGroundPositioned,
+>(sources: {
+  fields: readonly F[];
+  holes: readonly H[];
+  expiries: readonly E[];
+  residues: readonly R[];
+}): Array<PersistentSpellGroundCue<F, H, E, R>> {
+  const combined: Array<PersistentSpellGroundCue<F, H, E, R>> = [
+    ...sources.fields.map((value): PersistentSpellGroundCue<F, H, E, R> => ({ kind: 'field', value, y: value.pos.y })),
+    ...sources.holes.map((value): PersistentSpellGroundCue<F, H, E, R> => ({ kind: 'hole', value, y: value.pos.y })),
+    ...sources.expiries.map((value): PersistentSpellGroundCue<F, H, E, R> => ({ kind: 'expire', value, y: value.pos.y })),
+    ...sources.residues.map((value): PersistentSpellGroundCue<F, H, E, R> => ({ kind: 'residue', value, y: value.pos.y })),
+  ];
+  return stableWorldYDepthOrdered(combined, (cue) => cue.y);
+}
+""")
+
+spells_path = Path('src/game/spells.ts')
+source = spells_path.read_text()
+
+import_anchor = "import { secondaryImpactLineageLabelCapacityBudget } from './secondary-impact-lineage-label-capacity-budget-rendering.js';"
+import_line = "import { persistentSpellGroundLayerCues } from './persistent-spell-ground-ordering.js';"
+if import_line not in source:
+    if source.count(import_anchor) != 1:
+        raise SystemExit(f'import anchor count {source.count(import_anchor)}')
+    source = source.replace(import_anchor, import_anchor + '\n' + import_line, 1)
+
+render_marker = '  render(ctx: CanvasRenderingContext2D, motion?: ResidualCombatMotionPolicy'
+render_index = source.find(render_marker)
+if render_index < 0:
+    raise SystemExit('render marker missing')
+
+ground_method = """  renderGroundLayer(ctx: CanvasRenderingContext2D, motion?: ResidualCombatMotionPolicy, propVfxAtlasImage?: HTMLImageElement | null, propVfxAtlasReady = false, heroSpellSignatureAtlasImage?: HTMLImageElement | null, heroSpellSignatureAtlasReady = false, ultimateSignatureAtlasImage?: HTMLImageElement | null, ultimateSignatureAtlasReady = false, persistentSpellZoneVfxAtlasImage?: HTMLImageElement | null, persistentSpellZoneVfxAtlasReady = false, crowdControlPropagationVfxAtlasImage?: HTMLImageElement | null, crowdControlPropagationVfxAtlasReady = false, reducedFlash = false, ultimatePostImpactResidueVfxAtlasImage?: HTMLImageElement | null, ultimatePostImpactResidueVfxAtlasReady = false): void {
+    const drawVfxStamp = (id: 'fireBolt' | 'chainLightning' | 'frostNova' | 'flameField' | 'meteorStorm' | 'blackHole', x: number, y: number, size: number, alpha: number): void => {
+      if (!propVfxAtlasReady || !propVfxAtlasImage || alpha <= 0 || size <= 0) return;
+      const sprite = battlefieldSpellVfxSprite(id);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.drawImage(propVfxAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, x - size / 2, y - size / 2, size, size);
+      ctx.restore();
+    };
+    const groundCues = persistentSpellGroundLayerCues({
+      fields: this.fields,
+      holes: this.holes,
+      expiries: this.persistentZoneExpireVfx,
+      residues: this.ultimatePostImpactResidues,
+    });
+    for (const groundCue of groundCues) {
+      if (groundCue.kind === 'field') {
+        const field = groundCue.value;
+        ctx.save();
+        const g = ctx.createRadialGradient(field.pos.x, field.pos.y, 10, field.pos.x, field.pos.y, field.radius);
+        g.addColorStop(0, `${field.primary}55`); g.addColorStop(.65, `${field.secondary}33`); g.addColorStop(1, `${field.secondary}00`);
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(field.pos.x, field.pos.y, field.radius, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = `${field.primary}88`; ctx.lineWidth = 3; ctx.stroke();
+        const fieldAlpha = Math.min(0.72, 0.28 + Math.max(0, Math.min(1, field.ttl / 1.4)) * 0.44);
+        drawVfxStamp(field.spriteId, field.pos.x, field.pos.y, field.radius * 2.05, fieldAlpha);
+        if (heroSpellSignatureAtlasReady && heroSpellSignatureAtlasImage) {
+          const sprite = heroSpellSignatureVfxSprite(field.heroId, 'flameField');
+          const size = field.radius * 2.1;
+          ctx.save(); ctx.globalAlpha = Math.min(0.62, fieldAlpha * 0.82);
+          ctx.drawImage(heroSpellSignatureAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, field.pos.x - size / 2, field.pos.y - size / 2, size, size);
+          ctx.restore();
+        }
+        if (persistentSpellZoneVfxAtlasReady && persistentSpellZoneVfxAtlasImage) {
+          const progress = 1 - Math.max(0, field.ttl / Math.max(0.001, field.maxTtl));
+          const enterSprite = persistentSpellZoneVfxSprite(field.heroId,'flameField','enter');
+          const activeSprite = persistentSpellZoneVfxSprite(field.heroId,'flameField','active');
+          const sprite = progress < 0.18 ? enterSprite : activeSprite;
+          const size = field.radius * 2.28;
+          ctx.save(); ctx.globalAlpha = progress < 0.18 ? 0.76 : 0.48;
+          ctx.drawImage(persistentSpellZoneVfxAtlasImage,sprite.sx,sprite.sy,sprite.sw,sprite.sh,field.pos.x-size/2,field.pos.y-size/2,size,size); ctx.restore();
+        }
+        ctx.restore();
+        continue;
+      }
+      if (groundCue.kind === 'hole') {
+        const hole = groundCue.value;
+        ctx.save();
+        const choreography=hole.choreography;
+        const blackHoleMotionAmplitude = motion?.blackHoleMotionAmplitude ?? 0.05;
+        const orbitMotionScale = motion ? (motion.owner === 'black-hole-vortex' ? 1 : 0) : 1;
+        const pulse = 0.92 + Math.sin(hole.ttl * 8) * blackHoleMotionAmplitude;
+        const g = ctx.createRadialGradient(hole.pos.x, hole.pos.y, 10, hole.pos.x, hole.pos.y, hole.radius * pulse);
+        g.addColorStop(0, 'rgba(8,8,18,.98)'); g.addColorStop(.45, `${hole.secondary}99`); g.addColorStop(1, `${hole.primary}00`);
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(hole.pos.x, hole.pos.y, hole.radius * pulse, 0, Math.PI * 2); ctx.fill();
+        if(choreography.motion==='orbit') for(let i=0;i<choreography.orbitCount;i++){ const r=hole.radius*(.38+i*.16); const movingPhase=Math.sin(hole.ttl*2+i); const staticPhase=i*.83; const orbitPhase=staticPhase+(movingPhase-staticPhase)*orbitMotionScale; ctx.globalAlpha=Math.min(.62,choreography.glowAlpha+.12); ctx.strokeStyle=i%2?hole.secondary:hole.primary; ctx.lineWidth=1.5+i*.55; ctx.beginPath(); ctx.arc(hole.pos.x,hole.pos.y,r,orbitPhase,orbitPhase+Math.PI*1.35); ctx.stroke(); }
+        ctx.globalAlpha=.9; ctx.strokeStyle = `${hole.primary}88`; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(hole.pos.x,hole.pos.y,hole.radius*pulse,0,Math.PI*2); ctx.stroke();
+        drawVfxStamp(hole.spriteId, hole.pos.x, hole.pos.y, hole.radius * 2.15, 0.38);
+        if (ultimateSignatureAtlasReady && ultimateSignatureAtlasImage) {
+          const sprite = heroUltimateSignatureVfxSprite(hole.heroId, 'blackHole');
+          const size = hole.radius * 2.24;
+          ctx.save(); ctx.globalAlpha = 0.58;
+          ctx.drawImage(ultimateSignatureAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, hole.pos.x - size / 2, hole.pos.y - size / 2, size, size);
+          ctx.restore();
+        }
+        if (persistentSpellZoneVfxAtlasReady && persistentSpellZoneVfxAtlasImage) {
+          const progress = 1 - Math.max(0, hole.ttl / Math.max(0.001, hole.maxTtl));
+          const enterSprite = persistentSpellZoneVfxSprite(hole.heroId,'blackHole','enter');
+          const activeSprite = persistentSpellZoneVfxSprite(hole.heroId,'blackHole','active');
+          const sprite = progress < 0.18 ? enterSprite : activeSprite;
+          const size = hole.radius * 2.22;
+          ctx.save(); ctx.globalAlpha = progress < 0.18 ? 0.72 : 0.46;
+          ctx.drawImage(persistentSpellZoneVfxAtlasImage,sprite.sx,sprite.sy,sprite.sw,sprite.sh,hole.pos.x-size/2,hole.pos.y-size/2,size,size); ctx.restore();
+        }
+        if (crowdControlPropagationVfxAtlasReady && crowdControlPropagationVfxAtlasImage) {
+          const sprite=crowdControlPropagationVfxSprite(hole.heroId,'blackHole');
+          const size=hole.radius * 2.34;
+          ctx.save();ctx.globalAlpha=reducedFlash ? 0.32 : 0.58;
+          ctx.drawImage(crowdControlPropagationVfxAtlasImage,sprite.sx,sprite.sy,sprite.sw,sprite.sh,hole.pos.x-size/2,hole.pos.y-size/2,size,size);ctx.restore();
+        }
+        ctx.restore();
+        continue;
+      }
+      if (groundCue.kind === 'expire') {
+        if (!persistentSpellZoneVfxAtlasReady || !persistentSpellZoneVfxAtlasImage) continue;
+        const cue = groundCue.value;
+        const sprite = persistentSpellZoneVfxSprite(cue.heroId,cue.kind,'expire');
+        const progress = 1 - Math.max(0, cue.ttl / cue.maxTtl);
+        const size = cue.radius * (2.1 + progress * 0.34);
+        ctx.save(); ctx.globalAlpha = Math.max(0, 1 - progress) * 0.66;
+        ctx.drawImage(persistentSpellZoneVfxAtlasImage,sprite.sx,sprite.sy,sprite.sw,sprite.sh,cue.pos.x-size/2,cue.pos.y-size/2,size,size); ctx.restore();
+        continue;
+      }
+      if (!ultimatePostImpactResidueVfxAtlasReady || !ultimatePostImpactResidueVfxAtlasImage) continue;
+      const cue = groundCue.value;
+      const sprite=ultimatePostImpactResidueVfxSprite(cue.heroId,cue.kind);
+      const progress=1-Math.max(0,cue.ttl / cue.maxTtl);
+      const size=cue.radius * 2.18 * (1+progress*.18);
+      ctx.save();ctx.globalAlpha=Math.max(0,1-progress)*(reducedFlash ? 0.30 : 0.56);
+      ctx.drawImage(ultimatePostImpactResidueVfxAtlasImage,sprite.sx,sprite.sy,sprite.sw,sprite.sh,cue.pos.x-size/2,cue.pos.y-size/2,size,size);ctx.restore();
+    }
+  }
+
+"""
+source = source[:render_index] + ground_method + source[render_index:]
+
+old_sig_tail = "bossTelegraphZones:readonly {pos:Vec2;radius:number}[]=[]): void {"
+new_sig_tail = "bossTelegraphZones:readonly {pos:Vec2;radius:number}[]=[], includeGroundLayer = true): void {"
+if source.count(old_sig_tail) != 1:
+    raise SystemExit(f'render signature tail count {source.count(old_sig_tail)}')
+source = source.replace(old_sig_tail, new_sig_tail, 1)
+
+compat_anchor = new_sig_tail + "\n"
+compat_call = "    if (includeGroundLayer) this.renderGroundLayer(ctx, motion, propVfxAtlasImage, propVfxAtlasReady, heroSpellSignatureAtlasImage, heroSpellSignatureAtlasReady, ultimateSignatureAtlasImage, ultimateSignatureAtlasReady, persistentSpellZoneVfxAtlasImage, persistentSpellZoneVfxAtlasReady, crowdControlPropagationVfxAtlasImage, crowdControlPropagationVfxAtlasReady, reducedFlash, ultimatePostImpactResidueVfxAtlasImage, ultimatePostImpactResidueVfxAtlasReady);\n"
+source = source.replace(compat_anchor, compat_anchor + compat_call, 1)
+
+active_start = source.find('    for (const field of this.fields) {', source.find(render_marker))
+active_end = source.find('    for (const meteor of this.meteors) {', active_start)
+if active_start < 0 or active_end < 0:
+    raise SystemExit('active ground loop anchors missing')
+source = source[:active_start] + source[active_end:]
+
+expire_start = source.find('    if (persistentSpellZoneVfxAtlasReady && persistentSpellZoneVfxAtlasImage) {', source.find(render_marker))
+render_end_anchor = '\n  }\n\n  private castFireBolt'
+expire_end = source.find(render_end_anchor, expire_start)
+if expire_start < 0 or expire_end < 0:
+    raise SystemExit('retiring ground loop anchors missing')
+source = source[:expire_start] + source[expire_end:]
+spells_path.write_text(source)
+
+game_path = Path('src/game/game.ts')
+game = game_path.read_text()
+ground_anchor = '    this.drawBossPhaseTransitionVfx(ctx);\n    this.drawEnemySpawnLaneReadability(ctx);'
+ground_call = """    this.drawBossPhaseTransitionVfx(ctx);
+    this.spells.renderGroundLayer(ctx, residualMotion, this.battlefieldPropVfxAtlasImage, this.battlefieldPropVfxAtlasReady, this.heroSpellSignatureVfxAtlasImage, this.heroSpellSignatureVfxAtlasReady, this.heroUltimateSignatureVfxAtlasImage, this.heroUltimateSignatureVfxAtlasReady, this.persistentSpellZoneVfxAtlasImage, this.persistentSpellZoneVfxAtlasReady, this.crowdControlPropagationVfxAtlasImage, this.crowdControlPropagationVfxAtlasReady, this.presentationSettings.reducedFlash, this.ultimatePostImpactResidueVfxAtlasImage, this.ultimatePostImpactResidueVfxAtlasReady);
+    this.drawEnemySpawnLaneReadability(ctx);"""
+if game.count(ground_anchor) != 1:
+    raise SystemExit(f'game ground anchor count {game.count(ground_anchor)}')
+game = game.replace(ground_anchor, ground_call, 1)
+
+segment_start = game.find('    // Preserve the residual-motion render contract: this.spells.render(ctx, residualMotion)')
+segment_end = game.find('    this.drawFinalFormWorldVfx(ctx);', segment_start)
+if segment_start < 0 or segment_end < 0:
+    raise SystemExit('game spell render segment missing')
+segment = game[segment_start:segment_end]
+old_tail = 'this.bossArena.hazards.filter((hazard)=>hazard.telegraph>0).map((hazard)=>({pos:hazard.pos,radius:hazard.radius})));'
+new_tail = 'this.bossArena.hazards.filter((hazard)=>hazard.telegraph>0).map((hazard)=>({pos:hazard.pos,radius:hazard.radius})), false);'
+if segment.count(old_tail) != 1:
+    raise SystemExit(f'game render tail count {segment.count(old_tail)}')
+segment = segment.replace(old_tail, new_tail, 1)
+game = game[:segment_start] + segment + game[segment_end:]
+game_path.write_text(game)

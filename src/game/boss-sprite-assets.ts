@@ -24,12 +24,12 @@ const CELL_BY_ARCHETYPE: Readonly<Record<BossArchetype, readonly [column: number
 };
 
 const SIZE_SCALE: Readonly<Record<BossArchetype, number>> = {
-  inferno: 2.44,
-  summoner: 2.34,
-  juggernaut: 2.5,
-  abyssWitch: 2.38,
-  twinMaw: 2.42,
-  timeEater: 2.38,
+  inferno: 2.68,
+  summoner: 2.62,
+  juggernaut: 2.72,
+  abyssWitch: 2.64,
+  twinMaw: 2.67,
+  timeEater: 2.64,
 };
 
 export interface BossSpriteRect { sx: number; sy: number; sw: number; sh: number; }
@@ -39,6 +39,10 @@ export interface BossSpritePresentation {
   motionAmplitude: 0;
   drawSize: number;
   fallbackBodyVisible: true;
+  bodyAlpha: number;
+  groundShadowScale: number;
+  groundShadowAlphaBoost: number;
+  imageShadowBlur: number;
 }
 
 export function bossSpriteRect(archetype: BossArchetype): BossSpriteRect {
@@ -59,6 +63,10 @@ export function bossSpritePresentation(archetype: BossArchetype, radius: number,
     motionAmplitude: 0,
     drawSize: Math.round(safeRadius * SIZE_SCALE[archetype]),
     fallbackBodyVisible: true,
+    bodyAlpha: atlasReady ? 0.10 : 1,
+    groundShadowScale: atlasReady ? 1.22 : 1,
+    groundShadowAlphaBoost: atlasReady ? 0.10 : 0,
+    imageShadowBlur: atlasReady ? 12 : 0,
   };
 }
 

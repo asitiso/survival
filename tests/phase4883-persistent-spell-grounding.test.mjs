@@ -52,26 +52,71 @@ test('phase 4883 ordering is stable, finite-first, and never mutates lifecycle a
   assert.deepEqual(residues, before.residues);
 });
 
-test('phase 4883 game renders persistent spell ground layer below terrain foreground and combat spell layer above it', () => {
-  assert.match(
-    gameSource,
-    /this\.spells\.renderGroundLayer\([\s\S]*this\.drawTerrainForegroundOcclusion\(ctx\);[\s\S]*this\.spells\.render\(/,
-  );
-  assert.match(spellsSource, /renderGroundLayer\s*\(/);
-  assert.match(spellsSource, /includeGroundLayer\s*=\s*true/);
-  assert.match(spellsSource, /if\s*\(includeGroundLayer\)\s*this\.renderGroundLayer\(/);
+test('phase 4883 persistent readability cues share stable finite-first world-y ordering without mutating active zones', async () => {
+  const mod = await loadGroundOrdering();
+  assert.ok(mod, 'persistent spell ground ordering helper must exist');
+  assert.equal(typeof mod.persistentSpellReadabilityLayerCues, 'function');
+  const fields = [
+    { id: 'field-front', pos: { y: 260 } },
+    { id: 'field-back', pos: { y: 120 } },
+  ];
+  const holes = [
+    { id: 'hole-mid', pos: { y: 180 } },
+    { id: 'hole-nan', pos: { y: Number.NaN } },
+  ];
+  const before = { fields: [...fields], holes: [...holes] };
+  const ordered = mod.persistentSpellReadabilityLayerCues({ fields, holes });
+  assert.deepEqual(ordered.map((cue) => `${cue.kind}:${cue.value.id}`), [
+    'field:field-back',
+    'hole:hole-mid',
+    'field:field-front',
+    'hole:hole-nan',
+  ]);
+  assert.deepEqual(fields, before.fields);
+  assert.deepEqual(holes, before.holes);
 });
 
-test('phase 4883 ground layer owns field, black-hole, expire, and ultimate residue families without duplicate combat-layer loops', () => {
+test('phase 4883 game keeps physical persistent ground below terrain foreground while readability and combat layers stay above it', () => {
+  assert.match(
+    gameSource,
+    /this\.spells\.renderGroundLayer\([\s\S]*this\.drawTerrainForegroundOcclusion\(ctx\);[\s\S]*this\.spells\.renderPersistentReadabilityLayer\([\s\S]*this\.spells\.render\(/,
+  );
+  assert.match(spellsSource, /renderGroundLayer\s*\(/);
+  assert.match(spellsSource, /renderPersistentReadabilityLayer\s*\(/);
+  assert.match(spellsSource, /includeGroundLayer\s*=\s*true/);
+  assert.match(
+    spellsSource,
+    /if\s*\(includeGroundLayer\)\s*\{[\s\S]*this\.renderGroundLayer\([\s\S]*this\.renderPersistentReadabilityLayer\(/,
+  );
+});
+
+test('phase 4883 ground layer owns physical zone bodies and retirement cues without duplicate combat-layer loops', () => {
   assert.match(spellsSource, /persistentSpellGroundLayerCues\s*\(\{/);
   assert.match(spellsSource, /fields:\s*this\.fields/);
   assert.match(spellsSource, /holes:\s*this\.holes/);
   assert.match(spellsSource, /expiries:\s*this\.persistentZoneExpireVfx/);
   assert.match(spellsSource, /residues:\s*this\.ultimatePostImpactResidues/);
-  const renderStart = spellsSource.indexOf('  render(ctx: CanvasRenderingContext2D');
+
+  const groundStart = spellsSource.indexOf('  renderGroundLayer(');
+  const readabilityStart = spellsSource.indexOf('  renderPersistentReadabilityLayer(', groundStart);
+  const renderStart = spellsSource.indexOf('  render(ctx: CanvasRenderingContext2D', readabilityStart);
   const castStart = spellsSource.indexOf('  private castFireBolt', renderStart);
-  assert.ok(renderStart >= 0 && castStart > renderStart);
+  assert.ok(groundStart >= 0 && readabilityStart > groundStart && renderStart > readabilityStart && castStart > renderStart);
+
+  const groundSource = spellsSource.slice(groundStart, readabilityStart);
+  const readabilitySource = spellsSource.slice(readabilityStart, renderStart);
   const combatRenderSource = spellsSource.slice(renderStart, castStart);
+
+  assert.doesNotMatch(groundSource, /heroSpellSignatureVfxSprite/);
+  assert.doesNotMatch(groundSource, /heroUltimateSignatureVfxSprite/);
+  assert.doesNotMatch(groundSource, /crowdControlPropagationVfxSprite/);
+
+  assert.match(readabilitySource, /persistentSpellReadabilityLayerCues\s*\(\{/);
+  assert.match(readabilitySource, /heroSpellSignatureVfxSprite/);
+  assert.match(readabilitySource, /heroUltimateSignatureVfxSprite/);
+  assert.match(readabilitySource, /crowdControlPropagationVfxSprite/);
+  assert.doesNotMatch(readabilitySource, /persistentZoneExpireVfx|ultimatePostImpactResidues/);
+
   assert.doesNotMatch(combatRenderSource, /for \(const field of this\.fields\)/);
   assert.doesNotMatch(combatRenderSource, /for \(const hole of this\.holes\)/);
   assert.doesNotMatch(combatRenderSource, /for \(const cue of this\.persistentZoneExpireVfx\)/);

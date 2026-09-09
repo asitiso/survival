@@ -122,3 +122,10 @@ test('phase 4883 ground layer owns physical zone bodies and retirement cues with
   assert.doesNotMatch(combatRenderSource, /for \(const cue of this\.persistentZoneExpireVfx\)/);
   assert.doesNotMatch(combatRenderSource, /for \(const cue of this\.ultimatePostImpactResidues\)/);
 });
+
+test('phase 4883 persistent readability stays below protected tactical warning layers', () => {
+  assert.match(
+    gameSource,
+    /this\.drawTerrainForegroundOcclusion\(ctx\);[\s\S]*this\.spells\.renderPersistentReadabilityLayer\([\s\S]*this\.drawElitePackApproachFormationVfx\(ctx\);[\s\S]*this\.drawGoldenGoblinEventResponseIdentity\(ctx\);[\s\S]*this\.drawMythicTacticPrimedIcon\(ctx\);[\s\S]*this\.drawBossSpecialIntentCue\(ctx\);[\s\S]*this\.drawBossSafeResponseWindowConfirmation\(ctx\);/,
+  );
+});

@@ -3498,11 +3498,11 @@ export class Game {
     this.drawEnemySpawnLaneReadability(ctx);
     this.enemies.renderEnemies(ctx, this.enemySpriteAtlasImage, this.enemySpriteAtlasReady, this.bossSpriteAtlasImage, this.bossSpriteAtlasReady, residualMotion, this.eliteAffixIdentityAtlasImage, this.eliteAffixIdentityAtlasReady, this.specialistIntentAtlasImage, this.specialistIntentAtlasReady, this.hero.pos, this.specialistCombatVfxAtlasImage, this.specialistCombatVfxAtlasReady, this.bossPhaseOverlayVfxAtlasImage, this.bossPhaseOverlayVfxAtlasReady, this.battlefieldInteractionVfxAtlasImage, this.battlefieldInteractionVfxAtlasReady, this.spawnPressureVfxAtlasImage, this.spawnPressureVfxAtlasReady, this.regularEnemyActionVfxAtlasImage, this.regularEnemyActionVfxAtlasReady, this.eliteAffixLifecycleVfxAtlasImage, this.eliteAffixLifecycleVfxAtlasReady, this.enemyTargetPressureVfxAtlasImage, this.enemyTargetPressureVfxAtlasReady, this.core.pos, this.specialistReactionLifecycleVfxAtlasImage, this.specialistReactionLifecycleVfxAtlasReady, this.presentationSettings.reducedFlash, this.presentationSettings.reducedMotion, Math.min(1,this.bossArena.hazards.length/6));
     this.drawEnemyDefeatBodyTransitions(ctx);
-    this.drawTerrainForegroundOcclusion(ctx);
-    this.drawElitePackApproachFormationVfx(ctx);
     this.drawEnemyCombatImageVfx(ctx);
     this.drawEnemyFinisherVfx(ctx);
     this.drawFreezeShatterVfx(ctx);
+    this.drawTerrainForegroundOcclusion(ctx);
+    this.drawElitePackApproachFormationVfx(ctx);
     this.drawGoldenGoblinEventResponseIdentity(ctx);
     this.drawMythicTacticPrimedIcon(ctx);
     this.drawBossSpecialIntentCue(ctx);
@@ -3852,7 +3852,7 @@ export class Game {
     this.enemyDeathImageBursts = this.enemyDeathImageBursts.filter((burst) => burst.until > this.elapsed);
     if (!this.enemyCombatVfxAtlasReady || !this.enemyCombatVfxAtlasImage) return;
     const alphaCap = this.presentationSettings.reducedFlash ? 0.5 : 0.78;
-    for (const enemy of this.enemies.enemies) {
+    for (const enemy of stableWorldYDepthOrdered(this.enemies.enemies, (enemy) => enemy.pos.y)) {
       if (!enemy.alive || !isEnemyCombatVfxType(enemy.type) || enemy.hitFlash <= 0) continue;
       const sprite = enemyCombatVfxSprite(enemy.type, 'hit');
       const strength = Math.max(0, Math.min(1, enemy.hitFlash / 0.10));
@@ -3861,7 +3861,7 @@ export class Game {
       ctx.drawImage(this.enemyCombatVfxAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, enemy.pos.x - size / 2, enemy.pos.y - size / 2, size, size);
       ctx.restore();
     }
-    for (const burst of this.enemyDeathImageBursts) {
+    for (const burst of stableWorldYDepthOrdered(this.enemyDeathImageBursts, (burst) => burst.y)) {
       const duration = Math.max(0.001, burst.until - burst.startedAt);
       const progress = Math.max(0, Math.min(1, (this.elapsed - burst.startedAt) / duration));
       const sprite = enemyCombatVfxSprite(burst.type, 'death');
@@ -4095,7 +4095,7 @@ export class Game {
   }
 
   private drawEnemyFinisherVfx(ctx:CanvasRenderingContext2D):void{
-    if(!this.enemyFinisherVfxAtlasReady||!this.enemyFinisherVfxAtlasImage)return;const activeFinisherCount=this.enemyFinisherVfx.length;const finisherRank=new Map(this.enemyFinisherVfx.map((cue,index)=>[cue,Math.max(0,this.enemyFinisherVfx.length-1-index)]));for(const cue of this.enemyFinisherVfx){const progress=1-Math.max(0,cue.ttl/cue.maxTtl);const state=progress<0.38?'burst':'afterglow';const sprite=enemyFinisherVfxSprite(cue.source,state);const eliteScale=cue.enemyType==='boss'?1.55:cue.enemyType==='elite'?1.28:1;const size=(state==='burst'?92:108)*eliteScale*(1+progress*.18);const deathAfterglowContinuity=enemyFinisherDeathAfterglowContinuityPresentation({deathProgress:progress,finisherProgress:progress,tier:cue.tier},this.presentationSettings.reducedMotion,this.presentationSettings.reducedFlash);const deathAfterglowHandoff=enemyFinisherDeathAfterglowHandoffPresentation({owner:deathAfterglowContinuity.owner,deathProgress:progress,afterglowAlpha:deathAfterglowContinuity.afterglowAlphaScale},this.presentationSettings.reducedMotion);const deathAfterglowDensity=enemyFinisherDeathAfterglowDensityBudgetPresentation({activeCount:activeFinisherCount,indexFromNewest:finisherRank.get(cue)??activeFinisherCount,tier:cue.tier,owner:deathAfterglowHandoff.owner},this.presentationSettings.reducedMotion);ctx.save();ctx.globalAlpha=Math.min(this.presentationSettings.reducedFlash?0.42:0.72,(1-progress)*.82+.05)*(state==='afterglow'?deathAfterglowContinuity.afterglowAlphaScale*deathAfterglowHandoff.afterglowScale*deathAfterglowDensity.effectStrength:deathAfterglowContinuity.finisherAlphaScale*deathAfterglowHandoff.finisherScale*Math.max(.62,deathAfterglowDensity.effectStrength));ctx.drawImage(this.enemyFinisherVfxAtlasImage,sprite.sx,sprite.sy,sprite.sw,sprite.sh,cue.x-size/2,cue.y-size/2,size,size);ctx.restore();}
+    if(!this.enemyFinisherVfxAtlasReady||!this.enemyFinisherVfxAtlasImage)return;const activeFinisherCount=this.enemyFinisherVfx.length;const finisherRank=new Map(this.enemyFinisherVfx.map((cue,index)=>[cue,Math.max(0,this.enemyFinisherVfx.length-1-index)]));for(const cue of stableWorldYDepthOrdered(this.enemyFinisherVfx,(cue)=>cue.y)){const progress=1-Math.max(0,cue.ttl/cue.maxTtl);const state=progress<0.38?'burst':'afterglow';const sprite=enemyFinisherVfxSprite(cue.source,state);const eliteScale=cue.enemyType==='boss'?1.55:cue.enemyType==='elite'?1.28:1;const size=(state==='burst'?92:108)*eliteScale*(1+progress*.18);const deathAfterglowContinuity=enemyFinisherDeathAfterglowContinuityPresentation({deathProgress:progress,finisherProgress:progress,tier:cue.tier},this.presentationSettings.reducedMotion,this.presentationSettings.reducedFlash);const deathAfterglowHandoff=enemyFinisherDeathAfterglowHandoffPresentation({owner:deathAfterglowContinuity.owner,deathProgress:progress,afterglowAlpha:deathAfterglowContinuity.afterglowAlphaScale},this.presentationSettings.reducedMotion);const deathAfterglowDensity=enemyFinisherDeathAfterglowDensityBudgetPresentation({activeCount:activeFinisherCount,indexFromNewest:finisherRank.get(cue)??activeFinisherCount,tier:cue.tier,owner:deathAfterglowHandoff.owner},this.presentationSettings.reducedMotion);ctx.save();ctx.globalAlpha=Math.min(this.presentationSettings.reducedFlash?0.42:0.72,(1-progress)*.82+.05)*(state==='afterglow'?deathAfterglowContinuity.afterglowAlphaScale*deathAfterglowHandoff.afterglowScale*deathAfterglowDensity.effectStrength:deathAfterglowContinuity.finisherAlphaScale*deathAfterglowHandoff.finisherScale*Math.max(.62,deathAfterglowDensity.effectStrength));ctx.drawImage(this.enemyFinisherVfxAtlasImage,sprite.sx,sprite.sy,sprite.sw,sprite.sh,cue.x-size/2,cue.y-size/2,size,size);ctx.restore();}
   }
 
   private drawHeroCrisisVfx(ctx:CanvasRenderingContext2D):void{
@@ -4759,7 +4759,7 @@ export class Game {
 
   private drawFreezeShatterVfx(ctx:CanvasRenderingContext2D):void{
     if(!this.freezeControlVfxAtlasReady||!this.freezeControlVfxAtlasImage)return;
-    for(const cue of this.freezeShatterVfx){const sprite=freezeControlVfxSprite(cue.enemyClass,'shatter'),t=Math.max(0,Math.min(1,cue.ttl/cue.maxTtl)),progress=1-t,base=cue.enemyClass==='boss'?164:cue.enemyClass==='elite'?126:cue.enemyClass==='specialist'?104:88,size=base*(1+progress*.28);ctx.save();ctx.globalAlpha=Math.min(this.presentationSettings.reducedFlash?.5:.84,t*.92);ctx.drawImage(this.freezeControlVfxAtlasImage,sprite.sx,sprite.sy,sprite.sw,sprite.sh,cue.x-size/2,cue.y-size/2,size,size);ctx.restore();}
+    for(const cue of stableWorldYDepthOrdered(this.freezeShatterVfx,(cue)=>cue.y)){const sprite=freezeControlVfxSprite(cue.enemyClass,'shatter'),t=Math.max(0,Math.min(1,cue.ttl/cue.maxTtl)),progress=1-t,base=cue.enemyClass==='boss'?164:cue.enemyClass==='elite'?126:cue.enemyClass==='specialist'?104:88,size=base*(1+progress*.28);ctx.save();ctx.globalAlpha=Math.min(this.presentationSettings.reducedFlash?.5:.84,t*.92);ctx.drawImage(this.freezeControlVfxAtlasImage,sprite.sx,sprite.sy,sprite.sw,sprite.sh,cue.x-size/2,cue.y-size/2,size,size);ctx.restore();}
   }
 
   private queueHeroResponseVfx(kind:HeroResponseVfxKind,_intensity=1):void{const maxTtl=kind==='hit'?.32:kind==='perfectEvade'?.48:.42;if(kind==='hit'){this.heroRenderHitRecoil=Math.max(this.heroRenderHitRecoil,Math.max(0,Math.min(1.25,_intensity)));this.heroCrisisGroundSettleState=advanceHeroCrisisGroundSettleState(this.heroCrisisGroundSettleState,_intensity,0,this.presentationSettings.reducedMotion);this.heroActionTransitionState=advanceHeroActionTransitionState(this.heroActionTransitionState,'hit',0,this.presentationSettings.reducedMotion);}else if(kind==='perfectEvade')this.heroActionTransitionState=advanceHeroActionTransitionState(this.heroActionTransitionState,'evade',0,this.presentationSettings.reducedMotion);this.heroResponseVfx.push({kind,x:this.hero.pos.x,y:this.hero.pos.y,ttl:maxTtl,maxTtl});if(this.heroResponseVfx.length>10)this.heroResponseVfx.splice(0,this.heroResponseVfx.length-10);}

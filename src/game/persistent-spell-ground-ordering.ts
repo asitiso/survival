@@ -29,3 +29,22 @@ export function persistentSpellGroundLayerCues<
   ];
   return stableWorldYDepthOrdered(combined, (cue) => cue.y);
 }
+
+
+export type PersistentSpellReadabilityCue<F, H> =
+  | { kind: 'field'; value: F; y: number }
+  | { kind: 'hole'; value: H; y: number };
+
+export function persistentSpellReadabilityLayerCues<
+  F extends PersistentSpellGroundPositioned,
+  H extends PersistentSpellGroundPositioned,
+>(sources: {
+  fields: readonly F[];
+  holes: readonly H[];
+}): Array<PersistentSpellReadabilityCue<F, H>> {
+  const combined: Array<PersistentSpellReadabilityCue<F, H>> = [
+    ...sources.fields.map((value): PersistentSpellReadabilityCue<F, H> => ({ kind: 'field', value, y: value.pos.y })),
+    ...sources.holes.map((value): PersistentSpellReadabilityCue<F, H> => ({ kind: 'hole', value, y: value.pos.y })),
+  ];
+  return stableWorldYDepthOrdered(combined, (cue) => cue.y);
+}

@@ -77,7 +77,7 @@ import { secondaryImpactLineageLabelConnectorCapacityBudget } from './secondary-
 import { secondaryImpactLineageLabelMotionSettle, type SecondaryImpactLineageLabelMotionEntry } from './secondary-impact-lineage-label-motion-settle-rendering.js';
 import { secondaryImpactLineageLabelCountEmphasis, type SecondaryImpactLineageLabelCountMemoryEntry } from './secondary-impact-lineage-label-count-emphasis-rendering.js';
 import { secondaryImpactLineageLabelCapacityBudget } from './secondary-impact-lineage-label-capacity-budget-rendering.js';
-import { persistentSpellGroundLayerCues } from './persistent-spell-ground-ordering.js';
+import { persistentSpellGroundLayerCues, persistentSpellReadabilityLayerCues } from './persistent-spell-ground-ordering.js';
 
 export type SpellId = 'fireBolt' | 'chainLightning' | 'frostNova' | 'flameField' | 'meteorStorm' | 'blackHole';
 
@@ -413,13 +413,6 @@ export class SpellSystem {
         ctx.strokeStyle = `${field.primary}88`; ctx.lineWidth = 3; ctx.stroke();
         const fieldAlpha = Math.min(0.72, 0.28 + Math.max(0, Math.min(1, field.ttl / 1.4)) * 0.44);
         drawVfxStamp(field.spriteId, field.pos.x, field.pos.y, field.radius * 2.05, fieldAlpha);
-        if (heroSpellSignatureAtlasReady && heroSpellSignatureAtlasImage) {
-          const sprite = heroSpellSignatureVfxSprite(field.heroId, 'flameField');
-          const size = field.radius * 2.1;
-          ctx.save(); ctx.globalAlpha = Math.min(0.62, fieldAlpha * 0.82);
-          ctx.drawImage(heroSpellSignatureAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, field.pos.x - size / 2, field.pos.y - size / 2, size, size);
-          ctx.restore();
-        }
         if (persistentSpellZoneVfxAtlasReady && persistentSpellZoneVfxAtlasImage) {
           const progress = 1 - Math.max(0, field.ttl / Math.max(0.001, field.maxTtl));
           const enterSprite = persistentSpellZoneVfxSprite(field.heroId,'flameField','enter');
@@ -445,13 +438,6 @@ export class SpellSystem {
         if(choreography.motion==='orbit') for(let i=0;i<choreography.orbitCount;i++){ const r=hole.radius*(.38+i*.16); const movingPhase=Math.sin(hole.ttl*2+i); const staticPhase=i*.83; const orbitPhase=staticPhase+(movingPhase-staticPhase)*orbitMotionScale; ctx.globalAlpha=Math.min(.62,choreography.glowAlpha+.12); ctx.strokeStyle=i%2?hole.secondary:hole.primary; ctx.lineWidth=1.5+i*.55; ctx.beginPath(); ctx.arc(hole.pos.x,hole.pos.y,r,orbitPhase,orbitPhase+Math.PI*1.35); ctx.stroke(); }
         ctx.globalAlpha=.9; ctx.strokeStyle = `${hole.primary}88`; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(hole.pos.x,hole.pos.y,hole.radius*pulse,0,Math.PI*2); ctx.stroke();
         drawVfxStamp(hole.spriteId, hole.pos.x, hole.pos.y, hole.radius * 2.15, 0.38);
-        if (ultimateSignatureAtlasReady && ultimateSignatureAtlasImage) {
-          const sprite = heroUltimateSignatureVfxSprite(hole.heroId, 'blackHole');
-          const size = hole.radius * 2.24;
-          ctx.save(); ctx.globalAlpha = 0.58;
-          ctx.drawImage(ultimateSignatureAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, hole.pos.x - size / 2, hole.pos.y - size / 2, size, size);
-          ctx.restore();
-        }
         if (persistentSpellZoneVfxAtlasReady && persistentSpellZoneVfxAtlasImage) {
           const progress = 1 - Math.max(0, hole.ttl / Math.max(0.001, hole.maxTtl));
           const enterSprite = persistentSpellZoneVfxSprite(hole.heroId,'blackHole','enter');
@@ -460,12 +446,6 @@ export class SpellSystem {
           const size = hole.radius * 2.22;
           ctx.save(); ctx.globalAlpha = progress < 0.18 ? 0.72 : 0.46;
           ctx.drawImage(persistentSpellZoneVfxAtlasImage,sprite.sx,sprite.sy,sprite.sw,sprite.sh,hole.pos.x-size/2,hole.pos.y-size/2,size,size); ctx.restore();
-        }
-        if (crowdControlPropagationVfxAtlasReady && crowdControlPropagationVfxAtlasImage) {
-          const sprite=crowdControlPropagationVfxSprite(hole.heroId,'blackHole');
-          const size=hole.radius * 2.34;
-          ctx.save();ctx.globalAlpha=reducedFlash ? 0.32 : 0.58;
-          ctx.drawImage(crowdControlPropagationVfxAtlasImage,sprite.sx,sprite.sy,sprite.sw,sprite.sh,hole.pos.x-size/2,hole.pos.y-size/2,size,size);ctx.restore();
         }
         ctx.restore();
         continue;
@@ -490,8 +470,54 @@ export class SpellSystem {
     }
   }
 
+  renderPersistentReadabilityLayer(
+    ctx: CanvasRenderingContext2D,
+    heroSpellSignatureAtlasImage?: HTMLImageElement | null,
+    heroSpellSignatureAtlasReady = false,
+    ultimateSignatureAtlasImage?: HTMLImageElement | null,
+    ultimateSignatureAtlasReady = false,
+    crowdControlPropagationVfxAtlasImage?: HTMLImageElement | null,
+    crowdControlPropagationVfxAtlasReady = false,
+    reducedFlash = false,
+  ): void {
+    for (const cue of persistentSpellReadabilityLayerCues({ fields: this.fields, holes: this.holes })) {
+      if (cue.kind === 'field') {
+        const field = cue.value;
+        if (!heroSpellSignatureAtlasReady || !heroSpellSignatureAtlasImage) continue;
+        const fieldAlpha = Math.min(0.72, 0.28 + Math.max(0, Math.min(1, field.ttl / 1.4)) * 0.44);
+        const sprite = heroSpellSignatureVfxSprite(field.heroId, 'flameField');
+        const size = field.radius * 2.1;
+        ctx.save();
+        ctx.globalAlpha = Math.min(0.62, fieldAlpha * 0.82);
+        ctx.drawImage(heroSpellSignatureAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, field.pos.x - size / 2, field.pos.y - size / 2, size, size);
+        ctx.restore();
+        continue;
+      }
+      const hole = cue.value;
+      if (ultimateSignatureAtlasReady && ultimateSignatureAtlasImage) {
+        const sprite = heroUltimateSignatureVfxSprite(hole.heroId, 'blackHole');
+        const size = hole.radius * 2.24;
+        ctx.save();
+        ctx.globalAlpha = 0.58;
+        ctx.drawImage(ultimateSignatureAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, hole.pos.x - size / 2, hole.pos.y - size / 2, size, size);
+        ctx.restore();
+      }
+      if (crowdControlPropagationVfxAtlasReady && crowdControlPropagationVfxAtlasImage) {
+        const sprite = crowdControlPropagationVfxSprite(hole.heroId, 'blackHole');
+        const size = hole.radius * 2.34;
+        ctx.save();
+        ctx.globalAlpha = reducedFlash ? 0.32 : 0.58;
+        ctx.drawImage(crowdControlPropagationVfxAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, hole.pos.x - size / 2, hole.pos.y - size / 2, size, size);
+        ctx.restore();
+      }
+    }
+  }
+
   render(ctx: CanvasRenderingContext2D, motion?: ResidualCombatMotionPolicy, propVfxAtlasImage?: HTMLImageElement | null, propVfxAtlasReady = false, heroProjectileAtlasImage?: HTMLImageElement | null, heroProjectileAtlasReady = false, heroSpellSignatureAtlasImage?: HTMLImageElement | null, heroSpellSignatureAtlasReady = false, ultimateSignatureAtlasImage?: HTMLImageElement | null, ultimateSignatureAtlasReady = false, persistentSpellZoneVfxAtlasImage?: HTMLImageElement | null, persistentSpellZoneVfxAtlasReady = false, crowdControlPropagationVfxAtlasImage?: HTMLImageElement | null, crowdControlPropagationVfxAtlasReady = false, reducedFlash = false, ultimatePostImpactResidueVfxAtlasImage?: HTMLImageElement | null, ultimatePostImpactResidueVfxAtlasReady = false, reducedMotion = false, presentationQuality: PresentationQuality = 'high', primaryProjectileLabelBlockers:readonly Vec2[]=[], heroPos:Vec2|null=null, bossTelegraphZones:readonly {pos:Vec2;radius:number}[]=[], includeGroundLayer = true): void {
-    if (includeGroundLayer) this.renderGroundLayer(ctx, motion, propVfxAtlasImage, propVfxAtlasReady, heroSpellSignatureAtlasImage, heroSpellSignatureAtlasReady, ultimateSignatureAtlasImage, ultimateSignatureAtlasReady, persistentSpellZoneVfxAtlasImage, persistentSpellZoneVfxAtlasReady, crowdControlPropagationVfxAtlasImage, crowdControlPropagationVfxAtlasReady, reducedFlash, ultimatePostImpactResidueVfxAtlasImage, ultimatePostImpactResidueVfxAtlasReady);
+    if (includeGroundLayer) {
+      this.renderGroundLayer(ctx, motion, propVfxAtlasImage, propVfxAtlasReady, heroSpellSignatureAtlasImage, heroSpellSignatureAtlasReady, ultimateSignatureAtlasImage, ultimateSignatureAtlasReady, persistentSpellZoneVfxAtlasImage, persistentSpellZoneVfxAtlasReady, crowdControlPropagationVfxAtlasImage, crowdControlPropagationVfxAtlasReady, reducedFlash, ultimatePostImpactResidueVfxAtlasImage, ultimatePostImpactResidueVfxAtlasReady);
+      this.renderPersistentReadabilityLayer(ctx, heroSpellSignatureAtlasImage, heroSpellSignatureAtlasReady, ultimateSignatureAtlasImage, ultimateSignatureAtlasReady, crowdControlPropagationVfxAtlasImage, crowdControlPropagationVfxAtlasReady, reducedFlash);
+    }
     const drawVfxStamp = (id: 'fireBolt' | 'chainLightning' | 'frostNova' | 'flameField' | 'meteorStorm' | 'blackHole', x: number, y: number, size: number, alpha: number): void => {
       if (!propVfxAtlasReady || !propVfxAtlasImage || alpha <= 0 || size <= 0) return;
       const sprite = battlefieldSpellVfxSprite(id);

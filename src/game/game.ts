@@ -3503,6 +3503,7 @@ export class Game {
     this.drawEnemyFinisherVfx(ctx);
     this.drawFreezeShatterVfx(ctx);
     this.drawTerrainForegroundOcclusion(ctx);
+    this.spells.renderPersistentReadabilityLayer(ctx, this.heroSpellSignatureVfxAtlasImage, this.heroSpellSignatureVfxAtlasReady, this.heroUltimateSignatureVfxAtlasImage, this.heroUltimateSignatureVfxAtlasReady, this.crowdControlPropagationVfxAtlasImage, this.crowdControlPropagationVfxAtlasReady, this.presentationSettings.reducedFlash);
     this.drawElitePackApproachFormationVfx(ctx);
     this.drawGoldenGoblinEventResponseIdentity(ctx);
     this.drawMythicTacticPrimedIcon(ctx);

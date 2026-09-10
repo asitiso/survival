@@ -78,7 +78,7 @@ test('phase 2452-2453 enemy spawn portals classify specialist elite and boss and
 test('phase 2453 game initializes both atlases and supplies them only to presentation renderers', () => {
   assert.match(gameSource, /initializePickupFlowVfxAtlas/);
   assert.match(gameSource, /initializeSpawnPressureVfxAtlas/);
-  assert.match(gameSource, /this\.pickups\.render\([^\n]*pickupFlowVfxAtlasImage/);
+  assert.match(gameSource, /this\.pickups\.renderInteractionLayer\([^\n]*pickupFlowVfxAtlasImage/);
   assert.match(gameSource, /this\.enemies\.renderEnemies\([^\n]*spawnPressureVfxAtlasImage/);
 });
 

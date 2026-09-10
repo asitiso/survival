@@ -4,26 +4,31 @@ import fs from 'node:fs';
 
 const gameSource = fs.readFileSync(new URL('../src/game/game.ts', import.meta.url), 'utf8');
 
-function methodSlice(name, nextName) {
+function methodSlice(name) {
   const start = gameSource.indexOf(`private ${name}(`);
   assert.notEqual(start, -1, `${name} must exist`);
-  const end = gameSource.indexOf(`private ${nextName}(`, start + 1);
-  assert.notEqual(end, -1, `${nextName} must follow ${name}`);
-  return gameSource.slice(start, end);
+  const braceStart = gameSource.indexOf('{', start);
+  assert.notEqual(braceStart, -1, `${name} must have a body`);
+  let depth = 0;
+  for (let i = braceStart; i < gameSource.length; i += 1) {
+    if (gameSource[i] === '{') depth += 1;
+    else if (gameSource[i] === '}') {
+      depth -= 1;
+      if (depth === 0) return gameSource.slice(start, i + 1);
+    }
+  }
+  assert.fail(`${name} body must close`);
 }
 
 test('phase 4885 keeps the supply crate physical body on the grounded world pass', () => {
-  const body = methodSlice('drawSupplyCrate', 'updateFieldEventResponseIdentity');
+  const body = methodSlice('drawSupplyCrate');
   assert.match(body, /battlefieldInteractionSprite\('supply','crate'\)/);
   assert.match(body, /ctx\.fillRect\(-28, -22, 56, 44\)/);
   assert.doesNotMatch(body, /drawFieldEventResponseIdentity\(ctx,'supplyDrop'/);
 });
 
 test('phase 4885 renders the supply-drop response identity in its own readability pass', () => {
-  assert.match(gameSource, /private drawSupplyCrateResponseIdentity\(/);
-  const start = gameSource.indexOf('private drawSupplyCrateResponseIdentity(');
-  const end = gameSource.indexOf('\n  private ', start + 1);
-  const response = gameSource.slice(start, end === -1 ? gameSource.length : end);
+  const response = methodSlice('drawSupplyCrateResponseIdentity');
   assert.match(response, /if \(!this\.supplyCrate\) return/);
   assert.match(response, /drawFieldEventResponseIdentity\(ctx,'supplyDrop',0,-43,20\)/);
   assert.doesNotMatch(response, /battlefieldInteractionSprite\('supply'/);

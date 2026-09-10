@@ -1,4 +1,7 @@
-import type { EquipmentState, ShopOffer } from '../domain/types.js';
+import { equipmentPurchaseUnlock } from '../domain/equipment-progression.js';
+import { applyEquipmentSets, equipmentSetForItem } from './equipment-sets.js';
+import { shopOfferPrice } from '../domain/economy.js';
+import type { EquippedItem, EquipmentKind, EquipmentState, ShopOffer } from '../domain/types.js';
 export { legendaryEquipmentName } from '../domain/economy.js';
 
 export interface EquipmentBonuses {
@@ -13,23 +16,91 @@ export interface EquipmentBonuses {
 }
 
 export interface ShopDisplayOffer extends ShopOffer {
+  locked?: boolean;
+  unlockAtSeconds?: number;
   description: string;
   accent: string;
 }
 
-const WEAPONS: readonly ShopDisplayOffer[] = [
-  { id: 'arcane-staff', kind: 'weapon', name: '마력 지팡이', price: 220, power: 0.15, description: '랭크마다 모든 마법 피해 +15%', accent: '#c78cff' },
-  { id: 'rapid-wand', kind: 'weapon', name: '속사 완드', price: 240, power: 0.07, description: '랭크마다 일반·궁극기 쿨타임 -7%', accent: '#68d7ff' },
-  { id: 'blast-rod', kind: 'weapon', name: '폭발 지팡이', price: 230, power: 0.09, description: '랭크마다 광역 마법 범위 +9%', accent: '#ff9b5e' },
-  { id: 'golden-wand', kind: 'weapon', name: '황금 완드', price: 210, power: 0.12, description: '랭크마다 처치 금화 +12%', accent: '#f3cf67' },
+export interface EquipmentAtlasPresentation {
+  source: 'shop-items-enhanced';
+  position: string;
+  textFallback: boolean;
+}
+
+interface EquipmentEffect {
+  stat: keyof EquipmentBonuses;
+  perRank: number;
+  floor?: number;
+  legendaryFloor?: number;
+}
+
+export interface EquipmentDefinition extends ShopDisplayOffer {
+  kind: EquipmentKind;
+  crafted: boolean;
+  effectChannels: readonly (keyof EquipmentBonuses)[];
+  effects: readonly EquipmentEffect[];
+  atlas: EquipmentAtlasPresentation;
+}
+
+const CRAFTED_ATLAS: EquipmentAtlasPresentation = {
+  source: 'shop-items-enhanced', position: '50% 50%', textFallback: true,
+};
+
+const base = (
+  id: string, kind: EquipmentKind, name: string, price: number, power: number, description: string, accent: string,
+  effects: readonly EquipmentEffect[],
+): EquipmentDefinition => ({
+  id, kind, name, price, basePrice: price, power, description, accent, crafted: false,
+  effectChannels: effects.map((effect) => effect.stat), effects,
+  atlas: { source: 'shop-items-enhanced', position: '50% 50%', textFallback: true },
+});
+
+const crafted = (
+  id: string, kind: EquipmentKind, name: string, price: number, power: number, description: string, accent: string,
+  effects: readonly EquipmentEffect[],
+): EquipmentDefinition => ({
+  id, kind, name, price, basePrice: price, power, description, accent, crafted: true,
+  effectChannels: effects.map((effect) => effect.stat), effects, atlas: CRAFTED_ATLAS,
+});
+
+const BASE_EQUIPMENT: readonly EquipmentDefinition[] = [
+  base('arcane-staff', 'weapon', '마력 지팡이', 220, .20, '랭크마다 모든 마법 피해 +20%', '#c78cff', [{ stat: 'spellPowerMultiplier', perRank: .20 }]),
+  base('rapid-wand', 'weapon', '속사 완드', 240, .09, '랭크마다 일반·궁극기 쿨타임 -9%', '#68d7ff', [{ stat: 'cooldownMultiplier', perRank: .09, floor: .60, legendaryFloor: .45 }]),
+  base('blast-rod', 'weapon', '폭발 지팡이', 230, .12, '랭크마다 광역 마법 범위 +12%', '#ff9b5e', [{ stat: 'areaMultiplier', perRank: .12 }]),
+  base('golden-wand', 'weapon', '황금 완드', 210, .18, '랭크마다 처치 금화 +18%', '#f3cf67', [{ stat: 'goldMultiplier', perRank: .18 }]),
+  base('iron-robe', 'armor', '철갑 로브', 200, .10, '랭크마다 받는 피해 -10%', '#aab8c7', [{ stat: 'damageTakenMultiplier', perRank: .10, floor: .50, legendaryFloor: .38 }]),
+  base('gale-cloak', 'armor', '질풍 망토', 220, .10, '랭크마다 이동속도 +10%', '#69e0b5', [{ stat: 'moveSpeedMultiplier', perRank: .10 }]),
+  base('magnet-cloak', 'armor', '자석 망토', 210, .22, '랭크마다 경험치·금화 흡수거리 +22%', '#65cfff', [{ stat: 'pickupMultiplier', perRank: .22 }]),
+  base('guardian-plate', 'armor', '수호 갑주', 230, .09, '랭크마다 수호핵이 받는 피해 -9%', '#f0c46b', [{ stat: 'coreDamageTakenMultiplier', perRank: .09, floor: .55, legendaryFloor: .40 }]),
+  base('sage-amulet', 'accessory', '현자의 부적', 180, .08, '랭크마다 모든 마법 피해 +8%', '#c78cff', [{ stat: 'spellPowerMultiplier', perRank: .08 }]),
+  base('storm-ring', 'accessory', '폭풍 반지', 200, .04, '랭크마다 일반·궁극기 쿨타임 -4%', '#68d7ff', [{ stat: 'cooldownMultiplier', perRank: .04, floor: .80, legendaryFloor: .72 }]),
+  base('bastion-talisman', 'accessory', '성채의 성표', 190, .05, '랭크마다 받는 피해 -5%', '#f0c46b', [{ stat: 'damageTakenMultiplier', perRank: .05, floor: .75, legendaryFloor: .66 }]),
+  base('fortune-charm', 'accessory', '행운의 펜던트', 170, .10, '랭크마다 금화 획득 +10%', '#69e0b5', [{ stat: 'goldMultiplier', perRank: .10 }]),
 ];
 
-const ARMORS: readonly ShopDisplayOffer[] = [
-  { id: 'iron-robe', kind: 'armor', name: '철갑 로브', price: 200, power: 0.08, description: '랭크마다 받는 피해 -8%', accent: '#aab8c7' },
-  { id: 'gale-cloak', kind: 'armor', name: '질풍 망토', price: 220, power: 0.08, description: '랭크마다 이동속도 +8%', accent: '#69e0b5' },
-  { id: 'magnet-cloak', kind: 'armor', name: '자석 망토', price: 210, power: 0.16, description: '랭크마다 경험치·금화 흡수거리 +16%', accent: '#65cfff' },
-  { id: 'guardian-plate', kind: 'armor', name: '수호 갑주', price: 230, power: 0.07, description: '랭크마다 수호핵이 받는 피해 -7%', accent: '#f0c46b' },
+const CRAFTED_EQUIPMENT: readonly EquipmentDefinition[] = [
+  crafted('arcane-accelerator', 'weapon', '비전 가속봉', 700, .24, '마법 피해와 재사용시간을 함께 강화합니다.', '#9f8cff', [{ stat: 'spellPowerMultiplier', perRank: .18 }, { stat: 'cooldownMultiplier', perRank: .06, floor: .70 }]),
+  crafted('alchemical-blast-staff', 'weapon', '연금 폭발봉', 650, .17, '광역 범위와 금화 획득을 함께 강화합니다.', '#ff9b5e', [{ stat: 'areaMultiplier', perRank: .11 }, { stat: 'goldMultiplier', perRank: .14 }]),
+  crafted('wind-iron-armor', 'armor', '바람 철갑', 750, .13, '영웅 피해 감소와 이동속도를 함께 강화합니다.', '#69e0b5', [{ stat: 'damageTakenMultiplier', perRank: .08, floor: .60 }, { stat: 'moveSpeedMultiplier', perRank: .08 }]),
+  crafted('gravity-guardian-armor', 'armor', '중력 수호갑', 800, .16, '수집 범위와 수호핵 피해 감소를 함께 강화합니다.', '#65cfff', [{ stat: 'pickupMultiplier', perRank: .16 }, { stat: 'coreDamageTakenMultiplier', perRank: .07, floor: .65 }]),
+  crafted('thunder-wisdom-seal', 'accessory', '현뢰의 인장', 600, .14, '마법 피해와 재사용시간을 함께 강화합니다.', '#68d7ff', [{ stat: 'spellPowerMultiplier', perRank: .11 }, { stat: 'cooldownMultiplier', perRank: .05, floor: .75 }]),
+  crafted('golden-bastion-talisman', 'accessory', '황금 성채 부적', 650, .14, '영웅 피해 감소와 금화 획득을 함께 강화합니다.', '#f0c46b', [{ stat: 'damageTakenMultiplier', perRank: .065, floor: .70 }, { stat: 'goldMultiplier', perRank: .13 }]),
+  crafted('celestial-fusion-staff', 'weapon', '천체 융합봉', 2800, .31, '마법 피해·광역 범위·재사용시간을 강화합니다.', '#b4a0ff', [{ stat: 'spellPowerMultiplier', perRank: .18 }, { stat: 'areaMultiplier', perRank: .13 }, { stat: 'cooldownMultiplier', perRank: .08, floor: .55 }]),
+  crafted('world-tree-armor', 'armor', '세계수 성갑', 3200, .24, '영웅·수호핵 피해 감소와 이동속도를 강화합니다.', '#71e7a2', [{ stat: 'damageTakenMultiplier', perRank: .07, floor: .50 }, { stat: 'coreDamageTakenMultiplier', perRank: .065, floor: .50 }, { stat: 'moveSpeedMultiplier', perRank: .07 }]),
+  crafted('fate-core', 'accessory', '운명의 핵', 2500, .22, '마법 피해·재사용시간·금화·피해 감소를 강화합니다.', '#f3cf67', [{ stat: 'spellPowerMultiplier', perRank: .12 }, { stat: 'cooldownMultiplier', perRank: .055, floor: .60 }, { stat: 'goldMultiplier', perRank: .11 }, { stat: 'damageTakenMultiplier', perRank: .055, floor: .60 }]),
 ];
+
+const ALL_EQUIPMENT: readonly EquipmentDefinition[] = [...BASE_EQUIPMENT, ...CRAFTED_EQUIPMENT];
+const WEAPONS: readonly ShopDisplayOffer[] = BASE_EQUIPMENT.filter((offer) => offer.kind === 'weapon');
+const ARMORS: readonly ShopDisplayOffer[] = BASE_EQUIPMENT.filter((offer) => offer.kind === 'armor');
+const ACCESSORIES: readonly ShopDisplayOffer[] = BASE_EQUIPMENT.filter((offer) => offer.kind === 'accessory');
+
+export function equipmentCatalog(): readonly ShopDisplayOffer[] { return BASE_EQUIPMENT; }
+
+export function equipmentDefinition(id: string): EquipmentDefinition | null {
+  return ALL_EQUIPMENT.find((definition) => definition.id === id) ?? null;
+}
 
 const POTION: ShopDisplayOffer = {
   id: 'healing-potion', kind: 'potion', name: '체력 물약', price: 70, power: 0.35,
@@ -52,11 +123,53 @@ export function generateShopOffers(rng: () => number = Math.random): ShopDisplay
   const weapons = pickTwo(WEAPONS, rng);
   const armors = pickTwo(ARMORS, rng);
   const potionA = copyWithPriceVariance(POTION, rng);
-  const potionB = copyWithPriceVariance(POTION, rng);
-  return [weapons[0]!, weapons[1]!, armors[0]!, armors[1]!, potionA, potionB];
+  const accessory = copyWithPriceVariance(ACCESSORIES[Math.min(3, Math.floor(rng() * 4))]!, rng);
+  return [weapons[0]!, weapons[1]!, armors[0]!, armors[1]!, accessory, potionA];
 }
 
-function legendaryFactor(item: EquipmentState['weapon'] | EquipmentState['armor']): number {
+export function priceShopOffers(offers: readonly ShopDisplayOffer[], state: EquipmentState, elapsedSeconds = Infinity): ShopDisplayOffer[] {
+  return offers.map(offer => {
+    const priced = { ...offer, basePrice: offer.basePrice ?? offer.price };
+    const unlockAtSeconds = equipmentPurchaseUnlock(state, priced);
+    return { ...priced, price: shopOfferPrice(state, priced), unlockAtSeconds, locked: elapsedSeconds < unlockAtSeconds };
+  });
+}
+
+export function ensureEquippedOffers(offers: ShopDisplayOffer[], state: EquipmentState, accessoryChoice?: string | null): ShopDisplayOffer[] {
+  const result = [...offers];
+  for (const kind of ['weapon', 'armor', 'accessory'] as const) {
+    if (kind === 'accessory' && accessoryChoice) {
+      const choice = ACCESSORIES.find(offer => offer.id === accessoryChoice);
+      const index = result.findIndex(offer => offer.kind === 'accessory');
+      if (choice && index >= 0) { result[index] = { ...choice }; continue; }
+    }
+    const item = state[kind];
+    if (!item || result.some(offer => offer.id === item.id)) continue;
+    const template = equipmentCatalog().find(offer => offer.id === item.id);
+    const index = result.findIndex(offer => offer.kind === kind);
+    if (template && index >= 0) result[index] = { ...template };
+  }
+  // Match the equipped weapon's set without forcing costly random rerolls.
+  const targetSet = state.weapon ? equipmentSetForItem(state.weapon.id) : null;
+  for (const kind of ['armor', 'accessory'] as const) {
+    if (kind === 'accessory' && accessoryChoice && ACCESSORIES.some(offer => offer.id === accessoryChoice)) continue;
+    const target = targetSet ? equipmentCatalog().find(offer => offer.kind === kind && (targetSet.items as readonly string[]).includes(offer.id)) : null;
+    if (!target || result.some(offer => offer.id === target.id)) continue;
+    const index = result.findIndex(offer => offer.kind === kind && offer.id !== state[kind]?.id);
+    if (index >= 0) result[index] = { ...target };
+  }
+  return result;
+}
+
+export function refreshEquipmentPowers(state: EquipmentState): EquipmentState {
+  const refresh = (item: EquipmentState['weapon']) => {
+    const template = item ? equipmentDefinition(item.id) : null;
+    return item && template ? { ...item, power: Math.max(item.power, template.power) } : item;
+  };
+  return { ...state, weapon: refresh(state.weapon), armor: refresh(state.armor), accessory: refresh(state.accessory ?? null) };
+}
+
+function legendaryFactor(item: EquippedItem): number {
   return item?.legendary ? 1.35 : 1;
 }
 
@@ -72,19 +185,18 @@ export function equipmentBonuses(state: EquipmentState): EquipmentBonuses {
     coreDamageTakenMultiplier: 1,
   };
 
-  const weapon = state.weapon;
-  const weaponFactor = legendaryFactor(weapon);
-  if (weapon?.id === 'arcane-staff') bonuses.spellPowerMultiplier += weapon.power * weapon.rank * weaponFactor;
-  if (weapon?.id === 'rapid-wand') bonuses.cooldownMultiplier = Math.max(weapon.legendary ? 0.55 : 0.62, 1 - weapon.power * weapon.rank * weaponFactor);
-  if (weapon?.id === 'blast-rod') bonuses.areaMultiplier += weapon.power * weapon.rank * weaponFactor;
-  if (weapon?.id === 'golden-wand') bonuses.goldMultiplier += weapon.power * weapon.rank * weaponFactor;
-
-  const armor = state.armor;
-  const armorFactor = legendaryFactor(armor);
-  if (armor?.id === 'iron-robe') bonuses.damageTakenMultiplier = Math.max(armor.legendary ? 0.48 : 0.55, 1 - armor.power * armor.rank * armorFactor);
-  if (armor?.id === 'gale-cloak') bonuses.moveSpeedMultiplier += armor.power * armor.rank * armorFactor;
-  if (armor?.id === 'magnet-cloak') bonuses.pickupMultiplier += armor.power * armor.rank * armorFactor;
-  if (armor?.id === 'guardian-plate') bonuses.coreDamageTakenMultiplier = Math.max(armor.legendary ? 0.50 : 0.58, 1 - armor.power * armor.rank * armorFactor);
-
-  return bonuses;
+  for (const item of [state.weapon, state.armor, state.accessory]) {
+    if (!item) continue;
+    const definition = equipmentDefinition(item.id);
+    if (!definition) continue;
+    const progress = item.rank > 5 ? 1 - Math.pow(.92, item.rank - 5) : 0;
+    for (const effect of definition.effects) {
+      const power = effect.perRank * Math.min(5, item.rank) * legendaryFactor(item);
+      const value = effect.floor !== undefined
+        ? Math.max(item.legendary ? effect.legendaryFloor ?? effect.floor : effect.floor, 1 - power) * (1 - .4 * progress)
+        : 1 + power + progress * (item.kind === 'accessory' ? .5 : 1);
+      bonuses[effect.stat] *= value;
+    }
+  }
+  return applyEquipmentSets(bonuses, state);
 }

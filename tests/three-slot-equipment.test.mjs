@@ -104,3 +104,10 @@ test('accessory recommendations describe equipment benefits rather than potion s
  const offer=equipmentCatalog().find(o=>o.id==='sage-amulet');const guidance=shopGuidanceForOffers([offer],{heroId:'arkan',archetype:'burst',state:empty})[0];
  assert.equal(guidance.best,true);assert.match(guidance.reason,/현자의 서약/);assert.doesNotMatch(guidance.reason,/물약|회복 보충/);
 });
+
+test('ordinary shop offers stay limited to the twelve base equipment items and potion',()=>{
+ const crafted=new Set(['arcane-accelerator','alchemical-blast-staff','wind-iron-armor','gravity-guardian-armor','thunder-wisdom-seal','golden-bastion-talisman','celestial-fusion-staff','world-tree-armor','fate-core']);
+ const offers=Array.from({length:20},(_,seed)=>generateShopOffers(()=>seed/20)).flat();
+ assert.equal(offers.some(offer=>crafted.has(offer.id)),false);
+ assert.equal(new Set(offers.filter(offer=>offer.kind!=='potion').map(offer=>offer.id)).size,12);
+});

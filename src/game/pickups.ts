@@ -3,6 +3,7 @@ import type { Hero } from './entities.js';
 import type { EnemyDeathEvent } from './enemies.js';
 import { battlefieldInteractionSprite } from './battlefield-interaction-vfx-assets.js';
 import { pickupFlowVfxSprite, type PickupFlowVfxState } from './pickup-flow-vfx-assets.js';
+import { stableWorldYDepthOrdered } from './enemy-actor-depth-ordering.js';
 
 export type PickupKind = 'xp' | 'coin';
 type ActivePickupFlowState = Extract<PickupFlowVfxState,'attract'|'cluster'|'rich'|'globalMagnet'>;
@@ -99,15 +100,12 @@ export class PickupManager {
     }
   }
 
-  render(
+  renderGroundLayer(
     ctx: CanvasRenderingContext2D,
     interactionAtlasImage: CanvasImageSource | null = null,
     interactionAtlasReady = false,
-    flowAtlasImage: CanvasImageSource | null = null,
-    flowAtlasReady = false,
-    reducedFlash = false,
   ): void {
-    for (const pickup of this.pickups) {
+    for (const pickup of stableWorldYDepthOrdered(this.pickups, (pickup) => pickup.pos.y)) {
       ctx.save();
       ctx.translate(pickup.pos.x, pickup.pos.y);
       if (interactionAtlasReady && interactionAtlasImage) {
@@ -125,22 +123,45 @@ export class PickupManager {
         ctx.shadowColor = '#63d6ff'; ctx.shadowBlur = 12;
         ctx.fillStyle = '#71dcff'; ctx.fillRect(-pickup.radius * .65, -pickup.radius * .65, pickup.radius * 1.3, pickup.radius * 1.3);
       }
-      if (flowAtlasReady && flowAtlasImage && pickup.flowState) {
-        const flow = pickupFlowVfxSprite(pickup.kind,pickup.flowState);
-        const size = Math.max(46,pickup.radius*4.8);
-        ctx.globalAlpha = reducedFlash ? 0.34 : (pickup.flowState === 'globalMagnet' ? 0.68 : 0.56);
-        ctx.drawImage(flowAtlasImage,flow.sx,flow.sy,flow.sw,flow.sh,-size/2,-size/2,size,size);
-      }
       ctx.restore();
     }
-    if (flowAtlasReady && flowAtlasImage) {
-      for (const cue of this.collectionVfx) {
-        const sprite=pickupFlowVfxSprite(cue.kind,cue.state); const t=Math.max(0,Math.min(1,cue.ttl/cue.maxTtl)); const progress=1-t;
-        const base=cue.state==='collectLarge'?78:58,size=base*(1+progress*.38);
-        ctx.save();ctx.globalAlpha=(reducedFlash?.34:.72)*t;
-        ctx.drawImage(flowAtlasImage,sprite.sx,sprite.sy,sprite.sw,sprite.sh,cue.pos.x-size/2,cue.pos.y-size/2,size,size);ctx.restore();
-      }
+  }
+
+  renderInteractionLayer(
+    ctx: CanvasRenderingContext2D,
+    flowAtlasImage: CanvasImageSource | null = null,
+    flowAtlasReady = false,
+    reducedFlash = false,
+  ): void {
+    if (!flowAtlasReady || !flowAtlasImage) return;
+    for (const pickup of stableWorldYDepthOrdered(this.pickups, (pickup) => pickup.pos.y)) {
+      if (!pickup.flowState) continue;
+      const flow = pickupFlowVfxSprite(pickup.kind,pickup.flowState);
+      const size = Math.max(46,pickup.radius*4.8);
+      ctx.save();
+      ctx.translate(pickup.pos.x, pickup.pos.y);
+      ctx.globalAlpha = reducedFlash ? 0.34 : (pickup.flowState === 'globalMagnet' ? 0.68 : 0.56);
+      ctx.drawImage(flowAtlasImage,flow.sx,flow.sy,flow.sw,flow.sh,-size/2,-size/2,size,size);
+      ctx.restore();
     }
+    for (const cue of stableWorldYDepthOrdered(this.collectionVfx, (cue) => cue.pos.y)) {
+      const sprite=pickupFlowVfxSprite(cue.kind,cue.state); const t=Math.max(0,Math.min(1,cue.ttl/cue.maxTtl)); const progress=1-t;
+      const base=cue.state==='collectLarge'?78:58,size=base*(1+progress*.38);
+      ctx.save();ctx.globalAlpha=(reducedFlash?.34:.72)*t;
+      ctx.drawImage(flowAtlasImage,sprite.sx,sprite.sy,sprite.sw,sprite.sh,cue.pos.x-size/2,cue.pos.y-size/2,size,size);ctx.restore();
+    }
+  }
+
+  render(
+    ctx: CanvasRenderingContext2D,
+    interactionAtlasImage: CanvasImageSource | null = null,
+    interactionAtlasReady = false,
+    flowAtlasImage: CanvasImageSource | null = null,
+    flowAtlasReady = false,
+    reducedFlash = false,
+  ): void {
+    this.renderGroundLayer(ctx, interactionAtlasImage, interactionAtlasReady);
+    this.renderInteractionLayer(ctx, flowAtlasImage, flowAtlasReady, reducedFlash);
   }
 
   private queueCollectionVfx(pickup:Pickup):void {

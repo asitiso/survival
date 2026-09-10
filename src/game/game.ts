@@ -3496,6 +3496,7 @@ export class Game {
     this.drawBossArenaTransitionWorldVfx(ctx);
     this.drawBossPhaseTransitionVfx(ctx);
     this.spells.renderGroundLayer(ctx, residualMotion, this.battlefieldPropVfxAtlasImage, this.battlefieldPropVfxAtlasReady, this.heroSpellSignatureVfxAtlasImage, this.heroSpellSignatureVfxAtlasReady, this.heroUltimateSignatureVfxAtlasImage, this.heroUltimateSignatureVfxAtlasReady, this.persistentSpellZoneVfxAtlasImage, this.persistentSpellZoneVfxAtlasReady, this.crowdControlPropagationVfxAtlasImage, this.crowdControlPropagationVfxAtlasReady, this.presentationSettings.reducedFlash, this.ultimatePostImpactResidueVfxAtlasImage, this.ultimatePostImpactResidueVfxAtlasReady);
+    this.pickups.renderGroundLayer(ctx, this.battlefieldInteractionVfxAtlasImage, this.battlefieldInteractionVfxAtlasReady);
     this.drawEnemySpawnLaneReadability(ctx);
     this.enemies.renderEnemies(ctx, this.enemySpriteAtlasImage, this.enemySpriteAtlasReady, this.bossSpriteAtlasImage, this.bossSpriteAtlasReady, residualMotion, this.eliteAffixIdentityAtlasImage, this.eliteAffixIdentityAtlasReady, this.specialistIntentAtlasImage, this.specialistIntentAtlasReady, this.hero.pos, this.specialistCombatVfxAtlasImage, this.specialistCombatVfxAtlasReady, this.bossPhaseOverlayVfxAtlasImage, this.bossPhaseOverlayVfxAtlasReady, this.battlefieldInteractionVfxAtlasImage, this.battlefieldInteractionVfxAtlasReady, this.spawnPressureVfxAtlasImage, this.spawnPressureVfxAtlasReady, this.regularEnemyActionVfxAtlasImage, this.regularEnemyActionVfxAtlasReady, this.eliteAffixLifecycleVfxAtlasImage, this.eliteAffixLifecycleVfxAtlasReady, this.enemyTargetPressureVfxAtlasImage, this.enemyTargetPressureVfxAtlasReady, this.core.pos, this.specialistReactionLifecycleVfxAtlasImage, this.specialistReactionLifecycleVfxAtlasReady, this.presentationSettings.reducedFlash, this.presentationSettings.reducedMotion, Math.min(1,this.bossArena.hazards.length/6));
     this.drawEnemyDefeatBodyTransitions(ctx);
@@ -3504,6 +3505,7 @@ export class Game {
     this.drawFreezeShatterVfx(ctx);
     this.drawTerrainForegroundOcclusion(ctx);
     this.spells.renderPersistentReadabilityLayer(ctx, this.heroSpellSignatureVfxAtlasImage, this.heroSpellSignatureVfxAtlasReady, this.heroUltimateSignatureVfxAtlasImage, this.heroUltimateSignatureVfxAtlasReady, this.crowdControlPropagationVfxAtlasImage, this.crowdControlPropagationVfxAtlasReady, this.presentationSettings.reducedFlash);
+    this.pickups.renderInteractionLayer(ctx, this.pickupFlowVfxAtlasImage, this.pickupFlowVfxAtlasReady, this.presentationSettings.reducedFlash);
     this.drawElitePackApproachFormationVfx(ctx);
     this.drawGoldenGoblinEventResponseIdentity(ctx);
     this.drawMythicTacticPrimedIcon(ctx);
@@ -3521,7 +3523,6 @@ export class Game {
     const actionResultProtectedWarning=Boolean((this.bossPhaseCue&&this.bossPhaseCueTimer>0)||this.dangerState.heroCritical||this.dangerState.coreCritical);
     this.feedback.render(ctx,this.presentation.quality,{battlefieldStress:actionResultBattlefieldStress,protectedWarning:actionResultProtectedWarning,safeLaneVisible:Boolean(this.currentMythicSafeLanePresentation),reducedMotion:this.presentationSettings.reducedMotion,reducedFlash:this.presentationSettings.reducedFlash});
     this.presentation.renderScreenEffects(ctx, this.presentationSettings.reducedFlash, this.presentationSettings.reducedMotion);
-    this.pickups.render(ctx, this.battlefieldInteractionVfxAtlasImage, this.battlefieldInteractionVfxAtlasReady, this.pickupFlowVfxAtlasImage, this.pickupFlowVfxAtlasReady, this.presentationSettings.reducedFlash);
     this.drawCore(ctx, secondaryMotion);
     this.enemies.renderProjectiles(ctx, this.bossSpecialCombatVfxAtlasImage, this.bossSpecialCombatVfxAtlasReady, this.battlefieldEnvironmentReactionVfxAtlasImage, this.battlefieldEnvironmentReactionVfxAtlasReady, this.bossProjectileLifecycleVfxAtlasImage, this.bossProjectileLifecycleVfxAtlasReady, this.presentation.quality, this.presentationSettings.reducedFlash, this.presentationSettings.reducedMotion, this.hero.pos, this.currentMythicSafeLanePresentation?.target??null);
     this.drawProjectileThreatVisibility(ctx);

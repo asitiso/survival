@@ -3506,6 +3506,7 @@ export class Game {
     this.drawTerrainForegroundOcclusion(ctx);
     this.spells.renderPersistentReadabilityLayer(ctx, this.heroSpellSignatureVfxAtlasImage, this.heroSpellSignatureVfxAtlasReady, this.heroUltimateSignatureVfxAtlasImage, this.heroUltimateSignatureVfxAtlasReady, this.crowdControlPropagationVfxAtlasImage, this.crowdControlPropagationVfxAtlasReady, this.presentationSettings.reducedFlash);
     this.pickups.renderInteractionLayer(ctx, this.pickupFlowVfxAtlasImage, this.pickupFlowVfxAtlasReady, this.presentationSettings.reducedFlash);
+    this.drawSupplyCrateResponseIdentity(ctx, secondaryMotion);
     this.drawElitePackApproachFormationVfx(ctx);
     this.drawGoldenGoblinEventResponseIdentity(ctx);
     this.drawMythicTacticPrimedIcon(ctx);
@@ -5689,6 +5690,15 @@ export class Game {
         ctx.fillRect(-28, -5, 56, 10);
       }
     }
+    ctx.restore();
+  }
+
+  private drawSupplyCrateResponseIdentity(ctx: CanvasRenderingContext2D, motion: SecondaryCombatMotionPolicy): void {
+    if (!this.supplyCrate) return;
+    const pulse = 1 + Math.sin(this.elapsed * 4) * motion.supplyCrateMotionAmplitude;
+    ctx.save();
+    ctx.translate(this.supplyCrate.x, this.supplyCrate.y);
+    ctx.scale(pulse, pulse);
     this.drawFieldEventResponseIdentity(ctx,'supplyDrop',0,-43,20);
     ctx.restore();
   }

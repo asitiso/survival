@@ -5,7 +5,7 @@ on:
     types: [opened, synchronize, reopened]
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: fast-gate-${{ github.event.pull_request.number || github.ref }}
@@ -18,34 +18,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Apply bounded Phase 4885 split
-        run: node scripts/apply-phase4885-supply-crate-layering.mjs
-      - name: Guard production diff
-        shell: bash
-        run: |
-          mapfile -t changed < <(git diff --name-only)
-          printf 'Uncommitted files (%s):\n' "${#changed[@]}"
-          printf '  %s\n' "${changed[@]}"
-          test "${#changed[@]}" -eq 1
-          test "${changed[0]}" = "src/game/game.ts"
       - name: Build once
         run: npm run build
-      - name: Phase 4885 focused regression
-        run: node --test tests/phase4885-supply-crate-ground-response-layering.test.mjs tests/phase2423-2430-battlefield-interaction-visual-assets.test.mjs
-      - name: Commit verified production change and remove applicator
+      - name: Focused + directly coupled regression
         shell: bash
         run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git checkout "origin/${{ github.base_ref }}" -- .github/workflows/fast-gate.yml
-          rm scripts/apply-phase4885-supply-crate-layering.mjs
-          git add src/game/game.ts .github/workflows/fast-gate.yml scripts/apply-phase4885-supply-crate-layering.mjs
-          git commit -m 'feat: split Phase 4885 supply crate response layering'
-          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
+          base="origin/${{ github.base_ref }}"
+          mapfile -t files < <(node scripts/fast-gate-select.mjs "$base")
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo 'No focused or directly coupled tests selected.'
+            exit 0
+          fi
+          printf 'Selected tests (%s):\n' "${#files[@]}"
+          printf '  %s\n' "${files[@]}"
+          node --test "${files[@]}"

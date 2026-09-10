@@ -16,8 +16,10 @@ const normalizedInventory = (state: EquipmentState): EquipmentStack[] =>
 
 const normalizedRecipes = (state: EquipmentState): string[] => [...(state.discoveredRecipes ?? [])];
 
-const result = (state: EquipmentState, ok: boolean, message: string): EquipmentTransactionResult => ({
-  ok,
+const failure = (state: EquipmentState, message: string): EquipmentTransactionResult => ({ ok: false, state, message });
+
+const success = (state: EquipmentState, message: string): EquipmentTransactionResult => ({
+  ok: true,
   state: {
     ...state,
     inventory: normalizedInventory(state),
@@ -54,22 +56,22 @@ export function addInventoryItem(
 ): EquipmentTransactionResult {
   const amount = Math.floor(count);
   const next: EquipmentState = { ...state, inventory: normalizedInventory(state), discoveredRecipes: normalizedRecipes(state) };
-  if (amount <= 0) return result(next, false, 'Inventory count must be positive.');
-  if (!addToInventory(next.inventory!, { ...item }, amount)) return result(next, false, 'Inventory is full.');
-  return result(next, true, 'Item added to inventory.');
+  if (amount <= 0) return failure(state, 'Inventory count must be positive.');
+  if (!addToInventory(next.inventory!, { ...item }, amount)) return failure(state, 'Inventory is full.');
+  return success(next, 'Item added to inventory.');
 }
 
 export function equipInventoryStack(state: EquipmentState, stackKey: string): EquipmentTransactionResult {
   const inventory = normalizedInventory(state);
   const index = inventory.findIndex((stack) => inventoryStackKey(stack.id, stack.rank) === stackKey);
-  if (index < 0) return result(state, false, 'Inventory item not found.');
+  if (index < 0) return failure(state, 'Inventory item not found.');
   const selected = { ...inventory[index]! };
   const slot: 'weapon' | 'armor' | 'accessory' = selected.kind;
   const displaced = state[slot] as EquippedItem | null | undefined;
   inventory[index]!.count -= 1;
   if (inventory[index]!.count <= 0) inventory.splice(index, 1);
   if (displaced && !addToInventory(inventory, { ...displaced }, 1)) {
-    return result(state, false, 'Inventory is full for the equipped item.');
+    return failure(state, 'Inventory is full for the equipped item.');
   }
   const next: EquipmentState = {
     ...state,
@@ -77,7 +79,7 @@ export function equipInventoryStack(state: EquipmentState, stackKey: string): Eq
     inventory,
     discoveredRecipes: normalizedRecipes(state),
   };
-  return result(next, true, 'Item equipped.');
+  return success(next, 'Item equipped.');
 }
 
 export function sellInventoryStack(
@@ -87,7 +89,7 @@ export function sellInventoryStack(
 ): EquipmentTransactionResult {
   const inventory = normalizedInventory(state);
   const index = inventory.findIndex((stack) => inventoryStackKey(stack.id, stack.rank) === stackKey);
-  if (index < 0) return result(state, false, 'Inventory item not found.');
+  if (index < 0) return failure(state, 'Inventory item not found.');
   inventory[index]!.count -= 1;
   if (inventory[index]!.count <= 0) inventory.splice(index, 1);
   const next: EquipmentState = {
@@ -96,5 +98,5 @@ export function sellInventoryStack(
     inventory,
     discoveredRecipes: normalizedRecipes(state),
   };
-  return result(next, true, 'Item sold.');
+  return success(next, 'Item sold.');
 }

@@ -38,3 +38,26 @@ test('sale refunds 35 percent of base price and removes one unit', () => {
   assert.equal(out.state.coins, 70);
   assert.equal(out.state.inventory.length, 0);
 });
+
+test('failed transactions preserve exact original state identity and data', () => {
+  let state = empty();
+  for (let i = 0; i < 6; i += 1) state = addInventoryItem(state, item(`w${i}`)).state;
+  const full = addInventoryItem(state, item('w6'));
+  assert.equal(full.state, state);
+  assert.deepEqual(full.state.inventory, state.inventory);
+
+  const missing = sellInventoryStack(state, inventoryStackKey('missing', 1), 200);
+  assert.equal(missing.state, state);
+  assert.deepEqual(missing.state.inventory, state.inventory);
+});
+
+test('equip failure preserves state when displaced item has no inventory space', () => {
+  let state = { ...empty(), weapon: item('old') };
+  for (let i = 0; i < 6; i += 1) state = addInventoryItem(state, item(`w${i}`)).state;
+  state = addInventoryItem(state, item('w0')).state;
+  const out = equipInventoryStack(state, inventoryStackKey('w0', 1));
+  assert.equal(out.ok, false);
+  assert.equal(out.state, state);
+  assert.deepEqual(out.state.inventory, state.inventory);
+  assert.equal(out.state.weapon.id, 'old');
+});

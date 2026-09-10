@@ -1,0 +1,49 @@
+name: Phase 4884 Pickup Layer Applicator
+
+on:
+  push:
+    branches:
+      - work/phase4884-pickup-ground-interaction
+    paths:
+      - .github/workflows/phase4884-pickup-layer-apply.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/phase4884-pickup-ground-interaction
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply bounded Phase 4884 split
+        run: node scripts/apply-phase4884-pickup-ground-interaction.mjs
+      - name: Diff guard
+        shell: bash
+        run: |
+          git diff --check
+          changed="$(git diff --name-only | sort)"
+          printf '%s\n' "$changed"
+          test "$changed" = $'src/game/game.ts\nsrc/game/pickups.ts'
+      - name: Build
+        run: npm run build
+      - name: Phase 4884 focused regression
+        run: node --test tests/phase4884-pickup-ground-interaction-layer.test.mjs
+      - name: Commit verified production change and remove applicator
+        shell: bash
+        run: |
+          rm .github/workflows/phase4884-pickup-layer-apply.yml scripts/apply-phase4884-pickup-ground-interaction.mjs
+          git add src/game/game.ts src/game/pickups.ts .github/workflows/phase4884-pickup-layer-apply.yml scripts/apply-phase4884-pickup-ground-interaction.mjs
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat: split Phase 4884 pickup ground and interaction layers'
+          git push origin HEAD:work/phase4884-pickup-ground-interaction

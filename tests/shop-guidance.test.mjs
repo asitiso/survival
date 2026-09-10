@@ -44,7 +44,7 @@ test('phase 430 shop guidance highlights no more than two affordable offers and 
 });
 
 import { quickShopRecommendation, safeQuickPurchase } from '../dist/game/shop-guidance.js';
-import { equipmentCatalog, equipmentDefinition } from '../dist/game/shop-data.js';
+import { equipmentCatalog, equipmentDefinition, priceShopOffers } from '../dist/game/shop-data.js';
 const gear=(id,rank)=>({...equipmentCatalog().find(x=>x.id===id),rank,legendary:rank>=5});
 const readyState={...empty,coins:10000,inventory:[],discoveredRecipes:[],accessory:null};
 test('late guidance prioritizes weakest survival metric over hero build preference with a concrete gain',()=>{
@@ -83,6 +83,15 @@ test('crafted equipment is never eligible for quick buy',()=>{
  const guidance=[{offerId:crafted.id,label:'추천',reason:'조합',score:100,best:true,action:'purchase'}];
  assert.equal(safeQuickPurchase(crafted,[crafted],readyState),false);
  assert.equal(quickShopRecommendation([crafted],guidance,readyState),null);
+});
+test('ordinary rank-one material stays eligible before the legacy forge unlock',()=>{
+ const state={...readyState,weapon:gear('arcane-staff',1),armor:gear('guardian-plate',3)};
+ const [priced]=priceShopOffers([equipmentCatalog().find(item=>item.id==='arcane-staff')],state,30);
+ assert.equal(priced.locked,true,'fixture must retain the legacy next-rank presentation flag');
+ const [guided]=shopGuidanceForOffers([priced],{heroId:'arkan',archetype:'burst',state,elapsedSeconds:30,heroMaxHp:10000});
+ assert.equal(guided.action,'purchase');assert.equal(guided.best,true);
+ assert.equal(safeQuickPurchase(priced,[priced],state),true);
+ assert.equal(quickShopRecommendation([priced],[guided],state),priced);
 });
 test('recipe guidance previews a forge without consuming ingredients',()=>{
  const state={...readyState,weapon:gear('arcane-staff',1),armor:gear('iron-robe',3),accessory:gear('sage-amulet',3),inventory:[{...gear('arcane-staff',2),count:1},{...gear('rapid-wand',2),count:1}]};

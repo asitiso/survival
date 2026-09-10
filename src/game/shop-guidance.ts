@@ -5,7 +5,7 @@ import type { HeroId } from './hero-profiles.js';
 import type { ShopDisplayOffer } from './shop-data.js';
 import type { BuildArchetype } from './endless/build-overdrive.js';
 import { canStoreInventoryItem, equipInventoryStack, inventoryStackKey } from '../domain/equipment-inventory.js';
-import { strengthenEquipment, strengthenRequirement, combineEquipment } from '../domain/equipment-forge.js';
+import { strengthenEquipment, combineEquipment } from '../domain/equipment-forge.js';
 import { equipmentRecipes } from './equipment-recipes.js';
 import { equipmentReadiness, type EquipmentReadinessResult } from './equipment-survival-readiness.js';
 
@@ -70,7 +70,7 @@ function protectedReplacement(offer:ShopDisplayOffer,state:EquipmentState):boole
   return Boolean(current&&current.id!==offer.id&&(current.legendary||current.rank>=3));
 }
 export function safeQuickPurchase(offer:ShopDisplayOffer,offers:readonly ShopDisplayOffer[],state:EquipmentState):boolean{
-  if (offer.locked || equipmentRecipes().some(recipe => recipe.result.id === offer.id)) return false;
+  if (equipmentRecipes().some(recipe => recipe.result.id === offer.id)) return false;
   const exact=offers.some((candidate)=>candidate===offer||(candidate.id===offer.id&&candidate.kind===offer.kind&&candidate.price===offer.price));
   if(!exact||offer.price>state.coins||protectedReplacement(offer,state))return false;
   const current=offer.kind==='potion'?null:state[offer.kind];
@@ -108,13 +108,13 @@ function survivalGuidance(offers: readonly ShopDisplayOffer[], context: ShopGuid
       score: improvement > 0 ? 100 + improvement * 100 : -1, best: false, action: 'purchase',
     };
     if (blocked && improvement > 0) entry = { ...entry, label: '보관함 정리 필요', reason: `장비 판매 또는 조합 후 ${offer.name} 구매 가능`, action: 'cleanup', score: 1000 + improvement };
-    if (offer.locked || offer.price > state.coins) entry.score = -100;
+    if (offer.price > state.coins) entry.score = -100;
     if (current?.id === offer.id) {
       const strengthened = strengthenEquipment(state, { place: 'equipped', kind: offer.kind }, context.elapsedSeconds!);
       if (strengthened.ok && gain(read(strengthened.state)) > 0) {
         const upgraded = read(strengthened.state);
         entry = { ...entry, action: 'forge', label: '대장간 추천', reason: reason(upgraded, `${offer.name} 강화`), score: 2000 + gain(upgraded) };
-      } else if (!blocked && context.elapsedSeconds! >= strengthenRequirement(current.rank).unlockAtSeconds) {
+      } else if (!blocked) {
         // A missing duplicate is useful, but never claim it strengthens on purchase.
         const upgraded = read({ ...state, [offer.kind]: { ...current, rank: current.rank + 1, legendary: current.rank + 1 >= 5 } });
         if (gain(upgraded) > 0) entry = { ...entry, reason: `강화 재료 구매 · ${reason(upgraded, '대장간 강화')}`, score: offer.price <= state.coins ? 50 + gain(upgraded) : -100 };

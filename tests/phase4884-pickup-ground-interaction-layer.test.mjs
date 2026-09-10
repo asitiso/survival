@@ -5,6 +5,7 @@ import fs from 'node:fs';
 const pickupSource = fs.readFileSync(new URL('../src/game/pickups.ts', import.meta.url), 'utf8');
 const gameSource = fs.readFileSync(new URL('../src/game/game.ts', import.meta.url), 'utf8');
 
+// Phase 4884 is rendering-only: the final contract pins the existing pickup gameplay formulas below.
 function indexOfOrFail(source, needle, label) {
   const index = source.indexOf(needle);
   assert.notEqual(index, -1, `missing ${label}`);

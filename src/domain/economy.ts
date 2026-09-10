@@ -48,8 +48,8 @@ function cloneState(state: EquipmentState): EquipmentState {
     armor: cloneItem(state.armor),
     ...(state.accessory !== undefined ? { accessory: cloneItem(state.accessory) } : {}),
     healingPotions: state.healingPotions,
-    ...(state.inventory !== undefined ? { inventory: state.inventory.map(item => ({ ...item })) } : {}),
-    ...(state.discoveredRecipes !== undefined ? { discoveredRecipes: [...state.discoveredRecipes] } : {}),
+    inventory: state.inventory.map(item => ({ ...item })),
+    discoveredRecipes: [...state.discoveredRecipes],
   };
 }
 

@@ -19,7 +19,7 @@ function snapshot(heroId:HeroId,elapsed:number,seed:number):RunSnapshot{return{
   version:1,savedAt:elapsed*1000,heroId,traitId:'destruction',threatLevel:5,elapsed,
   hero:{level:42,xp:420,xpNext:900,hp:760,maxHp:900,coins:2400,kills:1800},coreHp:820,
   spellLevels:{fireBolt:10,chainLightning:10,frostNova:10,flameField:10,meteorStorm:6,blackHole:6},
-  equipment:{coins:2400,weapon:{id:'arcane-staff',kind:'weapon',name:'Arcane',rank:4,power:.15,legendary:false},armor:{id:'iron-robe',kind:'armor',name:'Robe',rank:4,power:.08,legendary:false},healingPotions:2},
+  equipment:{coins:2400,weapon:{id:'arcane-staff',kind:'weapon',name:'Arcane',rank:4,power:.15,legendary:false},armor:{id:'iron-robe',kind:'armor',name:'Robe',rank:4,power:.08,legendary:false},healingPotions:2,inventory:[],discoveredRecipes:[]},
   relic:'abyss-eye',fusions:['solar-detonation'],fateChoices:['frenzy'],map:{id:'ruinedGate',evolutionStage:2},progression:{bossesKilled:4,goldEarned:8200,shopTokens:2},
   endless:serializeExtension(createDefaultEndlessState(seed)),
 };}

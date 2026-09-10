@@ -25,7 +25,7 @@ import { HeroSelectOverlay } from '../ui/hero-select.js';
 import { ResultsOverlay } from '../ui/results.js';
 import { LobbyOverlay } from '../ui/lobby.js';
 import { TraitSelectOverlay } from '../ui/trait-select.js';
-import { generateShopOffers, type ShopDisplayOffer } from './shop-data.js';
+import { refreshEquipmentPowers, priceShopOffers, ensureEquippedOffers, generateShopOffers, type ShopDisplayOffer } from './shop-data.js';
 import { quickShopRecommendation, safeQuickPurchase, shopGuidanceForOffers } from './shop-guidance.js';
 import { purchaseOffer, rerollCost, SHOP_FIRST_TOKEN_AT, SHOP_TOKEN_INTERVAL } from '../domain/economy.js';
 import type { EquipmentState } from '../domain/types.js';
@@ -35,7 +35,7 @@ import { kainOverloadCooldownMultiplier, kainOverloadNext } from './hero-passive
 import { heroActionLabel } from './hero-spells.js';
 import { FieldEventDirector, eliteRushCount, fieldEventArenaPosition, fieldEventModifiers, type ActiveFieldEvent, type FieldEventId } from './field-events.js';
 import { calculateArcaneShards } from '../domain/meta-rewards.js';
-import { defaultMetaProfile, loadMetaProfile, metaBonuses, purchaseMetaUpgrade, saveMetaProfile, type MetaProfile } from '../domain/meta-profile.js';
+import { defaultMetaProfile, discoverEquipmentRecipe, loadMetaProfile, metaBonuses, purchaseMetaUpgrade, saveMetaProfile, type MetaProfile } from '../domain/meta-profile.js';
 import { MASTERY_RUN_TRAITS, RUN_TRAITS, runTraitBonuses, type RunTraitId } from './run-traits.js';
 import { composeRunStartStats } from './run-start.js';
 import { relicDefinition, relicDisplayName, type RelicId } from './relics.js';
@@ -510,8 +510,9 @@ export class Game {
 
   private queuedLevelUps = 0;
   private queuedBossRewards = 0;
-  private equipmentState: EquipmentState = { coins: 0, weapon: null, armor: null, healingPotions: 1 };
+  private equipmentState: EquipmentState = { coins: 0, weapon: null, armor: null, accessory: null, healingPotions: 1, inventory: [], discoveredRecipes: [] };
   private shopOffers: ShopDisplayOffer[] = [];
+  private shopAccessoryChoice: string | null = null;
   private shopImpactMessage = '';
   private damageReasonState: DamageReasonState | null = null;
   private attackResolutionHandoffState:AttackResolutionHandoffState=createAttackResolutionHandoffState();
@@ -2282,6 +2283,7 @@ export class Game {
     this.bossesKilled = 0;
     this.goldEarned = 0;
     this.autoCastNormal = openingAutoReadyProfile().initialAutoEnabled;
+    this.input.resetAutoReveal();
     this.autoTargetId = null;
     this.autoCombatBrain.reset();
     this.enemies.reset();
@@ -2374,7 +2376,7 @@ export class Game {
     this.shopOverlay.hide();
     this.queuedLevelUps = 0;
     this.queuedBossRewards = 0;
-    this.equipmentState = { coins: startStats.startingGold, weapon: null, armor: null, healingPotions: 1 };
+    this.equipmentState = { coins: startStats.startingGold + 180, weapon: null, armor: null, accessory: null, healingPotions: 1, inventory: [], discoveredRecipes: [] };
     this.rerollsThisVisit = 0;
     this.shopImpactMessage = '';
     this.damageReasonState = null;
@@ -2608,7 +2610,7 @@ export class Game {
 
     this.input.refreshKeyboardMovement();
     if (this.input.consumePressed('potion')) this.useHealingPotion();
-    if (this.input.consumePressed('auto')) {
+    if (this.input.consumePressed('auto') && this.input.autoModeVisible) {
       this.autoCastNormal = !this.autoCastNormal;
       this.manualTargetMemory.clear();
       this.autoCombatBrain.reset();
@@ -3496,7 +3498,7 @@ export class Game {
     this.drawBossArenaTransitionWorldVfx(ctx);
     this.drawBossPhaseTransitionVfx(ctx);
     this.spells.renderGroundLayer(ctx, residualMotion, this.battlefieldPropVfxAtlasImage, this.battlefieldPropVfxAtlasReady, this.heroSpellSignatureVfxAtlasImage, this.heroSpellSignatureVfxAtlasReady, this.heroUltimateSignatureVfxAtlasImage, this.heroUltimateSignatureVfxAtlasReady, this.persistentSpellZoneVfxAtlasImage, this.persistentSpellZoneVfxAtlasReady, this.crowdControlPropagationVfxAtlasImage, this.crowdControlPropagationVfxAtlasReady, this.presentationSettings.reducedFlash, this.ultimatePostImpactResidueVfxAtlasImage, this.ultimatePostImpactResidueVfxAtlasReady);
-    this.drawEnemySpawnLaneReadability(ctx);
+    // Enemy arrival arrows are intentionally hidden.
     this.enemies.renderEnemies(ctx, this.enemySpriteAtlasImage, this.enemySpriteAtlasReady, this.bossSpriteAtlasImage, this.bossSpriteAtlasReady, residualMotion, this.eliteAffixIdentityAtlasImage, this.eliteAffixIdentityAtlasReady, this.specialistIntentAtlasImage, this.specialistIntentAtlasReady, this.hero.pos, this.specialistCombatVfxAtlasImage, this.specialistCombatVfxAtlasReady, this.bossPhaseOverlayVfxAtlasImage, this.bossPhaseOverlayVfxAtlasReady, this.battlefieldInteractionVfxAtlasImage, this.battlefieldInteractionVfxAtlasReady, this.spawnPressureVfxAtlasImage, this.spawnPressureVfxAtlasReady, this.regularEnemyActionVfxAtlasImage, this.regularEnemyActionVfxAtlasReady, this.eliteAffixLifecycleVfxAtlasImage, this.eliteAffixLifecycleVfxAtlasReady, this.enemyTargetPressureVfxAtlasImage, this.enemyTargetPressureVfxAtlasReady, this.core.pos, this.specialistReactionLifecycleVfxAtlasImage, this.specialistReactionLifecycleVfxAtlasReady, this.presentationSettings.reducedFlash, this.presentationSettings.reducedMotion, Math.min(1,this.bossArena.hazards.length/6));
     this.drawEnemyDefeatBodyTransitions(ctx);
     this.drawEnemyCombatImageVfx(ctx);
@@ -5006,10 +5008,10 @@ export class Game {
     const meterLabel = heroMeterLabel(this.hero.profileId);
     ctx.fillStyle = 'rgba(4,8,15,.72)'; ctx.fillRect(18, 114, 440, this.hero.profileId === 'kain' ? 48 : 28);
     const meterRatio = this.heroMeter.activeTimer > 0 ? 1 : this.heroMeter.charge;
-    this.drawHeroMeterIdentityHud(ctx, 101, 116, 22);
-    this.drawBar(ctx, 132, 122, 290, 10, meterRatio, meterLabel.color, '#211b35');
+    this.drawHeroMeterIdentityHud(ctx, 236, 116, 22);
+    this.drawBar(ctx, 268, 122, 154, 10, meterRatio, meterLabel.color, '#211b35');
     ctx.fillStyle = meterLabel.color; ctx.font = '800 12px system-ui';
-    if (density.showMeterText && ((focus.showMeterText && ultraHudFocus.showMeterText) || this.heroMeter.activeTimer > 0)) ctx.fillText(this.heroMeter.activeTimer > 0 ? `${meterLabel.activeName} ${this.heroMeter.activeTimer.toFixed(1)}s` : `${meterLabel.name} ${Math.round(this.heroMeter.charge * 100)}%`, 34, 134);
+    if (density.showMeterText && ((focus.showMeterText && ultraHudFocus.showMeterText) || this.heroMeter.activeTimer > 0)) ctx.fillText(this.heroMeter.activeTimer > 0 ? `${meterLabel.activeName} ${this.heroMeter.activeTimer.toFixed(1)}s` : `${meterLabel.name} ${Math.round(this.heroMeter.charge * 100)}%`, 34, 134, 190);
     if (this.hero.profileId === 'kain') {
       this.drawBar(ctx, 132, 145, 290, 7, this.kainOverload, '#a88cff', '#211b35');
       if (density.showMeterText && focus.showMeterText && ultraHudFocus.showMeterText) { ctx.fillStyle = '#cbbdff'; ctx.font = '700 10px system-ui'; ctx.fillText(`과부하 ${Math.round(this.kainOverload * 100)}%`, 34, 153); }
@@ -5519,6 +5521,7 @@ export class Game {
     }
 
     for (const button of ACTION_BUTTONS) {
+      if (button.id === 'auto' && !this.input.autoModeVisible) continue;
       const held = this.input.isHeld(button.id);
       const unavailableShop = button.id === 'shop' && this.shopTokens <= 0;
       const autoActive = button.id === 'auto' && this.autoCastNormal;
@@ -7297,11 +7300,13 @@ export class Game {
     this.paused = true;
     this.rerollsThisVisit = 0;
     this.shopImpactMessage = '';
+    this.shopAccessoryChoice = null;
     this.shopOffers = generateShopOffers();
     this.refreshShopOverlay();
   }
 
   private refreshShopOverlay(): void {
+    this.shopOffers = priceShopOffers(ensureEquippedOffers(this.shopOffers, this.equipmentState, this.shopAccessoryChoice), this.equipmentState, this.elapsed);
     const guidance = shopGuidanceForOffers(this.shopOffers, { heroId:this.hero.profileId, archetype:this.currentBuildArchetype(), state:this.equipmentState });
     const quickOffer=quickShopRecommendation(this.shopOffers,guidance,this.equipmentState);
     const openingFastPath=openingShopFastPath(this.elapsed,Boolean(quickOffer));
@@ -7311,22 +7316,24 @@ export class Game {
     const fastPath=promotedFast.promoteQuickBuy
       ? {promoteQuickBuy:true,position:'before-grid' as const,estimatedPointerTravelReduction:promotedFast.estimatedPointerTravelReduction,newControlCount:0 as const}
       : openingFastPath;
-    const model = { state: this.equipmentState, offers: this.shopOffers, rerollPrice: rerollCost(this.rerollsThisVisit), guidance, impactMessage:this.shopImpactMessage, quickOffer, fastPath };
+    const model = { elapsedSeconds: this.elapsed, state: this.equipmentState, offers: this.shopOffers, rerollPrice: rerollCost(this.rerollsThisVisit), guidance, impactMessage:this.shopImpactMessage, quickOffer, fastPath };
     const purchase = (offer:ShopDisplayOffer,closeAfterPurchase=false):void => {
       const beforeState = this.equipmentState;
       const beforeWeaponLegendary = this.equipmentState.weapon?.legendary ?? false;
       const beforeArmorLegendary = this.equipmentState.armor?.legendary ?? false;
-      const result = purchaseOffer(this.equipmentState, offer);
+      const beforeAccessoryLegendary = this.equipmentState.accessory?.legendary ?? false;
+      const result = purchaseOffer(this.equipmentState, offer, this.elapsed);
       if (!result.ok) return;
       this.equipmentState = result.state;
       this.shopImpactMessage = purchaseImpactFeedback(beforeState, result.state, offer).message;
-      const becameLegendary = (!beforeWeaponLegendary && (result.state.weapon?.legendary ?? false)) || (!beforeArmorLegendary && (result.state.armor?.legendary ?? false));
+      const becameLegendary = (!beforeWeaponLegendary && (result.state.weapon?.legendary ?? false)) || (!beforeArmorLegendary && (result.state.armor?.legendary ?? false)) || (!beforeAccessoryLegendary && (result.state.accessory?.legendary ?? false));
       this.audio.play(becameLegendary ? 'legendary' : 'purchase');
       this.syncEquipmentState();
       if (closeAfterPurchase) { this.shopOverlay.hide(); this.paused = false; return; }
       this.refreshShopOverlay();
     };
     const handlers = {
+      onAccessoryChange: (id: string) => { this.shopAccessoryChoice = id; this.refreshShopOverlay(); },
       onPurchase: (offer: ShopDisplayOffer) => purchase(offer,false),
       onQuickPurchase: (offer: ShopDisplayOffer) => {
         const currentGuidance=shopGuidanceForOffers(this.shopOffers,{heroId:this.hero.profileId,archetype:this.currentBuildArchetype(),state:this.equipmentState});
@@ -7568,6 +7575,11 @@ export class Game {
     }
   }
 
+  private recordEquipmentRecipeDiscovery(recipeId: string): void {
+    this.metaProfile = discoverEquipmentRecipe(this.metaProfile, recipeId);
+    this.saveStoredMetaProfile();
+  }
+
   private loadStoredRunSnapshot(): RunSnapshot | null {
     try { return typeof window === 'undefined' ? null : loadRunSnapshotWithJournal(this.storage); }
     catch { return null; }
@@ -7615,7 +7627,7 @@ export class Game {
     this.hero.level = snapshot.hero.level; this.hero.xp = snapshot.hero.xp; this.hero.xpNext = snapshot.hero.xpNext; this.hero.hp = snapshot.hero.hp; this.hero.maxHp = snapshot.hero.maxHp; this.hero.coins = snapshot.hero.coins; this.hero.kills = snapshot.hero.kills;
     this.core.hp = Math.min(this.core.maxHp, snapshot.coreHp);
     for (const id of Object.keys(snapshot.spellLevels) as SpellId[]) this.spells.levels[id] = snapshot.spellLevels[id];
-    this.equipmentState = structuredClone(snapshot.equipment); this.activeRelic = snapshot.relic; this.fusionRuntime.restore(snapshot.fusions); this.fateRuntime.restore(snapshot.fateChoices);
+    this.equipmentState = refreshEquipmentPowers(structuredClone(snapshot.equipment)); this.activeRelic = snapshot.relic; this.fusionRuntime.restore(snapshot.fusions); this.fateRuntime.restore(snapshot.fateChoices);
     this.terrain.restore(snapshot.map.id, snapshot.map.evolutionStage);
     this.bossesKilled = snapshot.progression.bossesKilled; this.goldEarned = snapshot.progression.goldEarned; this.shopTokens = snapshot.progression.shopTokens;
     this.endlessState = restoreExtension(snapshot.endless ?? '', this.endlessState.rng.seed);

@@ -21,8 +21,8 @@ export interface EquipmentState {
   /** Missing on older saves; treated as an empty third slot. */
   accessory?: EquippedItem | null;
   healingPotions: number;
-  inventory?: EquipmentStack[];
-  discoveredRecipes?: string[];
+  inventory: EquipmentStack[];
+  discoveredRecipes: string[];
 }
 
 export interface EquipmentTransactionResult {

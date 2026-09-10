@@ -13,6 +13,7 @@ export interface MetaProfile {
   version: 1;
   shards: number;
   upgrades: MetaUpgradeLevels;
+  discoveredEquipmentRecipes: string[];
 }
 
 export interface MetaBonuses {
@@ -32,6 +33,7 @@ const PROFILE_KEY = 'arcane-last-stand.meta-profile';
 const LEGACY_SHARDS_KEY = 'arcane-last-stand.shards';
 const COSTS = [15, 25, 40, 60, 85] as const;
 const CAPS: Record<MetaUpgradeId, number> = { vitality: 5, power: 5, bankroll: 5, magnet: 4 };
+const HIDDEN_EQUIPMENT_RECIPE_IDS = new Set(['celestial-fusion-staff', 'world-tree-armor', 'fate-core']);
 
 function safeInteger(value: unknown, min: number, max: number): number {
   const numeric = typeof value === 'number' ? value : Number(value);
@@ -40,10 +42,10 @@ function safeInteger(value: unknown, min: number, max: number): number {
 }
 
 export function defaultMetaProfile(): MetaProfile {
-  return { version: 1, shards: 0, upgrades: { vitality: 0, power: 0, bankroll: 0, magnet: 0 } };
+  return { version: 1, shards: 0, upgrades: { vitality: 0, power: 0, bankroll: 0, magnet: 0 }, discoveredEquipmentRecipes: [] };
 }
 
-function sanitizeProfile(raw: unknown): MetaProfile {
+export function sanitizeMetaProfile(raw: unknown): MetaProfile {
   const source = typeof raw === 'object' && raw !== null ? raw as Record<string, unknown> : {};
   const upgradesRaw = typeof source.upgrades === 'object' && source.upgrades !== null
     ? source.upgrades as Record<string, unknown>
@@ -57,12 +59,21 @@ function sanitizeProfile(raw: unknown): MetaProfile {
       bankroll: safeInteger(upgradesRaw.bankroll, 0, CAPS.bankroll),
       magnet: safeInteger(upgradesRaw.magnet, 0, CAPS.magnet),
     },
+    discoveredEquipmentRecipes: Array.isArray(source.discoveredEquipmentRecipes)
+      ? [...new Set(source.discoveredEquipmentRecipes.filter((id): id is string => typeof id === 'string' && HIDDEN_EQUIPMENT_RECIPE_IDS.has(id)))]
+      : [],
   };
+}
+
+export function discoverEquipmentRecipe(profile: MetaProfile, recipeId: string): MetaProfile {
+  const safe = sanitizeMetaProfile(profile);
+  if (!HIDDEN_EQUIPMENT_RECIPE_IDS.has(recipeId) || safe.discoveredEquipmentRecipes.includes(recipeId)) return safe;
+  return { ...safe, discoveredEquipmentRecipes: [...safe.discoveredEquipmentRecipes, recipeId] };
 }
 
 export function saveMetaProfile(storage: KeyValueStorage, profile: MetaProfile): void {
   try {
-    storage.setItem(PROFILE_KEY, JSON.stringify(sanitizeProfile(profile)));
+    storage.setItem(PROFILE_KEY, JSON.stringify(sanitizeMetaProfile(profile)));
   } catch {
     // Storage is optional. Gameplay must keep working in sandbox/privacy modes.
   }
@@ -72,7 +83,7 @@ export function loadMetaProfile(storage: KeyValueStorage): MetaProfile {
   try {
     const raw = storage.getItem(PROFILE_KEY);
     if (raw !== null) {
-      try { return sanitizeProfile(JSON.parse(raw)); }
+      try { return sanitizeMetaProfile(JSON.parse(raw)); }
       catch { return defaultMetaProfile(); }
     }
 
@@ -93,7 +104,7 @@ export function metaUpgradeCost(id: MetaUpgradeId, currentLevel: number): number
 }
 
 export function purchaseMetaUpgrade(profile: MetaProfile, id: MetaUpgradeId): MetaPurchaseResult {
-  const safe = sanitizeProfile(profile);
+  const safe = sanitizeMetaProfile(profile);
   const level = safe.upgrades[id];
   const cost = metaUpgradeCost(id, level);
   if (cost === null) return { ok: false, profile: safe, message: '최대 단계' };
@@ -110,7 +121,7 @@ export function purchaseMetaUpgrade(profile: MetaProfile, id: MetaUpgradeId): Me
 }
 
 export function metaBonuses(profile: MetaProfile): MetaBonuses {
-  const safe = sanitizeProfile(profile);
+  const safe = sanitizeMetaProfile(profile);
   return {
     maxHpMultiplier: 1 + safe.upgrades.vitality * 0.03,
     spellPowerMultiplier: 1 + safe.upgrades.power * 0.02,

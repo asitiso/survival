@@ -4,8 +4,49 @@ import {
   EquipmentTransactionResult,
   EquippedItem,
 } from './types.js';
+import { equipmentDefinition } from '../game/shop-data.js';
 
 export const EQUIPMENT_INVENTORY_CAPACITY = 6;
+
+function record(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null ? value as Record<string, unknown> : {};
+}
+
+function boundedInteger(value: unknown, min: number, max: number): number {
+  const numeric = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numeric)) return min;
+  return Math.min(max, Math.max(min, Math.floor(numeric)));
+}
+
+export function sanitizeEquipmentInventory(raw: unknown): EquipmentStack[] {
+  if (!Array.isArray(raw)) return [];
+  const inventory: EquipmentStack[] = [];
+  for (const entry of raw) {
+    const stack = record(entry);
+    if (typeof stack.id !== 'string') continue;
+    const definition = equipmentDefinition(stack.id);
+    if (!definition || stack.kind !== definition.kind) continue;
+    const rank = boundedInteger(stack.rank, 1, 10_000);
+    const count = boundedInteger(stack.count, 1, 99);
+    const key = inventoryStackKey(definition.id, rank);
+    const existing = inventory.find((candidate) => inventoryStackKey(candidate.id, candidate.rank) === key);
+    if (existing) {
+      existing.count = Math.min(99, existing.count + count);
+      continue;
+    }
+    if (inventory.length >= EQUIPMENT_INVENTORY_CAPACITY) continue;
+    inventory.push({
+      id: definition.id,
+      kind: definition.kind,
+      name: definition.name,
+      rank,
+      power: definition.power,
+      legendary: rank >= 5,
+      count,
+    });
+  }
+  return inventory;
+}
 
 export function inventoryStackKey(id: string, rank: number): string {
   return `${id}@${Math.max(1, Math.floor(rank))}`;

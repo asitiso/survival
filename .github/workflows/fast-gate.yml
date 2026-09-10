@@ -26,36 +26,15 @@ jobs:
       - run: npm ci
       - name: Build once
         run: npm run build
-      - name: Diagnose focused + directly coupled regression
-        id: diagnose
+      - name: Focused + directly coupled regression
         shell: bash
         run: |
           base="origin/${{ github.base_ref }}"
           mapfile -t files < <(node scripts/fast-gate-select.mjs "$base")
-          mkdir -p tmp
-          report=tmp/phase4884-fast-gate-diagnostic.txt
-          : > "$report"
-          printf 'Selected tests (%s):\n' "${#files[@]}" | tee -a "$report"
-          printf '  %s\n' "${files[@]}" | tee -a "$report"
-          failures=0
-          for file in "${files[@]}"; do
-            printf '\n===== %s =====\n' "$file" | tee -a "$report"
-            if node --test "$file" >> "$report" 2>&1; then
-              printf 'RESULT: PASS %s\n' "$file" | tee -a "$report"
-            else
-              printf 'RESULT: FAIL %s\n' "$file" | tee -a "$report"
-              failures=$((failures + 1))
-            fi
-          done
-          printf '\nFAILURES=%s\n' "$failures" | tee -a "$report"
-          echo "failures=$failures" >> "$GITHUB_OUTPUT"
-      - name: Upload diagnostic report
-        uses: actions/upload-artifact@v4
-        with:
-          name: phase4884-fast-gate-diagnostic
-          path: tmp/phase4884-fast-gate-diagnostic.txt
-          if-no-files-found: error
-          retention-days: 1
-      - name: Preserve gate result
-        if: steps.diagnose.outputs.failures != '0'
-        run: exit 1
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo 'No focused or directly coupled tests selected.'
+            exit 0
+          fi
+          printf 'Selected tests (%s):\n' "${#files[@]}"
+          printf '  %s\n' "${files[@]}"
+          node --test "${files[@]}"

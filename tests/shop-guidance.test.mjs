@@ -25,11 +25,11 @@ test('phase 428 shop guidance values upgrading the currently equipped item inste
   assert.ok(guided[1].score>guided[2].score);
 });
 
-test('phase 429 completed rank-five equipment is never highlighted as a recommendation',()=>{
+test('phase 429 legendary equipment remains eligible for useful upgrades',()=>{
   const state={...empty,weapon:{id:'arcane-staff',kind:'weapon',name:'마력 지팡이',rank:5,power:.15,legendary:true}};
   const guided=shopGuidanceForOffers(offers,{heroId:'arkan',archetype:'burst',state});
-  assert.equal(guided[0].best,false);
-  assert.equal(guided[0].label,'완성');
+  assert.equal(guided[0].best,true);
+  assert.match(guided[0].reason,/현재 장비 강화/);
 });
 
 test('phase 430 shop guidance highlights no more than two affordable offers and preserves offer order',()=>{
@@ -41,4 +41,54 @@ test('phase 430 shop guidance highlights no more than two affordable offers and 
   assert.equal(broke[0].best,false);
   assert.equal(broke[2].best,false);
   assert.equal(broke[4].best,true);
+});
+
+import { quickShopRecommendation, safeQuickPurchase } from '../dist/game/shop-guidance.js';
+import { equipmentCatalog, equipmentDefinition } from '../dist/game/shop-data.js';
+const gear=(id,rank)=>({...equipmentCatalog().find(x=>x.id===id),rank,legendary:rank>=5});
+const readyState={...empty,coins:10000,inventory:[],discoveredRecipes:[],accessory:null};
+test('late guidance prioritizes weakest survival metric over hero build preference with a concrete gain',()=>{
+ const state={...readyState,weapon:gear('arcane-staff',3),accessory:gear('sage-amulet',3)};
+ const catalog=equipmentCatalog();
+ const guided=shopGuidanceForOffers(catalog,{heroId:'arkan',archetype:'burst',state,elapsedSeconds:480,heroMaxHp:333});
+ const iron=guided.find(x=>x.offerId==='iron-robe');
+ assert.equal(iron.best,true);assert.match(iron.reason,/영웅 생존 부족.*타 증가/);
+ assert.ok(iron.score>guided.find(x=>x.offerId==='arcane-staff').score);
+});
+test('six distinct stacks prioritize cleanup over an otherwise recommended buy and disable quick buy',()=>{
+ const state={...readyState,weapon:gear('arcane-staff',3),armor:gear('gale-cloak',1),accessory:gear('sage-amulet',3),inventory:['rapid-wand','blast-rod','golden-wand','magnet-cloak','guardian-plate','storm-ring'].map(id=>({...gear(id,1),count:1}))};
+ const catalog=equipmentCatalog();
+ const guided=shopGuidanceForOffers(catalog,{heroId:'arkan',archetype:'burst',state,elapsedSeconds:480,heroMaxHp:333});
+ const iron=guided.find(x=>x.offerId==='iron-robe');
+ assert.equal(iron.label,'보관함 정리 필요');assert.equal(iron.action,'cleanup');assert.equal(iron.best,true);
+ assert.equal(quickShopRecommendation(catalog,guided,state),null);
+});
+test('inventory actions never attach to a different offer from the same slot',()=>{
+ const state={...readyState,weapon:gear('arcane-staff',3),armor:gear('gale-cloak',1),accessory:gear('sage-amulet',3),inventory:[{...gear('iron-robe',1),count:1}]};
+ const guardian=equipmentCatalog().find(x=>x.id==='guardian-plate');
+ const [guided]=shopGuidanceForOffers([guardian],{heroId:'arkan',archetype:'burst',state,elapsedSeconds:480,heroMaxHp:333});
+ assert.equal(guided.offerId,'guardian-plate');assert.notEqual(guided.action,'equip');
+});
+test('available forge improvement precedes duplicate buying and never becomes a quick purchase',()=>{
+ const state={...readyState,weapon:gear('arcane-staff',3),armor:gear('iron-robe',1),accessory:gear('sage-amulet',3),inventory:[{...gear('iron-robe',1),count:1}]};
+ const catalog=equipmentCatalog();
+ const guided=shopGuidanceForOffers(catalog,{heroId:'arkan',archetype:'burst',state,elapsedSeconds:480,heroMaxHp:333});
+ const iron=guided.find(x=>x.offerId==='iron-robe');
+ assert.equal(iron.action,'forge');assert.match(iron.reason,/강화.*타 증가/);
+ assert.equal(quickShopRecommendation(catalog,guided,state),null);
+ assert.equal(state.armor.rank,1);assert.equal(state.inventory[0].count,1);
+});
+test('crafted equipment is never eligible for quick buy',()=>{
+ const crafted=equipmentDefinition('arcane-accelerator');
+ const guidance=[{offerId:crafted.id,label:'추천',reason:'조합',score:100,best:true,action:'purchase'}];
+ assert.equal(safeQuickPurchase(crafted,[crafted],readyState),false);
+ assert.equal(quickShopRecommendation([crafted],guidance,readyState),null);
+});
+test('recipe guidance previews a forge without consuming ingredients',()=>{
+ const state={...readyState,weapon:gear('arcane-staff',1),armor:gear('iron-robe',3),accessory:gear('sage-amulet',3),inventory:[{...gear('arcane-staff',2),count:1},{...gear('rapid-wand',2),count:1}]};
+ const frozen=JSON.stringify(state),catalog=equipmentCatalog();
+ const guided=shopGuidanceForOffers(catalog,{heroId:'arkan',archetype:'burst',state,elapsedSeconds:480,heroMaxHp:10000});
+ assert.ok(guided.some(entry=>entry.best&&entry.action==='forge'));
+ assert.equal(quickShopRecommendation(catalog,guided,state),null);
+ assert.equal(JSON.stringify(state),frozen);
 });

@@ -4,10 +4,13 @@ import type { EquipmentState } from '../domain/types.js';
 import type { HeroId } from './hero-profiles.js';
 import type { ShopDisplayOffer } from './shop-data.js';
 import type { BuildArchetype } from './endless/build-overdrive.js';
-import { canStoreInventoryItem } from '../domain/equipment-inventory.js';
+import { canStoreInventoryItem, equipInventoryStack, inventoryStackKey } from '../domain/equipment-inventory.js';
+import { strengthenEquipment, strengthenRequirement, combineEquipment } from '../domain/equipment-forge.js';
+import { equipmentRecipes } from './equipment-recipes.js';
+import { equipmentReadiness, type EquipmentReadinessResult } from './equipment-survival-readiness.js';
 
-export interface ShopGuidanceContext { heroId:HeroId; archetype:BuildArchetype; state:EquipmentState; }
-export interface ShopOfferGuidance { offerId:string; label:string; reason:string; score:number; best:boolean; }
+export interface ShopGuidanceContext { heroId:HeroId; archetype:BuildArchetype; state:EquipmentState; elapsedSeconds?:number; heroMaxHp?:number; }
+export interface ShopOfferGuidance { offerId:string; label:string; reason:string; score:number; best:boolean; action?:'purchase'|'forge'|'equip'|'cleanup'; }
 
 const ARCHETYPE_WEIGHT:Record<BuildArchetype,Readonly<Record<string,number>>>={
   burst:{'arcane-staff':44,'blast-rod':30,'rapid-wand':12,'golden-wand':4,'iron-robe':8,'gale-cloak':5,'magnet-cloak':4,'guardian-plate':6,'healing-potion':6},
@@ -36,6 +39,7 @@ function reasonFor(offer:ShopDisplayOffer,context:ShopGuidanceContext,currentSam
   return context.state.healingPotions<=1?'물약 부족 보충':'비상 회복 보충';
 }
 export function shopGuidanceForOffers(offers:readonly ShopDisplayOffer[],context:ShopGuidanceContext):ShopOfferGuidance[]{
+  if (context.elapsedSeconds !== undefined && context.heroMaxHp !== undefined) return survivalGuidance(offers, context);
   const scored=offers.map((offer,index)=>{
     const current=currentItem(context.state,offer);
     if(current?.id===offer.id&&current.rank>=MAX_EQUIPMENT_RANK)return{offerId:offer.id,label:'완성',reason:'이미 전설 완성',score:-100,best:false,index,affordable:true};
@@ -66,6 +70,7 @@ function protectedReplacement(offer:ShopDisplayOffer,state:EquipmentState):boole
   return Boolean(current&&current.id!==offer.id&&(current.legendary||current.rank>=3));
 }
 export function safeQuickPurchase(offer:ShopDisplayOffer,offers:readonly ShopDisplayOffer[],state:EquipmentState):boolean{
+  if (offer.locked || equipmentRecipes().some(recipe => recipe.result.id === offer.id)) return false;
   const exact=offers.some((candidate)=>candidate===offer||(candidate.id===offer.id&&candidate.kind===offer.kind&&candidate.price===offer.price));
   if(!exact||offer.price>state.coins||protectedReplacement(offer,state))return false;
   const current=offer.kind==='potion'?null:state[offer.kind];
@@ -74,6 +79,73 @@ export function safeQuickPurchase(offer:ShopDisplayOffer,offers:readonly ShopDis
   return true;
 }
 export function quickShopRecommendation(offers:readonly ShopDisplayOffer[],guidance:readonly ShopOfferGuidance[],state?:EquipmentState):ShopDisplayOffer|null{
+  if (guidance.some(entry => entry.best && entry.action && entry.action !== 'purchase')) return null;
   const ranked=guidance.map((entry,index)=>({entry,index})).filter(({entry,index})=>entry.best&&offers[index]?.id===entry.offerId&&(!state||safeQuickPurchase(offers[index]!,offers,state))).sort((a,b)=>b.entry.score-a.entry.score||a.index-b.index);
   return ranked.length>0?offers[ranked[0]!.index]??null:null;
+}
+
+function survivalGuidance(offers: readonly ShopDisplayOffer[], context: ShopGuidanceContext): ShopOfferGuidance[] {
+  const { state } = context;
+  const read = (candidate: EquipmentState) => equipmentReadiness({ state: candidate, elapsedSeconds: context.elapsedSeconds!, heroMaxHp: context.heroMaxHp! });
+  const before = read(state), metric = before.weakestMetric;
+  const gain = (after: EquipmentReadinessResult) => metric === 'hero'
+    ? (after.heroSurvivalHits - before.heroSurvivalHits) / before.recommended.heroSurvivalHits
+    : metric === 'firepower' ? (after.firepowerIndex - before.firepowerIndex) / before.recommended.firepowerIndex
+    : (before.coreDamageMultiplier - after.coreDamageMultiplier) / before.recommended.coreDamageMultiplier;
+  const reason = (after: EquipmentReadinessResult, action: string) => metric === 'hero'
+    ? `영웅 생존 부족 · ${action} 시 약 ${(after.heroSurvivalHits - before.heroSurvivalHits).toFixed(1)}타 증가`
+    : metric === 'firepower' ? `화력 부족 · ${action} 시 지수 ${(after.firepowerIndex - before.firepowerIndex).toFixed(2)} 증가`
+    : `수호핵 방어 부족 · ${action} 시 피해 배율 ${(before.coreDamageMultiplier - after.coreDamageMultiplier).toFixed(2)} 감소`;
+  const entries: ShopOfferGuidance[] = offers.map(offer => {
+    if (offer.kind === 'potion') return { offerId: offer.id, label: '', reason: '비상 회복 보충', score: 0, best: false, action: 'purchase' };
+    const current = state[offer.kind];
+    // This is an explicitly labelled equip preview. Buying into an occupied slot stores rank 1.
+    const after = read({ ...state, [offer.kind]: { ...offer, rank: 1, legendary: false } });
+    const improvement = gain(after);
+    const blocked = !!current && !canStoreInventoryItem(state, { id: offer.id, rank: 1 });
+    let entry: ShopOfferGuidance = {
+      offerId: offer.id, label: '', reason: improvement > 0 ? reason(after, `${offer.name} 장착`) : '보관용 재료 · 현재 장착 효과 유지',
+      score: improvement > 0 ? 100 + improvement * 100 : -1, best: false, action: 'purchase',
+    };
+    if (blocked && improvement > 0) entry = { ...entry, label: '보관함 정리 필요', reason: `장비 판매 또는 조합 후 ${offer.name} 구매 가능`, action: 'cleanup', score: 1000 + improvement };
+    if (offer.locked || offer.price > state.coins) entry.score = -100;
+    if (current?.id === offer.id) {
+      const strengthened = strengthenEquipment(state, { place: 'equipped', kind: offer.kind }, context.elapsedSeconds!);
+      if (strengthened.ok && gain(read(strengthened.state)) > 0) {
+        const upgraded = read(strengthened.state);
+        entry = { ...entry, action: 'forge', label: '대장간 추천', reason: reason(upgraded, `${offer.name} 강화`), score: 2000 + gain(upgraded) };
+      } else if (!blocked && context.elapsedSeconds! >= strengthenRequirement(current.rank).unlockAtSeconds) {
+        // A missing duplicate is useful, but never claim it strengthens on purchase.
+        const upgraded = read({ ...state, [offer.kind]: { ...current, rank: current.rank + 1, legendary: current.rank + 1 >= 5 } });
+        if (gain(upgraded) > 0) entry = { ...entry, reason: `강화 재료 구매 · ${reason(upgraded, '대장간 강화')}`, score: offer.price <= state.coins ? 50 + gain(upgraded) : -100 };
+      }
+    }
+    return entry;
+  });
+  const addInventoryAction = (offerId: string, candidate: EquipmentState, action: 'forge' | 'equip', name: string) => {
+    const after = read(candidate);
+    if (gain(after) <= 0) return;
+    const index = offers.findIndex(offer => offer.kind !== 'potion' && offer.id === offerId);
+    if (index < 0) return;
+    const score = 2000 + gain(after);
+    if (score <= entries[index]!.score) return;
+    entries[index] = { offerId: offers[index]!.id, action, label: action === 'forge' ? '대장간 추천' : '보관 장비 추천', reason: reason(after, name), score, best: false };
+  };
+  for (const stack of state.inventory ?? []) {
+    const equipped = equipInventoryStack(state, inventoryStackKey(stack.id, stack.rank));
+    if (equipped.ok) addInventoryAction(stack.id, equipped.state, 'equip', `${stack.name} 장착`);
+  }
+  for (const recipe of equipmentRecipes()) {
+    const crafted = combineEquipment(state, recipe.id);
+    if (!crafted.ok) continue;
+    const equipped = crafted.state[recipe.result.kind]?.id === recipe.result.id ? crafted
+      : equipInventoryStack(crafted.state, inventoryStackKey(recipe.result.id, recipe.result.rank));
+    if (equipped.ok) addInventoryAction(recipe.ingredientIds[0], equipped.state, 'forge', `${recipe.hidden && !state.discoveredRecipes.includes(recipe.id) ? '???' : recipe.result.name} 조합·장착`);
+  }
+  const winner = entries.reduce((best, entry, index) => entry.score > (entries[best]?.score ?? -Infinity) ? index : best, -1);
+  if (winner >= 0 && entries[winner]!.score >= 0 && (entries[winner]!.action !== 'purchase' || offers[winner]!.price <= state.coins)) {
+    entries[winner]!.best = true;
+    if (!entries[winner]!.label) entries[winner]!.label = '추천';
+  }
+  return entries;
 }

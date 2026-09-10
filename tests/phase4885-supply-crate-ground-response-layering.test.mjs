@@ -30,6 +30,7 @@ test('phase 4885 keeps the supply crate physical body on the grounded world pass
 test('phase 4885 renders the supply-drop response identity in its own readability pass', () => {
   const response = methodSlice('drawSupplyCrateResponseIdentity');
   assert.match(response, /if \(!this\.supplyCrate\) return/);
+  assert.match(response, /Math\.sin\(this\.elapsed \* 4\) \* motion\.supplyCrateMotionAmplitude/);
   assert.match(response, /drawFieldEventResponseIdentity\(ctx,'supplyDrop',0,-43,20\)/);
   assert.doesNotMatch(response, /battlefieldInteractionSprite\('supply'/);
   assert.doesNotMatch(response, /Math\.random\(/);

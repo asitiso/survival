@@ -1,3 +1,5 @@
+import { equipmentSetChange } from './equipment-sets.js';
+import { MAX_EQUIPMENT_RANK } from '../domain/economy.js';
 import type { EquipmentState } from '../domain/types.js';
 import { purchaseOffer } from '../domain/economy.js';
 import { equipmentBonuses, type EquipmentBonuses, type ShopDisplayOffer } from './shop-data.js';
@@ -14,7 +16,7 @@ const DELTA_LABEL:Readonly<Record<ShopPurchaseDeltaId,string>>={
 };
 const DELTA_ORDER:readonly ShopPurchaseDeltaId[]=['spellPowerMultiplier','cooldownMultiplier','areaMultiplier','damageTakenMultiplier','coreDamageTakenMultiplier','moveSpeedMultiplier','goldMultiplier','pickupMultiplier'];
 const format=(value:number)=>`${value.toFixed(2)}×`;
-function currentItem(state:EquipmentState,offer:ShopDisplayOffer){return offer.kind==='weapon'?state.weapon:offer.kind==='armor'?state.armor:null;}
+function currentItem(state:EquipmentState,offer:ShopDisplayOffer){return offer.kind==='potion'?null:state[offer.kind];}
 function actionFor(before:EquipmentState,after:EquipmentState,offer:ShopDisplayOffer):ShopPurchaseActionId{
   if(offer.kind==='potion')return'potion';
   const prior=currentItem(before,offer),next=currentItem(after,offer);
@@ -31,14 +33,22 @@ export function shopPurchaseProjectionFromStates(before:EquipmentState,after:Equ
   const affordable=before.coins>=offer.price;
   if(offer.kind==='potion'){return{actionId:'potion',actionLabel:ACTION_LABEL.potion,summary:`물약 ${before.healingPotions}→${after.healingPotions}개 · 최대 HP ${Math.round(offer.power*100)}% 회복 1회 추가`,deltas:[],affordable};}
   const actionId=actionFor(before,after,offer),deltas=deltasFor(before,after);
-  const summary=deltas.length>0?deltas.map(delta=>`${delta.label} ${format(delta.before)}→${format(delta.after)}`).join(' · '):'전설 완성';
+  const statSummary=deltas.length>0?deltas.map(delta=>`${delta.label} ${format(delta.before)}→${format(delta.after)}`).join(' · '):'전설 완성';
+  const setChange = equipmentSetChange(before,after);
+  const summary = [statSummary,setChange].filter(Boolean).join(' · ');
   return{actionId,actionLabel:ACTION_LABEL[actionId],summary,deltas,affordable};
 }
 export function projectShopPurchase(state:EquipmentState,offer:ShopDisplayOffer):ShopPurchaseProjection{
   const current=currentItem(state,offer);
-  if(offer.kind!=='potion'&&current?.id===offer.id&&current.rank>=5)return{actionId:'legendary',actionLabel:ACTION_LABEL.legendary,summary:'전설 완성',deltas:[],affordable:state.coins>=offer.price};
+  if(offer.kind!=='potion'&&current?.id===offer.id&&current.rank>=MAX_EQUIPMENT_RANK)return{actionId:'legendary',actionLabel:ACTION_LABEL.legendary,summary:'전설 완성',deltas:[],affordable:state.coins>=offer.price};
   const simulated={...state,coins:Math.max(state.coins,offer.price)};
   const result=purchaseOffer(simulated,offer);
   if(!result.ok)return{actionId:offer.kind==='potion'?'potion':current?'upgrade':'equip',actionLabel:offer.kind==='potion'?ACTION_LABEL.potion:current?ACTION_LABEL.upgrade:ACTION_LABEL.equip,summary:result.message,deltas:[],affordable:state.coins>=offer.price};
+  const beforeStack = offer.kind === 'potion' ? undefined : state.inventory?.find(item => item.id === offer.id && item.rank === 1);
+  const afterStack = offer.kind === 'potion' ? undefined : result.state.inventory?.find(item => item.id === offer.id && item.rank === 1);
+  if (offer.kind !== 'potion' && result.state[offer.kind]?.id === current?.id
+      && afterStack && (!beforeStack || afterStack.count > beforeStack.count)) {
+    return { actionId: 'upgrade', actionLabel: ACTION_LABEL.upgrade, summary: result.message, deltas: [], affordable: state.coins >= offer.price };
+  }
   return shopPurchaseProjectionFromStates(state,{...result.state,coins:state.coins-offer.price},offer);
 }

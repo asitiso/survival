@@ -98,6 +98,7 @@ export interface EquipmentIconPresentation {
   visible: boolean;
   source: string;
   position: string;
+  backgroundSize: string;
 }
 
 export function equipmentIconPresentation(id: string): EquipmentIconPresentation {
@@ -105,12 +106,12 @@ export function equipmentIconPresentation(id: string): EquipmentIconPresentation
   if (craftedCell) {
     const [column, row] = craftedCell;
     return { visible: true, source: FORGE_ITEM_ATLAS.src,
-      position: `${column * 50}% ${row * 50}%` };
+      position: `${column * 50}% ${row * 50}%`, backgroundSize: '300% 300%' };
   }
   const accessory = accessoryIconPosition(id);
-  if (accessory) return { visible: true, source: './assets/ui/shop-accessories.png', position: accessory };
-  if (isShopItemAssetId(id)) return { visible: true, source: SHOP_ITEM_ATLAS.src, position: shopItemIconBackgroundPosition(id) };
-  return { visible: false, source: '', position: '50% 50%' };
+  if (accessory) return { visible: true, source: './assets/ui/shop-accessories.png', position: accessory, backgroundSize: '200% 200%' };
+  if (isShopItemAssetId(id)) return { visible: true, source: SHOP_ITEM_ATLAS.src, position: shopItemIconBackgroundPosition(id), backgroundSize: '300% 300%' };
+  return { visible: false, source: '', position: '50% 50%', backgroundSize: '100% 100%' };
 }
 
 export interface ShopItemAtlasAudit {

@@ -22,6 +22,11 @@ test('crafted equipment has a dedicated atlas instead of the generic fallback', 
   assert.match(assets, /equipment-forge-items\.png/);
 });
 
+test('accessories keep their two-column atlas scale inside the forge', () => {
+  assert.match(assets, /backgroundSize: '200% 200%'/);
+  assert.match(styles, /--forge-item-size/);
+});
+
 test('forge icon styling keeps rank and count readable', () => {
   assert.match(styles, /\.forge-equipment-icon/);
   assert.match(styles, /\.forge-item-count/);

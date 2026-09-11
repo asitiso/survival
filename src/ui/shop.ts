@@ -458,10 +458,11 @@ export class ShopOverlay {
     const element = document.createElement('span');
     element.className = `${className}${icon.visible ? '' : ' forge-equipment-icon-fallback'}`;
     element.setAttribute('aria-hidden', 'true');
-    if (icon.visible) {
-      element.style.setProperty('--forge-item-image', `url('${icon.source}')`);
-      element.style.setProperty('--forge-item-position', icon.position);
-    }
+      if (icon.visible) {
+        element.style.setProperty('--forge-item-image', `url('${icon.source}')`);
+        element.style.setProperty('--forge-item-position', icon.position);
+        element.style.setProperty('--forge-item-size', icon.backgroundSize);
+      }
     return element;
   }
 

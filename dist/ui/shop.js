@@ -419,6 +419,7 @@ export class ShopOverlay {
         if (icon.visible) {
             element.style.setProperty('--forge-item-image', `url('${icon.source}')`);
             element.style.setProperty('--forge-item-position', icon.position);
+            element.style.setProperty('--forge-item-size', icon.backgroundSize);
         }
         return element;
     }

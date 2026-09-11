@@ -1,3 +1,4 @@
+import { equipmentEnemyPressure } from '../domain/equipment-progression.js';
 import { distance, normalize, type Vec2 } from '../core/math.js';
 import { ARENA_MARGIN, LOGICAL_HEIGHT, LOGICAL_WIDTH } from './config.js';
 import type { GuardianCore, Hero } from './entities.js';
@@ -276,15 +277,16 @@ const BASE: Record<EnemyType, EnemyStats> = {
   boss: { hp: 2100, speed: 46, radius: 58, damage: 36, xp: 260, gold: 320, attackInterval: 0.72, preferredRange: 0, color: '#ff4f63' },
 };
 
-export function enemyStats(type: EnemyType, danger: number): EnemyStats {
+export function enemyStats(type: EnemyType, danger: number, elapsedSeconds?: number): EnemyStats {
+  const equipmentPressure = elapsedSeconds === undefined ? { health: 1, damage: 1 } : equipmentEnemyPressure(elapsedSeconds);
   const base = BASE[type];
   const d = Math.max(1, danger);
   const bossScale = type === 'boss' ? 1 + (d - 1) * 0.11 : 1;
   const eliteScale = type === 'elite' ? 1 + (d - 1) * 0.06 : 1;
   return {
     ...base,
-    hp: Math.round(base.hp * (1 + (d - 1) * 0.14) * bossScale * eliteScale),
-    damage: base.damage * (1 + (d - 1) * 0.08),
+    hp: Math.round(base.hp * (1 + (d - 1) * 0.14) * bossScale * eliteScale * equipmentPressure.health),
+    damage: base.damage * (1 + (d - 1) * 0.08) * equipmentPressure.damage,
     xp: Math.round(base.xp * (1 + (d - 1) * 0.09)),
     gold: Math.max(1, Math.round(base.gold * (1 + (d - 1) * 0.06))),
   };
@@ -344,6 +346,7 @@ export class EnemyManager {
   private bossTimer = 120;
   private bossSpawnCount = 0;
   private bossEncounterModifiers: BossEncounterModifiers = { bossDamageTakenMultiplier: 1, specialCadenceMultiplier: 1, summonCountMultiplier: 1, dashDistanceMultiplier: 1 };
+  private equipmentElapsed = 0;
   private endlessHealthMultiplier = 1;
   private endlessDamageMultiplier = 1;
   private endlessProjectileSpeedMultiplier = 1;
@@ -383,6 +386,7 @@ export class EnemyManager {
     this.bossTimer = 120;
     this.bossSpawnCount = 0;
     this.bossEncounterModifiers = { bossDamageTakenMultiplier: 1, specialCadenceMultiplier: 1, summonCountMultiplier: 1, dashDistanceMultiplier: 1 };
+    this.equipmentElapsed = 0;
     this.endlessHealthMultiplier = 1;
     this.endlessDamageMultiplier = 1;
     this.endlessProjectileSpeedMultiplier = 1;
@@ -400,6 +404,7 @@ export class EnemyManager {
   getBossEncounterModifiers(): BossEncounterModifiers { return { ...this.bossEncounterModifiers }; }
 
   update(dt: number, ctx: EnemyUpdateContext): void {
+    this.equipmentElapsed = ctx.elapsed;
     this.activeReducedMotion = ctx.reducedMotion ?? false;
     const director = directorSnapshot(ctx.elapsed);
     this.spawnTimer -= dt;
@@ -1389,7 +1394,7 @@ export class EnemyManager {
   }
 
   private spawn(type: EnemyType, danger: number, target: EnemyTarget, explicitPos?: Vec2): number {
-    const baseStats = enemyStats(type, danger);
+    const baseStats = enemyStats(type, danger, this.equipmentElapsed);
     const eliteHealthMultiplier = type === 'elite' ? this.endlessEliteHealthMultiplier : 1;
     const stats: EnemyStats = { ...baseStats, hp: Math.round(baseStats.hp * this.endlessHealthMultiplier * eliteHealthMultiplier), damage: baseStats.damage * this.endlessDamageMultiplier };
     const eliteAffixes = type === 'elite' ? selectEliteAffixes(danger) : [];
@@ -1614,7 +1619,7 @@ export class EnemyManager {
       else if (archetype === 'abyssWitch') type = i % 2 === 0 ? 'nullifier' : 'shaman';
       else if (archetype === 'timeEater') type = i % 2 === 0 ? 'assassin' : 'nullifier';
       else type = i % 3 === 2 ? 'brute' : 'hound';
-      const baseStats = enemyStats(type, Math.max(1, danger - 1));
+      const baseStats = enemyStats(type, Math.max(1, danger - 1), this.equipmentElapsed);
       const stats: EnemyStats = { ...baseStats, hp: Math.round(baseStats.hp * this.endlessHealthMultiplier), damage: baseStats.damage * this.endlessDamageMultiplier };
       const angle = (Math.PI * 2 * i) / Math.max(1, count) + (boss.bossCycle ?? 0) * 0.35;
       const distanceFromBoss = boss.radius + stats.radius + 34;

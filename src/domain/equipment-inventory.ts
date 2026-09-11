@@ -7,6 +7,8 @@ import {
 import { equipmentDefinition } from '../game/shop-data.js';
 
 export const EQUIPMENT_INVENTORY_CAPACITY = 6;
+export const MAX_EQUIPMENT_STACK_COUNT = 99;
+export const EQUIPMENT_MAX_STACK_COUNT = MAX_EQUIPMENT_STACK_COUNT;
 
 function record(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null ? value as Record<string, unknown> : {};
@@ -27,11 +29,11 @@ export function sanitizeEquipmentInventory(raw: unknown): EquipmentStack[] {
     const definition = equipmentDefinition(stack.id);
     if (!definition || stack.kind !== definition.kind) continue;
     const rank = boundedInteger(stack.rank, 1, 10_000);
-    const count = boundedInteger(stack.count, 1, 99);
+    const count = boundedInteger(stack.count, 1, MAX_EQUIPMENT_STACK_COUNT);
     const key = inventoryStackKey(definition.id, rank);
     const existing = inventory.find((candidate) => inventoryStackKey(candidate.id, candidate.rank) === key);
     if (existing) {
-      existing.count = Math.min(99, existing.count + count);
+      existing.count = Math.min(MAX_EQUIPMENT_STACK_COUNT, existing.count + count);
       continue;
     }
     if (inventory.length >= EQUIPMENT_INVENTORY_CAPACITY) continue;
@@ -71,8 +73,10 @@ const success = (state: EquipmentState, message: string): EquipmentTransactionRe
 
 function addToInventory(inventory: EquipmentStack[], item: EquippedItem, count: number): boolean {
   const rank = Math.max(1, Math.floor(item.rank));
+  if (count <= 0 || count > MAX_EQUIPMENT_STACK_COUNT) return false;
   const existing = inventory.find((stack) => inventoryStackKey(stack.id, stack.rank) === inventoryStackKey(item.id, rank));
   if (existing) {
+    if (existing.count + count > MAX_EQUIPMENT_STACK_COUNT) return false;
     existing.count += count;
     return true;
   }
@@ -84,10 +88,14 @@ function addToInventory(inventory: EquipmentStack[], item: EquippedItem, count: 
 export function canStoreInventoryItem(
   state: EquipmentState,
   item: Pick<EquippedItem, 'id' | 'rank'>,
+  count = 1,
 ): boolean {
+  const amount = Math.floor(count);
+  if (amount <= 0) return false;
   const inventory = state.inventory ?? [];
-  return inventory.length < EQUIPMENT_INVENTORY_CAPACITY
-    || inventory.some((stack) => inventoryStackKey(stack.id, stack.rank) === inventoryStackKey(item.id, item.rank));
+  const existing = inventory.find((stack) => inventoryStackKey(stack.id, stack.rank) === inventoryStackKey(item.id, item.rank));
+  return existing ? existing.count + amount <= MAX_EQUIPMENT_STACK_COUNT
+    : amount <= MAX_EQUIPMENT_STACK_COUNT && inventory.length < EQUIPMENT_INVENTORY_CAPACITY;
 }
 
 export function addInventoryItem(
@@ -98,7 +106,10 @@ export function addInventoryItem(
   const amount = Math.floor(count);
   const next: EquipmentState = { ...state, inventory: normalizedInventory(state), discoveredRecipes: normalizedRecipes(state) };
   if (amount <= 0) return failure(state, 'Inventory count must be positive.');
-  if (!addToInventory(next.inventory!, { ...item }, amount)) return failure(state, 'Inventory is full.');
+  if (!addToInventory(next.inventory!, { ...item }, amount)) {
+    const existing = next.inventory!.some((stack) => inventoryStackKey(stack.id, stack.rank) === inventoryStackKey(item.id, item.rank));
+    return failure(state, existing ? `같은 장비는 한 스택에 ${MAX_EQUIPMENT_STACK_COUNT}개까지 보관할 수 있습니다.` : '보관함이 가득 찼습니다.');
+  }
   return success(next, 'Item added to inventory.');
 }
 
@@ -112,7 +123,10 @@ export function equipInventoryStack(state: EquipmentState, stackKey: string): Eq
   inventory[index]!.count -= 1;
   if (inventory[index]!.count <= 0) inventory.splice(index, 1);
   if (displaced && !addToInventory(inventory, { ...displaced }, 1)) {
-    return failure(state, 'Inventory is full for the equipped item.');
+    const sameStack = inventory.some((stack) => inventoryStackKey(stack.id, stack.rank) === inventoryStackKey(displaced.id, displaced.rank));
+    return failure(state, sameStack
+      ? `같은 장비는 한 스택에 ${MAX_EQUIPMENT_STACK_COUNT}개까지 보관할 수 있습니다.`
+      : 'Inventory is full for the equipped item.');
   }
   const next: EquipmentState = {
     ...state,

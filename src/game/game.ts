@@ -26,7 +26,7 @@ import { ResultsOverlay } from '../ui/results.js';
 import { LobbyOverlay } from '../ui/lobby.js';
 import { TraitSelectOverlay } from '../ui/trait-select.js';
 import { refreshEquipmentPowers, priceShopOffers, ensureEquippedOffers, generateShopOffers, equipmentDefinition, type ShopDisplayOffer } from './shop-data.js';
-import { quickShopRecommendation, safeQuickPurchase, shopGuidanceForOffers } from './shop-guidance.js';
+import { quickShopRecommendation, safeQuickPurchase, shopGuidanceForOffers, shopTopRecommendations } from './shop-guidance.js';
 import { purchaseOffer, rerollCost, SHOP_FIRST_TOKEN_AT, SHOP_TOKEN_INTERVAL } from '../domain/economy.js';
 import type { EquipmentState, EquipmentTransactionResult } from '../domain/types.js';
 import { equipInventoryStack, sellInventoryStack, inventoryStackKey } from '../domain/equipment-inventory.js';
@@ -7325,8 +7325,10 @@ export class Game {
 
   private refreshShopOverlay(): void {
     this.shopOffers = priceShopOffers(ensureEquippedOffers(this.shopOffers, this.equipmentState, this.shopAccessoryChoice), this.equipmentState, this.elapsed);
-    const guidance = shopGuidanceForOffers(this.shopOffers, { heroId:this.hero.profileId, archetype:this.currentBuildArchetype(), state:this.equipmentState, elapsedSeconds: this.elapsed, heroMaxHp: this.hero.maxHp });
-    const quickOffer=quickShopRecommendation(this.shopOffers,guidance,this.equipmentState);
+    const guidanceContext = { heroId:this.hero.profileId, archetype:this.currentBuildArchetype(), state:this.equipmentState, elapsedSeconds: this.elapsed, heroMaxHp: this.hero.maxHp, permanentRecipeDiscoveries: this.metaProfile.discoveredEquipmentRecipes };
+    const guidance = shopGuidanceForOffers(this.shopOffers, { heroId:this.hero.profileId, archetype:this.currentBuildArchetype(), state:this.equipmentState, elapsedSeconds: this.elapsed, heroMaxHp: this.hero.maxHp, permanentRecipeDiscoveries: this.metaProfile.discoveredEquipmentRecipes });
+    const topRecommendations = shopTopRecommendations(this.shopOffers, guidanceContext, guidance);
+    const quickOffer=quickShopRecommendation(this.shopOffers,guidance,this.equipmentState,topRecommendations);
     const openingFastPath=openingShopFastPath(this.elapsed,Boolean(quickOffer));
     const repeatFast=repeatShopFastPath(this.elapsed,quickOffer,this.equipmentState);
     const lateFast=lateShopFastPath(this.elapsed,quickOffer,this.equipmentState);
@@ -7338,7 +7340,7 @@ export class Game {
     const model = { ...readinessContext, activeTab: this.shopActiveTab, selectedStackKey: this.shopSelectedStackKey,
       permanentRecipeDiscoveries: this.metaProfile.discoveredEquipmentRecipes,
       recipes: recipesForOwnedItems(this.equipmentState, this.metaProfile.discoveredEquipmentRecipes),
-      readiness: equipmentReadiness(readinessContext), offers: this.shopOffers, rerollPrice: rerollCost(this.rerollsThisVisit), guidance, impactMessage:this.shopImpactMessage, quickOffer, fastPath };
+      readiness: equipmentReadiness(readinessContext), offers: this.shopOffers, rerollPrice: rerollCost(this.rerollsThisVisit), guidance, topRecommendations, impactMessage:this.shopImpactMessage, quickOffer, fastPath };
     const applyEquipmentTransaction = (result: EquipmentTransactionResult): boolean => {
       if (!result.ok) {
         this.shopImpactMessage = result.message;
@@ -7391,8 +7393,10 @@ export class Game {
       onAccessoryChange: (id: string) => { this.shopAccessoryChoice = id; this.refreshShopOverlay(); },
       onPurchase: (offer: ShopDisplayOffer) => purchase(offer,false),
       onQuickPurchase: (offer: ShopDisplayOffer) => {
-        const currentGuidance=shopGuidanceForOffers(this.shopOffers,{heroId:this.hero.profileId,archetype:this.currentBuildArchetype(),state:this.equipmentState, elapsedSeconds: this.elapsed, heroMaxHp: this.hero.maxHp});
-        const currentQuick=quickShopRecommendation(this.shopOffers,currentGuidance,this.equipmentState);
+        const currentContext={heroId:this.hero.profileId,archetype:this.currentBuildArchetype(),state:this.equipmentState, elapsedSeconds: this.elapsed, heroMaxHp: this.hero.maxHp, permanentRecipeDiscoveries:this.metaProfile.discoveredEquipmentRecipes};
+        const currentGuidance=shopGuidanceForOffers(this.shopOffers,{heroId:this.hero.profileId,archetype:this.currentBuildArchetype(),state:this.equipmentState, elapsedSeconds: this.elapsed, heroMaxHp: this.hero.maxHp, permanentRecipeDiscoveries:this.metaProfile.discoveredEquipmentRecipes});
+        const currentTopRecommendations=shopTopRecommendations(this.shopOffers,currentContext,currentGuidance);
+        const currentQuick=quickShopRecommendation(this.shopOffers,currentGuidance,this.equipmentState,currentTopRecommendations);
         if(!currentQuick||currentQuick.id!==offer.id||currentQuick.kind!==offer.kind||currentQuick.price!==offer.price||!safeQuickPurchase(offer,this.shopOffers,this.equipmentState))return;
         purchase(offer,true);
       },

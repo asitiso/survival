@@ -1,5 +1,5 @@
 import { equipmentPriceMultiplier } from './equipment-progression.js';
-import { canStoreInventoryItem } from './equipment-inventory.js';
+import { canStoreInventoryItem, MAX_EQUIPMENT_STACK_COUNT } from './equipment-inventory.js';
 import type { EquippedItem, EquipmentState, PurchaseResult, ShopOffer } from './types.js';
 
 export const MAX_EQUIPMENT_RANK = 10000;
@@ -83,7 +83,16 @@ export function purchaseOffer(state: EquipmentState, offer: ShopOffer, elapsedSe
     next[offer.kind] = purchased;
     return { ok: true, state: next, message: `${offer.name} 즉시 장착` };
   }
-  if (!canStoreInventoryItem(next, purchased)) return { ok: false, state, message: '보관함이 가득 찼습니다 · 장비 판매 또는 조합 필요' };
+  if (!canStoreInventoryItem(state, purchased)) {
+    const sameStack = state.inventory.some(item => item.id === purchased.id && item.rank === purchased.rank);
+    return {
+      ok: false,
+      state,
+      message: sameStack
+        ? `같은 장비는 한 스택에 ${MAX_EQUIPMENT_STACK_COUNT}개까지 보관할 수 있습니다.`
+        : '보관함이 가득 찼습니다 · 장비 판매 또는 조합 필요',
+    };
+  }
   next.inventory = next.inventory ?? [];
   const existing = next.inventory.find(item => item.id === purchased.id && item.rank === purchased.rank);
   if (existing) existing.count += 1;

@@ -99,7 +99,8 @@ const ACCESSORIES: readonly ShopDisplayOffer[] = BASE_EQUIPMENT.filter((offer) =
 export function equipmentCatalog(): readonly ShopDisplayOffer[] { return BASE_EQUIPMENT; }
 
 export function equipmentDefinition(id: string): EquipmentDefinition | null {
-  return ALL_EQUIPMENT.find((definition) => definition.id === id) ?? null;
+  return ALL_EQUIPMENT.find((definition) => definition.id === id)
+    ?? (id === 'healing-potion' ? POTION as unknown as EquipmentDefinition : null);
 }
 
 const POTION: ShopDisplayOffer = {

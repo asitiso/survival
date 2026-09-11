@@ -100,7 +100,7 @@ export function strengthenEquipment(
   }
 
   const stored = addInventoryItem({ ...state, inventory }, upgraded);
-  if (!stored.ok) return failure(state, '보관함이 가득 찼습니다.');
+  if (!stored.ok) return failure(state, stored.message);
   return success({ ...stored.state, coins: state.coins - requirement.goldCost }, '장비를 강화했습니다.');
 }
 
@@ -123,8 +123,9 @@ export function combineEquipment(state: EquipmentState, recipeId: string): Equip
   const placed = afterIngredients[slot] === null || afterIngredients[slot] === undefined
     ? { ...afterIngredients, [slot]: { ...recipe.result } }
     : addInventoryItem(afterIngredients, recipe.result);
+  const placementFailure = 'ok' in placed && !placed.ok ? placed.message : '보관함이 가득 찼거나 같은 장비 스택이 99개로 가득 찼습니다.';
   const next = 'ok' in placed ? (placed.ok ? placed.state : null) : placed;
-  if (!next) return failure(state, '보관함이 가득 찼습니다.');
+  if (!next) return failure(state, placementFailure);
   if (state.coins < recipe.goldCost) return failure(state, '금화가 부족합니다.');
 
   return success({ ...next, coins: state.coins - recipe.goldCost }, '장비를 조합했습니다.', newlyDiscoveredRecipeId);

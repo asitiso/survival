@@ -28,6 +28,7 @@ export interface ShopViewModel {
   offers: ShopDisplayOffer[];
   rerollPrice: number;
   guidance?: ShopOfferGuidance[];
+  topRecommendations?: ShopOfferGuidance[];
   impactMessage?: string;
   quickOffer?: ShopDisplayOffer | null;
   fastPath?: OpeningShopFastPathProfile;
@@ -51,6 +52,12 @@ type ShopContext = Pick<ShopViewModel, 'state' | 'elapsedSeconds' | 'heroMaxHp' 
 const kindNames = { weapon: '무기', armor: '방어구', accessory: '장신구' } as const;
 const timeLabel = (seconds: number): string => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 const survivalSummary = (model: ShopContext, state: EquipmentState): string => projectEquipmentSurvival(model, state).summary;
+
+export function shopSetSummary(state: EquipmentState): string[] {
+  return equipmentSetStates(state).filter(set => set.count > 0).map(set => set.id === 'genesis-legacy'
+    ? `${set.name} ${set.count}/3 · ${set.threeActive ? '✓' : '○'} 3부위: ${set.threeText}`
+    : `${set.name} ${set.count}/3 · ${set.twoActive ? '✓' : '○'} 고급 2부위: ${set.twoText} · ${set.threeActive ? '✓' : '○'} 희귀 3부위: ${set.threeText}`);
+}
 
 export function shopPurchaseView(model: ShopContext, offer: ShopDisplayOffer) {
   const result = purchaseOffer(model.state, offer, model.elapsedSeconds);
@@ -218,7 +225,7 @@ export class ShopOverlay {
     body.append(readiness);
     const recommendation = document.createElement('p');
     recommendation.className = 'shop-readiness-recommendation';
-    recommendation.textContent = model.guidance?.find(entry => entry.best)?.reason ?? `${weakest} 보완을 우선하세요.`;
+    recommendation.textContent = model.topRecommendations?.[0]?.reason ?? model.guidance?.find(entry => entry.best)?.reason ?? `${weakest} 보완을 우선하세요.`;
     body.append(recommendation);
 
     const equipped = document.createElement('div');
@@ -235,9 +242,9 @@ export class ShopOverlay {
     if (model.activeTab === 'forge') body.append(stage);
     const sets = document.createElement('div');
     sets.className = 'shop-set-summary';
-    for (const set of equipmentSetStates(model.state).filter(set => set.count > 0)) {
+    for (const summary of shopSetSummary(model.state)) {
       const row = document.createElement('div');
-      row.textContent = `${set.name} ${set.count}/3 · ${set.twoActive ? '✓' : '○'} 고급 2부위: ${set.twoText} · ${set.threeActive ? '✓' : '○'} 희귀 3부위: ${set.threeText}`;
+      row.textContent = summary;
       sets.append(row);
     }
     if (sets.childElementCount) body.append(sets);

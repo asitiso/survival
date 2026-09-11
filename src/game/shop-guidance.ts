@@ -1,14 +1,14 @@
 import { equipmentSetForItem, equipmentSetStates } from './equipment-sets.js';
 import type { EquipmentState } from '../domain/types.js';
 import type { HeroId } from './hero-profiles.js';
-import type { ShopDisplayOffer } from './shop-data.js';
+import { equipmentDefinition, type ShopDisplayOffer } from './shop-data.js';
 import type { BuildArchetype } from './endless/build-overdrive.js';
 import { canStoreInventoryItem, equipInventoryStack, inventoryStackKey } from '../domain/equipment-inventory.js';
 import { strengthenEquipment, combineEquipment } from '../domain/equipment-forge.js';
 import { equipmentRecipes } from './equipment-recipes.js';
 import { equipmentReadiness, type EquipmentReadinessResult } from './equipment-survival-readiness.js';
 
-export interface ShopGuidanceContext { heroId:HeroId; archetype:BuildArchetype; state:EquipmentState; elapsedSeconds?:number; heroMaxHp?:number; }
+export interface ShopGuidanceContext { heroId:HeroId; archetype:BuildArchetype; state:EquipmentState; elapsedSeconds?:number; heroMaxHp?:number; permanentRecipeDiscoveries?:readonly string[]; }
 export interface ShopOfferGuidance { offerId:string; label:string; reason:string; score:number; best:boolean; action?:'purchase'|'forge'|'equip'|'cleanup'; }
 
 const ARCHETYPE_WEIGHT:Record<BuildArchetype,Readonly<Record<string,number>>>={
@@ -37,7 +37,7 @@ function reasonFor(offer:ShopDisplayOffer,context:ShopGuidanceContext,currentSam
   if(offer.id==='golden-wand')return '장기 금화 수급 강화';
   return context.state.healingPotions<=1?'물약 부족 보충':'비상 회복 보충';
 }
-export function shopGuidanceForOffers(offers:readonly ShopDisplayOffer[],context:ShopGuidanceContext):ShopOfferGuidance[]{
+function baseShopGuidanceForOffers(offers:readonly ShopDisplayOffer[],context:ShopGuidanceContext):ShopOfferGuidance[]{
   if (context.elapsedSeconds !== undefined && context.heroMaxHp !== undefined) return survivalGuidance(offers, context);
   const scored=offers.map((offer,index)=>{
     const current=currentItem(context.state,offer);
@@ -75,10 +75,96 @@ export function safeQuickPurchase(offer:ShopDisplayOffer,offers:readonly ShopDis
   if (current && offer.kind!=='potion' && !canStoreInventoryItem(state, { id: offer.id, rank: 1 })) return false;
   return true;
 }
-export function quickShopRecommendation(offers:readonly ShopDisplayOffer[],guidance:readonly ShopOfferGuidance[],state?:EquipmentState):ShopDisplayOffer|null{
+export function quickShopRecommendation(offers:readonly ShopDisplayOffer[],guidance:readonly ShopOfferGuidance[],state?:EquipmentState,topRecommendations?:readonly ShopOfferGuidance[]):ShopDisplayOffer|null{
+  if (topRecommendations?.some(entry => entry.action && entry.action !== 'purchase')) return null;
   if (guidance.some(entry => entry.best && entry.action && entry.action !== 'purchase')) return null;
   const ranked=guidance.map((entry,index)=>({entry,index})).filter(({entry,index})=>entry.best&&offers[index]?.id===entry.offerId&&(!state||safeQuickPurchase(offers[index]!,offers,state))).sort((a,b)=>b.entry.score-a.entry.score||a.index-b.index);
   return ranked.length>0?offers[ranked[0]!.index]??null:null;
+}
+
+function recommendationGain(context: ShopGuidanceContext, candidate: EquipmentState): number {
+  if (context.elapsedSeconds === undefined || context.heroMaxHp === undefined) return 0;
+  const before = equipmentReadiness({ state: context.state, elapsedSeconds: context.elapsedSeconds, heroMaxHp: context.heroMaxHp });
+  const after = equipmentReadiness({ state: candidate, elapsedSeconds: context.elapsedSeconds, heroMaxHp: context.heroMaxHp });
+  if (before.weakestMetric === 'hero') return (after.heroSurvivalHits - before.heroSurvivalHits) / Math.max(1, before.recommended.heroSurvivalHits);
+  if (before.weakestMetric === 'firepower') return (after.firepowerIndex - before.firepowerIndex) / Math.max(1, before.recommended.firepowerIndex);
+  return (before.coreDamageMultiplier - after.coreDamageMultiplier) / Math.max(1, before.recommended.coreDamageMultiplier);
+}
+
+/** Returns the two actions worth showing above the offer grid, including forge actions. */
+export function shopTopRecommendations(
+  offers: readonly ShopDisplayOffer[],
+  context: ShopGuidanceContext,
+  guidance: readonly ShopOfferGuidance[] = baseShopGuidanceForOffers(offers, context),
+): ShopOfferGuidance[] {
+  const candidates: ShopOfferGuidance[] = guidance.filter(entry => entry.best).map(entry => ({ ...entry }));
+  const add = (entry: ShopOfferGuidance) => {
+    if (!Number.isFinite(entry.score) || candidates.some(candidate => candidate.offerId === entry.offerId && candidate.action === entry.action)) return;
+    candidates.push(entry);
+  };
+
+  for (const stack of context.state.inventory ?? []) {
+    if (stack.count <= 0) continue;
+    const key = inventoryStackKey(stack.id, stack.rank);
+    const definition = equipmentDefinition(stack.id);
+    const equipped = equipInventoryStack(context.state, key);
+    if (equipped.ok) {
+      const gain = recommendationGain(context, equipped.state);
+      add({ offerId: stack.id, label: '보관 장비 추천', reason: `${stack.name} 장착`, score: 2200 + gain * 100, best: false, action: 'equip' });
+    }
+    if (context.elapsedSeconds !== undefined) {
+      const strengthened = strengthenEquipment(context.state, { place: 'inventory', stackKey: key }, context.elapsedSeconds);
+      if (strengthened.ok) {
+        const gain = recommendationGain(context, strengthened.state);
+        add({ offerId: stack.id, label: '대장간 추천', reason: `${definition?.name ?? stack.name} 강화`, score: 2400 + gain * 100, best: false, action: 'forge' });
+      }
+    }
+  }
+
+  for (const kind of ['weapon', 'armor', 'accessory'] as const) {
+    const equipped = context.state[kind];
+    if (!equipped || context.elapsedSeconds === undefined) continue;
+    const strengthened = strengthenEquipment(context.state, { place: 'equipped', kind }, context.elapsedSeconds);
+    if (!strengthened.ok) continue;
+    const gain = recommendationGain(context, strengthened.state);
+    add({ offerId: equipped.id, label: '대장간 추천', reason: `${equipped.name} 강화`, score: 2600 + gain * 100, best: false, action: 'forge' });
+  }
+
+  const permanent = context.permanentRecipeDiscoveries ?? [];
+  for (const recipe of equipmentRecipes()) {
+    const combined = combineEquipment(context.state, recipe.id);
+    if (!combined.ok) continue;
+    const hiddenUndiscovered = recipe.hidden && !permanent.includes(recipe.id);
+    const gain = recommendationGain(context, combined.state);
+    add({
+      offerId: hiddenUndiscovered ? 'hidden-forge' : recipe.result.id,
+      label: '대장간 추천',
+      reason: hiddenUndiscovered ? '??? 조합 가능' : `${recipe.result.name} 조합 가능 · 지수 ${gain.toFixed(2)} 증가`,
+      score: (hiddenUndiscovered ? 2600 : 2500) + gain * 100,
+      best: false,
+      action: 'forge',
+    });
+  }
+
+  return candidates
+    .sort((a, b) => b.score - a.score || a.offerId.localeCompare(b.offerId))
+    .slice(0, 2)
+    .map((entry, index) => ({ ...entry, best: index === 0 }));
+}
+
+export const topShopRecommendations = shopTopRecommendations;
+
+/** Keeps the historical offer-shaped result while promoting non-purchase actions to the visible top slot. */
+export function shopGuidanceForOffers(offers: readonly ShopDisplayOffer[], context: ShopGuidanceContext): ShopOfferGuidance[] {
+  const entries = baseShopGuidanceForOffers(offers, context);
+  const top = shopTopRecommendations(offers, context, entries);
+  const recommendation = top[0];
+  if (!recommendation || !recommendation.action || recommendation.action === 'purchase' || entries.length === 0) return entries;
+  const matchingOffer = entries.findIndex(entry => entry.offerId === recommendation.offerId);
+  if (matchingOffer >= 0 || offers.some(offer => offer.kind !== 'potion')) return entries;
+  const existingBest = entries.findIndex(entry => entry.best);
+  const targetIndex = existingBest >= 0 ? existingBest : 0;
+  return entries.map((entry, index) => index === targetIndex ? { ...recommendation, best: true } : { ...entry, best: false });
 }
 
 function survivalGuidance(offers: readonly ShopDisplayOffer[], context: ShopGuidanceContext): ShopOfferGuidance[] {

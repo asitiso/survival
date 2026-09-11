@@ -3,7 +3,7 @@ import { appendRecoveryCheckpoint, loadRunSnapshotWithJournal } from '../domain/
 const PRIMARY = 'arcane-last-stand.run-snapshot';
 const BACKUP = 'arcane-last-stand.run-snapshot.backup';
 const JOURNAL = 'arcane-last-stand.recovery-journal.v1';
-function sample(savedAt) { return { version: 1, savedAt, heroId: 'arkan', traitId: 'destruction', threatLevel: 5, elapsed: savedAt / 10, hero: { level: 8, xp: 100, xpNext: 200, hp: 500, maxHp: 600, coins: 250, kills: 80 }, coreHp: 700, spellLevels: { fireBolt: 3, chainLightning: 2, frostNova: 2, flameField: 2, meteorStorm: 1, blackHole: 1 }, equipment: { coins: 250, weapon: null, armor: null, healingPotions: 1 }, relic: null, fusions: [], fateChoices: [], map: { id: 'ruinedGate', evolutionStage: 0 }, progression: { bossesKilled: 1, goldEarned: 250, shopTokens: 0 } }; }
+function sample(savedAt) { return { version: 1, savedAt, heroId: 'arkan', traitId: 'destruction', threatLevel: 5, elapsed: savedAt / 10, hero: { level: 8, xp: 100, xpNext: 200, hp: 500, maxHp: 600, coins: 250, kills: 80 }, coreHp: 700, spellLevels: { fireBolt: 3, chainLightning: 2, frostNova: 2, flameField: 2, meteorStorm: 1, blackHole: 1 }, equipment: { coins: 250, weapon: null, armor: null, healingPotions: 1, inventory: [], discoveredRecipes: [] }, relic: null, fusions: [], fateChoices: [], map: { id: 'ruinedGate', evolutionStage: 0 }, progression: { bossesKilled: 1, goldEarned: 250, shopTokens: 0 } }; }
 function faultStorage(fault) { const map = new Map(); return { map, getItem(key) { if (fault === 'get')
         throw new Error('read unavailable'); return map.get(key) ?? null; }, setItem(key, value) { if (fault === 'backup' && key === BACKUP)
         throw new Error('backup quota'); if (fault === 'primary' && key === PRIMARY)

@@ -21,7 +21,7 @@ test('phase 1207-1210 Game shares one transient manual target memory across pres
 
 test('phase 1211-1214 manual target memory stays transient and AUTO transitions clear stale manual intent',()=>{
   const update=block('private update(dt: number)','private updateLongRunRewardRate');
-  const autoToggle=update.match(/if \(this\.input\.consumePressed\('auto'\)\) \{[\s\S]*?\n    \}/)?.[0]??'';
+  const autoToggle=update.match(/if \(this\.input\.consumePressed\('auto'\) && this\.input\.autoModeVisible\) \{[\s\S]*?\n    \}/)?.[0]??'';
   assert.match(autoToggle,/manualTargetMemory\.clear\(\)/);
   const clear=block('private clearBufferedCastIntents','resetTransientDecisionInput(): void');
   assert.match(clear,/manualTargetMemory\.clear\(\)/);

@@ -12,9 +12,9 @@ export const ENEMY_SPRITE_ATLAS = {
   src: './assets/enemies/enemy-sprites.png',
   columns: 4,
   rows: 3,
-  cellSize: 128,
-  width: 512,
-  height: 384,
+  cellSize: 362,
+  width: 1448,
+  height: 1086,
 } as const;
 
 const CELL_BY_TYPE: Readonly<Record<EnemySpriteType, readonly [column: number, row: number]>> = {

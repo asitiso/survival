@@ -32,8 +32,8 @@ export function auditBossSpriteAssets(): BossSpriteAssetAudit {
   add(samples, 'unique-cells', 6, atlas.uniqueCellCount);
   add(samples, 'atlas-columns', 3, BOSS_SPRITE_ATLAS.columns);
   add(samples, 'atlas-rows', 2, BOSS_SPRITE_ATLAS.rows);
-  add(samples, 'atlas-width', 768, BOSS_SPRITE_ATLAS.width);
-  add(samples, 'atlas-height', 512, BOSS_SPRITE_ATLAS.height);
+  add(samples, 'atlas-width', 1536, BOSS_SPRITE_ATLAS.width);
+  add(samples, 'atlas-height', 1024, BOSS_SPRITE_ATLAS.height);
   add(samples, 'no-missing-archetypes', 0, atlas.missing.length);
   add(samples, 'no-out-of-bounds-archetypes', 0, atlas.outOfBounds.length);
 

@@ -13,6 +13,17 @@ import { joystickNeutralRecoveryProfile, shouldCatchJoystickNeutralReturn } from
 import { StrategicActionReleaseTracker, strategicActionReleaseRadius } from './strategic-action-release.js';
 export class InputState {
     canvas;
+    autoModeVisible = false;
+    levelTapCount = 0;
+    levelPointers = new Set();
+    resetAutoReveal() {
+        this.autoModeVisible = false;
+        this.levelTapCount = 0;
+        this.levelPointers.clear();
+    }
+    inLevelLabel(p) {
+        return p.x >= 24 && p.x <= 145 && p.y >= 26 && p.y <= 65;
+    }
     move = { x: 0, y: 0 };
     joystickActive = false;
     joystickBase = { x: 170, y: 710 };
@@ -45,6 +56,8 @@ export class InputState {
         window.removeEventListener('keyup', this.onKeyUp);
     }
     isHeld(action) {
+        if (action === 'auto' && !this.autoModeVisible)
+            return false;
         return this.held.has(action) || this.keyboardActionHeld(action);
     }
     consumePressed(action) {
@@ -69,6 +82,7 @@ export class InputState {
         }
     }
     resetTransient() {
+        this.levelPointers.clear();
         this.joystickPointer = null;
         this.joystickHome = null;
         this.actionPointers.clear();
@@ -92,6 +106,11 @@ export class InputState {
     onPointerDown = (event) => {
         event.preventDefault();
         const p = this.toLogical(event);
+        if (this.inLevelLabel(p)) {
+            this.levelPointers.add(event.pointerId);
+            this.canvas.setPointerCapture?.(event.pointerId);
+            return;
+        }
         const rect = this.canvas.getBoundingClientRect();
         const safeArea = landscapeSafeAreaProfile(rect.width || LOGICAL_WIDTH, rect.height || LOGICAL_HEIGHT);
         const touchProfile = foldableTouchScaleMap(safeArea, ACTION_BUTTONS, ACTION_TOUCH_SCALE);
@@ -101,6 +120,8 @@ export class InputState {
         const button = safeArea.aspectClass === 'foldable'
             ? deadSpaceButton ?? (thumbIntent === 'right' ? hitTestActionButton(p, ACTION_BUTTONS, ACTION_TOUCH_SCALE, touchProfile) : null)
             : hitTestActionButton(p);
+        if (button?.id === 'auto' && !this.autoModeVisible)
+            return;
         if (button) {
             const actualTouchScale = touchProfile[button.id] ?? ACTION_TOUCH_SCALE;
             if (button.id === 'shop' || button.id === 'auto') {
@@ -155,6 +176,11 @@ export class InputState {
     };
     onPointerUp = (event) => {
         event.preventDefault();
+        if (this.levelPointers.delete(event.pointerId)) {
+            if (this.inLevelLabel(this.toLogical(event)) && ++this.levelTapCount >= 3)
+                this.autoModeVisible = true;
+            return;
+        }
         if (event.pointerId === this.joystickPointer) {
             this.joystickPointer = null;
             this.joystickHome = null;
@@ -176,6 +202,7 @@ export class InputState {
             this.move = { x: 0, y: 0 };
             this.joystickThumb = { ...this.joystickBase };
         }
+        this.levelPointers.delete(event.pointerId);
         this.strategicReleases.cancel(event.pointerId);
         this.releaseActionPointer(event.pointerId);
     };
@@ -187,6 +214,7 @@ export class InputState {
             this.move = { x: 0, y: 0 };
             this.joystickThumb = { ...this.joystickBase };
         }
+        this.levelPointers.delete(event.pointerId);
         this.strategicReleases.cancel(event.pointerId);
         this.releaseActionPointer(event.pointerId);
     };
@@ -206,7 +234,7 @@ export class InputState {
         const key = event.key.toLowerCase();
         this.keys.add(key);
         const action = this.actionFromKey(key);
-        if (action && !event.repeat)
+        if (action && (action !== 'auto' || this.autoModeVisible) && !event.repeat)
             this.pressed.add(action);
         if ([' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key))
             event.preventDefault();

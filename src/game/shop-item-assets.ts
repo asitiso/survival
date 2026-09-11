@@ -13,12 +13,12 @@ export const SHOP_ITEM_IDS = [
 export type ShopItemAssetId = typeof SHOP_ITEM_IDS[number];
 
 export const SHOP_ITEM_ATLAS = {
-  src: './assets/ui/shop-items.png',
+  src: './assets/ui/shop-items-enhanced.png',
   columns: 3,
   rows: 3,
-  cellSize: 128,
-  width: 384,
-  height: 384,
+  cellSize: 418,
+  width: 1254,
+  height: 1254,
 } as const;
 
 const CELL_BY_ITEM: Readonly<Record<ShopItemAssetId, readonly [column: number, row: number]>> = {
@@ -63,6 +63,12 @@ export function shopItemIconSprite(id: string): ShopItemIconSprite | null {
   };
 }
 
+export const ACCESSORY_ICON_POSITIONS: Readonly<Record<string, string>> = {
+  'sage-amulet':'0% 0%', 'storm-ring':'100% 0%',
+  'bastion-talisman':'0% 100%', 'fortune-charm':'100% 100%',
+};
+export function accessoryIconPosition(id: string): string | null { return ACCESSORY_ICON_POSITIONS[id] ?? null; }
+
 export function shopItemIconBackgroundPosition(id: string): string {
   if (!isShopItemAssetId(id)) return '50% 50%';
   const [column, row] = CELL_BY_ITEM[id];
@@ -72,7 +78,7 @@ export function shopItemIconBackgroundPosition(id: string): string {
 }
 
 export function shopItemIconPresentation(id: string): ShopItemIconPresentation {
-  const visible = isShopItemAssetId(id);
+  const visible = isShopItemAssetId(id) || accessoryIconPosition(id) !== null;
   return { visible, animated: false, motionAmplitude: 0, size: 48, compactSize: 38 };
 }
 

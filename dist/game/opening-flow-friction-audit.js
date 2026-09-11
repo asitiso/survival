@@ -22,8 +22,8 @@ export function auditOpeningFlowFriction() {
     const auto = openingAutoReadyProfile();
     const estimatedFrictionReduction = Math.round(((auto.savedOpeningTaps / 4) * .35 + upgradeRecommendationCoverage * .28 + shopPointerTravelReduction * .25 + bossPrepCoverage * .12) * 1000) / 1000;
     const issues = [];
-    if (auto.savedOpeningTaps < 1)
-        issues.push('opening-auto-tap');
+    if (auto.initialAutoEnabled)
+        issues.push('opening-auto-must-be-off');
     if (upgradeRecommendationCoverage < 1)
         issues.push('opening-upgrade-guidance');
     if (shopPointerTravelReduction < .45)

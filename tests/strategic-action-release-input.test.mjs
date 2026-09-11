@@ -16,7 +16,7 @@ globalThis.window=fakeWindow;
 const { InputState }=await import('../dist/core/input.js');
 const pointEvent=(pointerId,x,y)=>({pointerId,clientX:x,clientY:y,preventDefault(){}});
 const keyEvent=(key,{repeat=false}={})=>({key,repeat,preventDefault(){}});
-function setup(){ const canvas=new FakeCanvas(); return {canvas,input:new InputState(canvas)}; }
+function setup(){ const canvas=new FakeCanvas(); const input=new InputState(canvas); for(let i=0;i<3;i++){canvas.dispatch('pointerdown',pointEvent(90,50,45));canvas.dispatch('pointerup',pointEvent(90,50,45));} return {canvas,input}; }
 
 test('phase 1305 shop touch arms on pointerdown and commits only on pointerup',()=>{
   const {canvas,input}=setup();

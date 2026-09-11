@@ -108,6 +108,16 @@ export function spellTuning(id: SpellId, level: number): SpellTuning {
   }
 }
 
+export function flameFieldVisualAlpha(ttl: number, maxTtl: number): number {
+  const fadeWindow = Math.min(1.6, Math.max(0.001, maxTtl));
+  const remaining = Math.max(0, Math.min(1, ttl / fadeWindow));
+  return 0.12 + remaining * 0.60;
+}
+
+export function persistentZoneExpirySeconds(kind: 'flameField' | 'blackHole'): number {
+  return kind === 'flameField' ? 0.32 : 0.52;
+}
+
 
 export function chainJumpBudget(baseJumps: number, temporaryBonus: number): number {
   return Math.max(0, Math.floor(baseJumps)) + Math.max(0, Math.floor(temporaryBonus));
@@ -411,7 +421,7 @@ export class SpellSystem {
         g.addColorStop(0, `${field.primary}55`); g.addColorStop(.65, `${field.secondary}33`); g.addColorStop(1, `${field.secondary}00`);
         ctx.fillStyle = g; ctx.beginPath(); ctx.arc(field.pos.x, field.pos.y, field.radius, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = `${field.primary}88`; ctx.lineWidth = 3; ctx.stroke();
-        const fieldAlpha = Math.min(0.72, 0.28 + Math.max(0, Math.min(1, field.ttl / 1.4)) * 0.44);
+        const fieldAlpha = flameFieldVisualAlpha(field.ttl, field.maxTtl);
         drawVfxStamp(field.spriteId, field.pos.x, field.pos.y, field.radius * 2.05, fieldAlpha);
         if (persistentSpellZoneVfxAtlasReady && persistentSpellZoneVfxAtlasImage) {
           const progress = 1 - Math.max(0, field.ttl / Math.max(0.001, field.maxTtl));
@@ -484,7 +494,7 @@ export class SpellSystem {
       if (cue.kind === 'field') {
         const field = cue.value;
         if (!heroSpellSignatureAtlasReady || !heroSpellSignatureAtlasImage) continue;
-        const fieldAlpha = Math.min(0.72, 0.28 + Math.max(0, Math.min(1, field.ttl / 1.4)) * 0.44);
+        const fieldAlpha = flameFieldVisualAlpha(field.ttl, field.maxTtl);
         const sprite = heroSpellSignatureVfxSprite(field.heroId, 'flameField');
         const size = field.radius * 2.1;
         ctx.save();
@@ -907,7 +917,7 @@ export class SpellSystem {
         }
       }
     }
-    for (const field of this.fields) if (field.ttl <= 0) { const maxTtl=.48; this.persistentZoneExpireVfx.push({heroId:field.heroId,kind:'flameField',pos:{...field.pos},radius:field.radius,ttl:maxTtl,maxTtl}); if(this.persistentZoneExpireVfx.length > 16)this.persistentZoneExpireVfx.splice(0,this.persistentZoneExpireVfx.length-16); }
+    for (const field of this.fields) if (field.ttl <= 0) { const maxTtl=persistentZoneExpirySeconds('flameField'); this.persistentZoneExpireVfx.push({heroId:field.heroId,kind:'flameField',pos:{...field.pos},radius:field.radius,ttl:maxTtl,maxTtl}); if(this.persistentZoneExpireVfx.length > 16)this.persistentZoneExpireVfx.splice(0,this.persistentZoneExpireVfx.length-16); }
     this.fields = this.fields.filter((f) => f.ttl > 0);
   }
 
@@ -956,7 +966,7 @@ export class SpellSystem {
         hole.tickTimer += hole.tickInterval;
       }
     }
-    for (const hole of this.holes) if (hole.ttl <= 0) { const maxTtl=.52; this.persistentZoneExpireVfx.push({heroId:hole.heroId,kind:'blackHole',pos:{...hole.pos},radius:hole.radius,ttl:maxTtl,maxTtl}); if(this.persistentZoneExpireVfx.length > 16)this.persistentZoneExpireVfx.splice(0,this.persistentZoneExpireVfx.length-16); this.queueUltimatePostImpactResidue(hole.heroId,'blackHole',hole.pos,hole.radius,.68); }
+    for (const hole of this.holes) if (hole.ttl <= 0) { const maxTtl=persistentZoneExpirySeconds('blackHole'); this.persistentZoneExpireVfx.push({heroId:hole.heroId,kind:'blackHole',pos:{...hole.pos},radius:hole.radius,ttl:maxTtl,maxTtl}); if(this.persistentZoneExpireVfx.length > 16)this.persistentZoneExpireVfx.splice(0,this.persistentZoneExpireVfx.length-16); this.queueUltimatePostImpactResidue(hole.heroId,'blackHole',hole.pos,hole.radius,.68); }
     this.holes = this.holes.filter((h) => h.ttl > 0);
   }
 }

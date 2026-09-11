@@ -8,7 +8,7 @@ export interface RepeatShopFastPathProfile {
   estimatedPointerTravelReduction:number;
 }
 function currentItem(offer:ShopDisplayOffer,state:EquipmentState){
-  return offer.kind==='weapon'?state.weapon:offer.kind==='armor'?state.armor:null;
+  return offer.kind==='potion'?null:state[offer.kind];
 }
 export function repeatShopFastPath(elapsedSeconds:number,quickOffer:ShopDisplayOffer|null,state:EquipmentState):RepeatShopFastPathProfile{
   const elapsed=Number.isFinite(elapsedSeconds)?Math.max(0,elapsedSeconds):0;

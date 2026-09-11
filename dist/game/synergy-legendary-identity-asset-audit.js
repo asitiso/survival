@@ -5,7 +5,7 @@ import { LegendaryEffectController } from './legendary-effects.js';
 import { LEGENDARY_AWAKENING_ITEM_IDS, activeLegendaryAwakeningRecall, auditLegendaryAwakeningReuse, legendaryProcIdentity } from './legendary-awakening-recall.js';
 const close = (a, b) => Math.abs(a - b) < 1e-9;
 const item = (id, kind) => ({ id, kind, name: id, rank: 5, power: .1, legendary: true });
-const equip = (weapon = null, armor = null) => ({ coins: 0, weapon, armor, healingPotions: 1 });
+const equip = (weapon = null, armor = null) => ({ coins: 0, weapon, armor, healingPotions: 1, inventory: [], discoveredRecipes: [] });
 function synergyContractOk() {
     const cases = [
         [{ heroId: 'arkan', traitId: null, relicId: 'abyss-eye', equipment: equip(item('arcane-staff', 'weapon')) }, 'forbidden-arcana'],

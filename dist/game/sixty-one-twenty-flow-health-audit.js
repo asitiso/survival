@@ -3,7 +3,7 @@ import { lateRunShopNeed } from './late-run-shop-need.js';
 import { deepRunHudFocus } from './deep-run-hud-focus.js';
 import { reduceDeepRunBossRewardDecision } from './deep-run-boss-reward-guidance.js';
 const HEROES = ['arkan', 'seria', 'kain', 'edric'];
-const equipment = { coins: 6000, weapon: { id: 'arcane-staff', kind: 'weapon', name: 'Arcane', rank: 5, power: .15, legendary: true }, armor: { id: 'iron-robe', kind: 'armor', name: 'Robe', rank: 5, power: .08, legendary: true }, healingPotions: 3 };
+const equipment = { coins: 6000, weapon: { id: 'arcane-staff', kind: 'weapon', name: 'Arcane', rank: 5, power: .15, legendary: true }, armor: { id: 'iron-robe', kind: 'armor', name: 'Robe', rank: 5, power: .08, legendary: true }, healingPotions: 3, inventory: [], discoveredRecipes: [] };
 const rewardChoices = [{ kind: 'relic', id: 'relic:chrono-shard', relicId: 'chrono-shard', title: 'Time Gear', description: 'swap', accent: '#fff', best: false, badge: '유물 교체', hint: '교체' }, { kind: 'upgrade', id: 'meteorStorm', title: 'Meteor', description: 'grow', accent: '#fff', best: true, badge: '궁극기 성장', hint: '성장' }, { kind: 'upgrade', id: 'spellPower', title: 'Power', description: 'grow', accent: '#fff', best: false, badge: '기본 성장', hint: '성장' }];
 const levels = { fireBolt: 10, chainLightning: 10, frostNova: 10, flameField: 10, meteorStorm: 5, blackHole: 5 };
 function round(v) { return Math.round(v * 1000) / 1000; }

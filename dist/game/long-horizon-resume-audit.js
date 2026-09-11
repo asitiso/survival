@@ -3,7 +3,7 @@ import { saveRunSnapshot, loadRunSnapshot } from '../domain/run-snapshot.js';
 import { appendRecoveryCheckpoint, loadRunSnapshotWithJournal } from '../domain/recovery-journal.js';
 const HOURS = [2, 4, 8, 12];
 function memory() { const map = new Map(); return { getItem: k => map.get(k) ?? null, setItem: (k, v) => map.set(k, String(v)), removeItem: k => map.delete(k) }; }
-function sample(heroId, hours, savedAt) { return { version: 1, savedAt, heroId, traitId: 'destruction', threatLevel: 5, elapsed: hours * 3600, hero: { level: 40, xp: 1, xpNext: 2, hp: 500, maxHp: 500, coins: 1000, kills: 5000 }, coreHp: 800, spellLevels: { fireBolt: 10, chainLightning: 10, frostNova: 10, flameField: 10, meteorStorm: 10, blackHole: 10 }, equipment: { coins: 1000, weapon: null, armor: null, healingPotions: 2 }, relic: null, fusions: [], fateChoices: [], map: { id: 'ruinedGate', evolutionStage: 2 }, progression: { bossesKilled: 12, goldEarned: 10000, shopTokens: 2 } }; }
+function sample(heroId, hours, savedAt) { return { version: 1, savedAt, heroId, traitId: 'destruction', threatLevel: 5, elapsed: hours * 3600, hero: { level: 40, xp: 1, xpNext: 2, hp: 500, maxHp: 500, coins: 1000, kills: 5000 }, coreHp: 800, spellLevels: { fireBolt: 10, chainLightning: 10, frostNova: 10, flameField: 10, meteorStorm: 10, blackHole: 10 }, equipment: { coins: 1000, weapon: null, armor: null, healingPotions: 2, inventory: [], discoveredRecipes: [] }, relic: null, fusions: [], fateChoices: [], map: { id: 'ruinedGate', evolutionStage: 2 }, progression: { bossesKilled: 12, goldEarned: 10000, shopTokens: 2 } }; }
 export function auditLongHorizonResume() {
     let primaryOk = 0, journalOk = 0, maxElapsedDrift = 0;
     const drifts = new Map();

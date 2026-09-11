@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openingAutoReadyProfile, openingAutoCastIntent } from '../dist/game/opening-auto-ready.js';
 
-test('phase 543 new runs start with AUTO ready so the first spell volley needs no setup tap',()=>{
+test('phase 543 new runs start with AUTO disabled',()=>{
   const p=openingAutoReadyProfile();
-  assert.equal(p.initialAutoEnabled,true);
-  assert.equal(p.savedOpeningTaps,1);
+  assert.equal(p.initialAutoEnabled,false);
+  assert.equal(p.savedOpeningTaps,0);
 });
 
 test('phase 544 holding a spell remains a manual cast and does not double fire through AUTO',()=>{

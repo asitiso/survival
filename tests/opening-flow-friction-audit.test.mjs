@@ -6,7 +6,7 @@ import { collectReleaseCandidateEvidence, releaseCandidateAudit } from '../dist/
 test('phase 559 opening friction audit measures the run-start through first-boss convenience path',()=>{
   const a=auditOpeningFlowFriction();
   assert.ok(a.samples>=12);
-  assert.equal(a.autoTapReduction,1);
+  assert.equal(a.autoTapReduction,0);
 });
 
 test('phase 560 recommendation and early shop fast path cover every modeled actionable opening state',()=>{

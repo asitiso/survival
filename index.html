@@ -4,11 +4,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
   <meta name="theme-color" content="#050913" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="./assets/pwa/icon.svg" />
   <title>Arcane Last Stand</title>
   <link rel="stylesheet" href="./src/styles.css" />
 </head>
 <body>
   <main id="app" aria-label="Arcane Last Stand"></main>
   <script type="module" src="./dist/main.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("./service-worker.js");
+    }
+  </script>
 </body>
 </html>

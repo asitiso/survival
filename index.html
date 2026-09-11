@@ -11,12 +11,24 @@
   <style data-mobile-landscape-modal>
     @media (orientation: landscape) and (max-height: 600px) and (max-width: 1024px) {
       .modal-overlay {
+        --mobile-modal-scale: 0.8;
         place-items: start center;
         overflow-y: auto;
         padding: 12px 2vw;
         overscroll-behavior: contain;
         -webkit-overflow-scrolling: touch;
         touch-action: pan-y;
+      }
+
+      .modal-panel {
+        zoom: var(--mobile-modal-scale);
+      }
+    }
+
+    @media (orientation: landscape) and (max-height: 500px) and (max-width: 1024px) {
+      .modal-overlay {
+        --mobile-modal-scale: 0.74;
+        padding: 8px 1.5vw;
       }
     }
   </style>

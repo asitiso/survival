@@ -10,6 +10,7 @@ import { equipmentReadiness, type EquipmentReadinessResult } from './equipment-s
 
 export interface ShopGuidanceContext { heroId:HeroId; archetype:BuildArchetype; state:EquipmentState; elapsedSeconds?:number; heroMaxHp?:number; permanentRecipeDiscoveries?:readonly string[]; }
 export interface ShopOfferGuidance { offerId:string; label:string; reason:string; score:number; best:boolean; action?:'purchase'|'forge'|'equip'|'cleanup'; }
+const MATERIAL_READINESS_GAIN = 0.05;
 
 const ARCHETYPE_WEIGHT:Record<BuildArchetype,Readonly<Record<string,number>>>={
   burst:{'arcane-staff':44,'blast-rod':30,'rapid-wand':12,'golden-wand':4,'iron-robe':8,'gale-cloak':5,'magnet-cloak':4,'guardian-plate':6,'healing-potion':6},
@@ -86,9 +87,16 @@ function recommendationGain(context: ShopGuidanceContext, candidate: EquipmentSt
   if (context.elapsedSeconds === undefined || context.heroMaxHp === undefined) return 0;
   const before = equipmentReadiness({ state: context.state, elapsedSeconds: context.elapsedSeconds, heroMaxHp: context.heroMaxHp });
   const after = equipmentReadiness({ state: candidate, elapsedSeconds: context.elapsedSeconds, heroMaxHp: context.heroMaxHp });
-  if (before.weakestMetric === 'hero') return (after.heroSurvivalHits - before.heroSurvivalHits) / Math.max(1, before.recommended.heroSurvivalHits);
-  if (before.weakestMetric === 'firepower') return (after.firepowerIndex - before.firepowerIndex) / Math.max(1, before.recommended.firepowerIndex);
-  return (before.coreDamageMultiplier - after.coreDamageMultiplier) / Math.max(1, before.recommended.coreDamageMultiplier);
+  return Math.max(
+    (after.heroSurvivalHits - before.heroSurvivalHits) / Math.max(1, before.recommended.heroSurvivalHits),
+    (after.firepowerIndex - before.firepowerIndex) / Math.max(1, before.recommended.firepowerIndex),
+    (before.coreDamageMultiplier - after.coreDamageMultiplier) / Math.max(1, before.recommended.coreDamageMultiplier),
+    0,
+  );
+}
+
+function materiallyImprovesReadiness(gain: number): boolean {
+  return Number.isFinite(gain) && gain >= MATERIAL_READINESS_GAIN;
 }
 
 /** Returns the two actions worth showing above the offer grid, including forge actions. */
@@ -110,13 +118,17 @@ export function shopTopRecommendations(
     const equipped = equipInventoryStack(context.state, key);
     if (equipped.ok) {
       const gain = recommendationGain(context, equipped.state);
-      add({ offerId: stack.id, label: '보관 장비 추천', reason: `${stack.name} 장착`, score: 2200 + gain * 100, best: false, action: 'equip' });
+      if (materiallyImprovesReadiness(gain)) {
+        add({ offerId: stack.id, label: '보관 장비 추천', reason: `${stack.name} 장착`, score: 2200 + gain * 100, best: false, action: 'equip' });
+      }
     }
     if (context.elapsedSeconds !== undefined) {
       const strengthened = strengthenEquipment(context.state, { place: 'inventory', stackKey: key }, context.elapsedSeconds);
       if (strengthened.ok) {
         const gain = recommendationGain(context, strengthened.state);
-        add({ offerId: stack.id, label: '대장간 추천', reason: `${definition?.name ?? stack.name} 강화`, score: 2400 + gain * 100, best: false, action: 'forge' });
+        if (materiallyImprovesReadiness(gain)) {
+          add({ offerId: stack.id, label: '대장간 추천', reason: `${definition?.name ?? stack.name} 강화`, score: 2400 + gain * 100, best: false, action: 'forge' });
+        }
       }
     }
   }
@@ -127,7 +139,9 @@ export function shopTopRecommendations(
     const strengthened = strengthenEquipment(context.state, { place: 'equipped', kind }, context.elapsedSeconds);
     if (!strengthened.ok) continue;
     const gain = recommendationGain(context, strengthened.state);
-    add({ offerId: equipped.id, label: '대장간 추천', reason: `${equipped.name} 강화`, score: 2600 + gain * 100, best: false, action: 'forge' });
+    if (materiallyImprovesReadiness(gain)) {
+      add({ offerId: equipped.id, label: '대장간 추천', reason: `${equipped.name} 강화`, score: 2600 + gain * 100, best: false, action: 'forge' });
+    }
   }
 
   const permanent = context.permanentRecipeDiscoveries ?? [];
@@ -136,6 +150,7 @@ export function shopTopRecommendations(
     if (!combined.ok) continue;
     const hiddenUndiscovered = recipe.hidden && !permanent.includes(recipe.id);
     const gain = recommendationGain(context, combined.state);
+    if (!materiallyImprovesReadiness(gain)) continue;
     add({
       offerId: hiddenUndiscovered ? 'hidden-forge' : recipe.result.id,
       label: '대장간 추천',
@@ -194,20 +209,20 @@ function survivalGuidance(offers: readonly ShopDisplayOffer[], context: ShopGuid
     if (offer.price > state.coins) entry.score = -100;
     if (current?.id === offer.id) {
       const strengthened = strengthenEquipment(state, { place: 'equipped', kind: offer.kind }, context.elapsedSeconds!);
-      if (strengthened.ok && gain(read(strengthened.state)) > 0) {
+      if (strengthened.ok && materiallyImprovesReadiness(gain(read(strengthened.state)))) {
         const upgraded = read(strengthened.state);
         entry = { ...entry, action: 'forge', label: '대장간 추천', reason: reason(upgraded, `${offer.name} 강화`), score: 2000 + gain(upgraded) };
       } else if (!blocked) {
         // A missing duplicate is useful, but never claim it strengthens on purchase.
         const upgraded = read({ ...state, [offer.kind]: { ...current, rank: current.rank + 1, legendary: current.rank + 1 >= 5 } });
-        if (gain(upgraded) > 0) entry = { ...entry, reason: `강화 재료 구매 · ${reason(upgraded, '대장간 강화')}`, score: offer.price <= state.coins ? 50 + gain(upgraded) : -100 };
+        if (materiallyImprovesReadiness(gain(upgraded))) entry = { ...entry, reason: `강화 재료 구매 · ${reason(upgraded, '대장간 강화')}`, score: offer.price <= state.coins ? 50 + gain(upgraded) : -100 };
       }
     }
     return entry;
   });
   const addInventoryAction = (offerId: string, candidate: EquipmentState, action: 'forge' | 'equip', name: string) => {
     const after = read(candidate);
-    if (gain(after) <= 0) return;
+    if (!materiallyImprovesReadiness(gain(after))) return;
     const index = offers.findIndex(offer => offer.kind !== 'potion' && offer.id === offerId);
     if (index < 0) return;
     const score = 2000 + gain(after);

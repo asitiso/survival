@@ -4,7 +4,7 @@ import { addInventoryItem, MAX_EQUIPMENT_STACK_COUNT } from '../dist/domain/equi
 import { purchaseOffer } from '../dist/domain/economy.js';
 import { combineEquipment } from '../dist/domain/equipment-forge.js';
 import { equipmentDefinition } from '../dist/game/shop-data.js';
-import { shopTopRecommendations } from '../dist/game/shop-guidance.js';
+import { shopGuidanceForOffers, shopTopRecommendations, quickShopRecommendation } from '../dist/game/shop-guidance.js';
 import { recipesForOwnedItems } from '../dist/game/equipment-recipes.js';
 import { shopRecipeView } from '../dist/ui/shop.js';
 import { loadRunSnapshot, saveRunSnapshot, sanitizeRunSnapshot } from '../dist/domain/run-snapshot.js';
@@ -53,8 +53,35 @@ test('retained result stack at full capacity blocks combine atomically', () => {
   assert.match(result.message, /99|가득/);
 });
 
+test('retained ingredient stacks keep six slots occupied and block combine atomically', () => {
+  const state = {
+    ...empty(), coins: 10000, weapon: item('blast-rod'), inventory: [
+      item('arcane-staff', 2, 2), item('rapid-wand', 2, 2), item('blast-rod', 1),
+      item('iron-robe', 1), item('sage-amulet', 1), item('gale-cloak', 1),
+    ],
+  };
+  const before = structuredClone(state);
+  const result = combineEquipment(state, 'arcane-accelerator');
+  assert.equal(result.ok, false);
+  assert.equal(result.state, state);
+  assert.deepEqual(state, before);
+  assert.match(result.message, /가득|99/);
+});
+
+test('lower-rank stored duplicate does not outrank a useful armor purchase', () => {
+  const state = { ...empty(), coins: 10000, weapon: item('arcane-staff', 3), inventory: [item('arcane-staff', 1)] };
+  const armor = equipmentDefinition('iron-robe');
+  const context = { heroId: 'arkan', archetype: 'burst', state, elapsedSeconds: 480, heroMaxHp: 333, permanentRecipeDiscoveries: [] };
+  const guidance = shopGuidanceForOffers([armor], context);
+  const top = shopTopRecommendations([armor], context, guidance);
+  assert.equal(top[0]?.action, 'purchase');
+  assert.equal(guidance[0]?.action, 'purchase');
+  assert.equal(guidance[0]?.best, true);
+  assert.equal(quickShopRecommendation([armor], guidance, state, top), armor);
+});
+
 test('top recommendations include stored crafted actions and hidden forge without leaking its result', () => {
-  const state = { ...empty(), weapon: item('arcane-staff', 3), armor: item('iron-robe', 3), accessory: item('sage-amulet', 3), inventory: [item('arcane-accelerator', 3), item('alchemical-blast-staff', 3)] };
+  const state = { ...empty(), armor: item('iron-robe', 3), accessory: item('sage-amulet', 3), inventory: [item('arcane-accelerator', 3), item('alchemical-blast-staff', 3)] };
   const context = { heroId: 'arkan', archetype: 'burst', state, elapsedSeconds: 480, heroMaxHp: 333, permanentRecipeDiscoveries: [] };
   const recommendations = shopTopRecommendations([equipmentDefinition('guardian-plate')], context);
   assert.ok(recommendations.some(entry => entry.action === 'equip' && ['arcane-accelerator', 'alchemical-blast-staff'].includes(entry.offerId)));

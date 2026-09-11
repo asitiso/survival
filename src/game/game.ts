@@ -20,15 +20,19 @@ import { LevelUpOverlay } from '../ui/levelup.js';
 import { growthChoiceIconStyle } from './growth-choice-icon-assets.js';
 import { projectGenericUpgradeEffectiveGain, genericUpgradeEffectiveGainHint } from './generic-upgrade-effective-projection.js';
 import { genericUpgradeGainStatusIdentityStyle } from './generic-upgrade-gain-status-identity-assets.js';
-import { ShopOverlay } from '../ui/shop.js';
+import { ShopOverlay, type ShopTab } from '../ui/shop.js';
 import { HeroSelectOverlay } from '../ui/hero-select.js';
 import { ResultsOverlay } from '../ui/results.js';
 import { LobbyOverlay } from '../ui/lobby.js';
 import { TraitSelectOverlay } from '../ui/trait-select.js';
-import { refreshEquipmentPowers, priceShopOffers, ensureEquippedOffers, generateShopOffers, type ShopDisplayOffer } from './shop-data.js';
+import { refreshEquipmentPowers, priceShopOffers, ensureEquippedOffers, generateShopOffers, equipmentDefinition, type ShopDisplayOffer } from './shop-data.js';
 import { quickShopRecommendation, safeQuickPurchase, shopGuidanceForOffers } from './shop-guidance.js';
 import { purchaseOffer, rerollCost, SHOP_FIRST_TOKEN_AT, SHOP_TOKEN_INTERVAL } from '../domain/economy.js';
-import type { EquipmentState } from '../domain/types.js';
+import type { EquipmentState, EquipmentTransactionResult } from '../domain/types.js';
+import { equipInventoryStack, sellInventoryStack, inventoryStackKey } from '../domain/equipment-inventory.js';
+import { strengthenEquipment, combineEquipment, type EquipmentTarget } from '../domain/equipment-forge.js';
+import { recipesForOwnedItems } from './equipment-recipes.js';
+import { equipmentReadiness, projectEquipmentSurvival } from './equipment-survival-readiness.js';
 import { HERO_PROFILES, heroProfile, type HeroId } from './hero-profiles.js';
 import { CombatFeedbackSystem, KillChainVfxTracker, killChainVfxProfile, type KillChainVfxCue } from './combat-feedback.js';
 import { kainOverloadCooldownMultiplier, kainOverloadNext } from './hero-passives.js';
@@ -514,6 +518,8 @@ export class Game {
   private shopOffers: ShopDisplayOffer[] = [];
   private shopAccessoryChoice: string | null = null;
   private shopImpactMessage = '';
+  private shopActiveTab: ShopTab = 'purchase';
+  private shopSelectedStackKey: string | null = null;
   private damageReasonState: DamageReasonState | null = null;
   private attackResolutionHandoffState:AttackResolutionHandoffState=createAttackResolutionHandoffState();
   private rerollsThisVisit = 0;
@@ -526,6 +532,8 @@ export class Game {
   private heroMeter: HeroMeterState = createHeroMeterState('arkan');
   private goldenGoblinEnemyId: number | null = null;
   private supplyCrate: Vec2 | null = null;
+  private supplyCrateOffer: ShopDisplayOffer | null = null;
+  private supplyCrateBlocked = false;
   private eventToast = '';
   private eventToastTimer = 0;
   private eventToastLastLawId: MythicLastLawId | null = null;
@@ -5620,6 +5628,8 @@ export class Game {
       anchor={id:event.id,x:pos.x,y:pos.y};
     } else if (event.id === 'supplyDrop') {
       this.supplyCrate = fieldEventArenaPosition();
+      this.supplyCrateOffer = null;
+      this.supplyCrateBlocked = false;
       anchor={id:event.id,x:this.supplyCrate.x,y:this.supplyCrate.y};
     } else if (event.id === 'eliteRush') {
       const count = eliteRushCount(danger);
@@ -5650,15 +5660,21 @@ export class Game {
   private updateSupplyCrate(): void {
     if (!this.supplyCrate || this.fieldEvents.active?.id !== 'supplyDrop') return;
     if (distance(this.hero.pos, this.supplyCrate) > this.hero.radius + 58) return;
-    if (Math.random() < 0.45) {
+    if (!this.supplyCrateOffer && Math.random() < 0.45) {
       this.equipmentState = { ...this.equipmentState, healingPotions: this.equipmentState.healingPotions + 1 };
       this.showTacticalStatusEventToast('보급 획득 · 체력 물약 +1', 'supplyDrop');
     } else {
       const equipmentOffers = generateShopOffers().filter((offer) => offer.kind !== 'potion');
-      const offer = equipmentOffers[Math.floor(Math.random() * equipmentOffers.length)] ?? equipmentOffers[0];
+      const offer = this.supplyCrateOffer ?? equipmentOffers[Math.floor(Math.random() * equipmentOffers.length)] ?? equipmentOffers[0];
       if (offer) {
-        const result = purchaseOffer(this.equipmentState, { ...offer, price: 0 });
-        if (result.ok) this.equipmentState = result.state;
+        this.supplyCrateOffer = offer;
+        const result = purchaseOffer(this.equipmentState, { ...offer, price: 0, basePrice: 0 }, this.elapsed);
+        if (!result.ok) {
+          if (!this.supplyCrateBlocked) this.showTacticalStatusEventToast(`보급 대기 · ${result.message}`, 'supplyDrop');
+          this.supplyCrateBlocked = true;
+          return;
+        }
+        this.equipmentState = result.state;
         this.showTacticalStatusEventToast(`무료 보급 · ${offer.name}`, 'supplyDrop');
       }
     }
@@ -7301,13 +7317,15 @@ export class Game {
     this.rerollsThisVisit = 0;
     this.shopImpactMessage = '';
     this.shopAccessoryChoice = null;
+    this.shopActiveTab = 'purchase';
+    this.shopSelectedStackKey = null;
     this.shopOffers = generateShopOffers();
     this.refreshShopOverlay();
   }
 
   private refreshShopOverlay(): void {
     this.shopOffers = priceShopOffers(ensureEquippedOffers(this.shopOffers, this.equipmentState, this.shopAccessoryChoice), this.equipmentState, this.elapsed);
-    const guidance = shopGuidanceForOffers(this.shopOffers, { heroId:this.hero.profileId, archetype:this.currentBuildArchetype(), state:this.equipmentState });
+    const guidance = shopGuidanceForOffers(this.shopOffers, { heroId:this.hero.profileId, archetype:this.currentBuildArchetype(), state:this.equipmentState, elapsedSeconds: this.elapsed, heroMaxHp: this.hero.maxHp });
     const quickOffer=quickShopRecommendation(this.shopOffers,guidance,this.equipmentState);
     const openingFastPath=openingShopFastPath(this.elapsed,Boolean(quickOffer));
     const repeatFast=repeatShopFastPath(this.elapsed,quickOffer,this.equipmentState);
@@ -7316,27 +7334,64 @@ export class Game {
     const fastPath=promotedFast.promoteQuickBuy
       ? {promoteQuickBuy:true,position:'before-grid' as const,estimatedPointerTravelReduction:promotedFast.estimatedPointerTravelReduction,newControlCount:0 as const}
       : openingFastPath;
-    const model = { elapsedSeconds: this.elapsed, state: this.equipmentState, offers: this.shopOffers, rerollPrice: rerollCost(this.rerollsThisVisit), guidance, impactMessage:this.shopImpactMessage, quickOffer, fastPath };
-    const purchase = (offer:ShopDisplayOffer,closeAfterPurchase=false):void => {
+    const readinessContext = { elapsedSeconds: this.elapsed, heroMaxHp: this.hero.maxHp, state: this.equipmentState };
+    const model = { ...readinessContext, activeTab: this.shopActiveTab, selectedStackKey: this.shopSelectedStackKey,
+      permanentRecipeDiscoveries: this.metaProfile.discoveredEquipmentRecipes,
+      recipes: recipesForOwnedItems(this.equipmentState, this.metaProfile.discoveredEquipmentRecipes),
+      readiness: equipmentReadiness(readinessContext), offers: this.shopOffers, rerollPrice: rerollCost(this.rerollsThisVisit), guidance, impactMessage:this.shopImpactMessage, quickOffer, fastPath };
+    const applyEquipmentTransaction = (result: EquipmentTransactionResult): boolean => {
+      if (!result.ok) {
+        this.shopImpactMessage = result.message;
+        this.refreshShopOverlay();
+        return false;
+      }
       const beforeState = this.equipmentState;
-      const beforeWeaponLegendary = this.equipmentState.weapon?.legendary ?? false;
-      const beforeArmorLegendary = this.equipmentState.armor?.legendary ?? false;
-      const beforeAccessoryLegendary = this.equipmentState.accessory?.legendary ?? false;
-      const result = purchaseOffer(this.equipmentState, offer, this.elapsed);
-      if (!result.ok) return;
       this.equipmentState = result.state;
-      this.shopImpactMessage = purchaseImpactFeedback(beforeState, result.state, offer).message;
-      const becameLegendary = (!beforeWeaponLegendary && (result.state.weapon?.legendary ?? false)) || (!beforeArmorLegendary && (result.state.armor?.legendary ?? false)) || (!beforeAccessoryLegendary && (result.state.accessory?.legendary ?? false));
+      if (result.newlyDiscoveredRecipeId) {
+        this.recordEquipmentRecipeDiscovery(result.newlyDiscoveredRecipeId);
+      }
+      const messages: Record<string, string> = { 'Item equipped.': '장비를 장착했습니다.', 'Item sold.': '장비 1개를 판매했습니다.' };
+      this.shopImpactMessage = `${messages[result.message] ?? result.message} · ${projectEquipmentSurvival({ elapsedSeconds: this.elapsed, heroMaxHp: this.hero.maxHp, state: beforeState }, result.state).summary}`;
+      if (this.shopSelectedStackKey && !this.shopSelectedStackKey.startsWith('equipped:')
+        && !result.state.inventory.some(stack => inventoryStackKey(stack.id, stack.rank) === this.shopSelectedStackKey)) this.shopSelectedStackKey = null;
+      const becameLegendary = (['weapon', 'armor', 'accessory'] as const).some(kind => !beforeState[kind]?.legendary && result.state[kind]?.legendary);
       this.audio.play(becameLegendary ? 'legendary' : 'purchase');
       this.syncEquipmentState();
-      if (closeAfterPurchase) { this.shopOverlay.hide(); this.paused = false; return; }
       this.refreshShopOverlay();
+      return true;
+    };
+    const purchase = (offer:ShopDisplayOffer,closeAfterPurchase=false):void => {
+      const beforeState = this.equipmentState;
+      const result = purchaseOffer(this.equipmentState, offer, this.elapsed);
+      if (!applyEquipmentTransaction(offer.kind === 'potion' && result.ok ? { ...result, message: purchaseImpactFeedback(beforeState, result.state, offer).message } : result)) return;
+      if (closeAfterPurchase) { this.shopOverlay.hide(); this.paused = false; return; }
     };
     const handlers = {
+      onTabChange: (tab: ShopTab) => { this.shopActiveTab = tab; this.refreshShopOverlay(); },
+      onSelectStack: (stackKey: string) => { this.shopSelectedStackKey = stackKey; this.refreshShopOverlay(); },
+      onEquip: (stackKey: string) => {
+        const stack = this.equipmentState.inventory.find(item => inventoryStackKey(item.id, item.rank) === stackKey);
+        const result = equipInventoryStack(this.equipmentState, stackKey);
+        if (result.ok && stack) this.shopSelectedStackKey = `equipped:${stack.kind}`;
+        applyEquipmentTransaction(result);
+      },
+      onStrengthen: (target: EquipmentTarget) => {
+        const stack = target.place === 'inventory' ? this.equipmentState.inventory.find(item => inventoryStackKey(item.id, item.rank) === target.stackKey) : null;
+        const result = strengthenEquipment(this.equipmentState, target, this.elapsed);
+        if (result.ok && stack) this.shopSelectedStackKey = inventoryStackKey(stack.id, stack.rank + 1);
+        applyEquipmentTransaction(result);
+      },
+      onCombine: (recipeId: string) => { applyEquipmentTransaction(combineEquipment(this.equipmentState, recipeId)); },
+      onSell: (stackKey: string) => {
+        const stack = this.equipmentState.inventory.find(item => inventoryStackKey(item.id, item.rank) === stackKey);
+        const definition = stack ? equipmentDefinition(stack.id) : null;
+        applyEquipmentTransaction(definition ? sellInventoryStack(this.equipmentState, stackKey, definition.basePrice ?? definition.price)
+          : { ok: false, state: this.equipmentState, message: '판매할 장비를 찾을 수 없습니다.' });
+      },
       onAccessoryChange: (id: string) => { this.shopAccessoryChoice = id; this.refreshShopOverlay(); },
       onPurchase: (offer: ShopDisplayOffer) => purchase(offer,false),
       onQuickPurchase: (offer: ShopDisplayOffer) => {
-        const currentGuidance=shopGuidanceForOffers(this.shopOffers,{heroId:this.hero.profileId,archetype:this.currentBuildArchetype(),state:this.equipmentState});
+        const currentGuidance=shopGuidanceForOffers(this.shopOffers,{heroId:this.hero.profileId,archetype:this.currentBuildArchetype(),state:this.equipmentState, elapsedSeconds: this.elapsed, heroMaxHp: this.hero.maxHp});
         const currentQuick=quickShopRecommendation(this.shopOffers,currentGuidance,this.equipmentState);
         if(!currentQuick||currentQuick.id!==offer.id||currentQuick.kind!==offer.kind||currentQuick.price!==offer.price||!safeQuickPurchase(offer,this.shopOffers,this.equipmentState))return;
         purchase(offer,true);
@@ -7353,7 +7408,7 @@ export class Game {
       },
       onClose: () => { this.shopOverlay.hide(); this.paused = false; },
     };
-    if (this.shopOverlay.isOpen) this.shopOverlay.refresh(model);
+    if (this.shopOverlay.isOpen) this.shopOverlay.refresh(model, handlers);
     else this.shopOverlay.open(model, handlers);
   }
 

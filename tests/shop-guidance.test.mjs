@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { shopGuidanceForOffers } from '../dist/game/shop-guidance.js';
 
 const offers=[
@@ -100,4 +101,16 @@ test('recipe guidance previews a forge without consuming ingredients',()=>{
  assert.ok(guided.some(entry=>entry.best&&entry.action==='forge'));
  assert.equal(quickShopRecommendation(catalog,guided,state),null);
  assert.equal(JSON.stringify(state),frozen);
+});
+
+test('shop integration gives both ordinary and quick guidance actual time and hero maximum HP', () => {
+ const game=fs.readFileSync(new URL('../src/game/game.ts',import.meta.url),'utf8');
+ const refresh=game.slice(game.indexOf('  private refreshShopOverlay()'),game.indexOf('  private currentCombatBuild()'));
+ const calls=[...refresh.matchAll(/shopGuidanceForOffers\([^;]+/g)];
+ assert.equal(calls.length,2);
+ for(const [call] of calls) {
+   assert.match(call,/elapsedSeconds:\s*this\.elapsed/);
+   assert.match(call,/heroMaxHp:\s*this\.hero\.maxHp/);
+ }
+ assert.match(refresh,/this\.shopOverlay\.refresh\(model, handlers\)/,'refresh must replace action closures alongside the new model');
 });

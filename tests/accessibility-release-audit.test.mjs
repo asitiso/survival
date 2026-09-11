@@ -31,3 +31,13 @@ test('phase 718 accessibility release audit passes without reducing critical tel
   assert.equal(audit.actionCount,9);
   assert.equal(audit.passed,true);
 });
+
+test('forge controls expose selected tabs, button reasons, keyboard navigation and a bounded scroll body', () => {
+  const shop=fs.readFileSync(new URL('../src/ui/shop.ts',import.meta.url),'utf8');
+  const css=fs.readFileSync(new URL('../src/styles.css',import.meta.url),'utf8');
+  for (const token of ['aria-selected', 'aria-controls', 'aria-describedby', 'aria-pressed', 'ArrowRight', 'preventScroll', 'aria-modal', "event.key === 'Tab'", "event.key === 'Escape'", 'previousFocus']) assert.ok(shop.includes(token), token);
+  assert.match(css, /\.shop-content\s*\{[^}]*overflow-y:\s*auto/);
+  assert.match(css, /\.shop-panel\s*\{[^}]*overflow:\s*hidden/);
+  assert.match(css, /\.shop-overlay\s*\{[^}]*position:\s*fixed/,'shop must fit the viewport even when the portrait game canvas is short');
+  assert.match(css, /\.shop-footer button\s*\{[^}]*white-space:\s*nowrap/,'mobile footer actions must keep their full visible label');
+});

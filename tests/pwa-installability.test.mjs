@@ -9,7 +9,8 @@ test("publishes a standalone install manifest with app icons", async () => {
   const manifest = JSON.parse(await read("manifest.webmanifest"));
 
   assert.equal(manifest.display, "standalone");
-  assert.ok(manifest.icons.some((icon) => icon.src === "./assets/pwa/icon.svg"));
+  assert.ok(manifest.icons.some((icon) => icon.src === "./assets/pwa/icon-192.png" && icon.sizes === "192x192"));
+  assert.ok(manifest.icons.some((icon) => icon.src === "./assets/pwa/icon-512.png" && icon.sizes === "512x512"));
 });
 
 test("registers an offline service worker from the game document", async () => {

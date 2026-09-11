@@ -17,6 +17,16 @@ export const SHOP_ITEM_ATLAS = {
     width: 1254,
     height: 1254,
 };
+export const FORGE_ITEM_ATLAS = {
+    src: './assets/ui/equipment-forge-items.png',
+    columns: 3,
+    rows: 3,
+};
+const FORGE_CELL_BY_ITEM = {
+    'arcane-accelerator': [0, 0], 'alchemical-blast-staff': [1, 0], 'celestial-fusion-staff': [2, 0],
+    'wind-iron-armor': [0, 1], 'gravity-guardian-armor': [1, 1], 'world-tree-armor': [2, 1],
+    'thunder-wisdom-seal': [0, 2], 'golden-bastion-talisman': [1, 2], 'fate-core': [2, 2],
+};
 const CELL_BY_ITEM = {
     'arcane-staff': [0, 0],
     'rapid-wand': [1, 0],
@@ -58,6 +68,20 @@ export function shopItemIconBackgroundPosition(id) {
 export function shopItemIconPresentation(id) {
     const visible = isShopItemAssetId(id) || accessoryIconPosition(id) !== null;
     return { visible, animated: false, motionAmplitude: 0, size: 48, compactSize: 38 };
+}
+export function equipmentIconPresentation(id) {
+    const craftedCell = FORGE_CELL_BY_ITEM[id];
+    if (craftedCell) {
+        const [column, row] = craftedCell;
+        return { visible: true, source: FORGE_ITEM_ATLAS.src,
+            position: `${column * 50}% ${row * 50}%` };
+    }
+    const accessory = accessoryIconPosition(id);
+    if (accessory)
+        return { visible: true, source: './assets/ui/shop-accessories.png', position: accessory };
+    if (isShopItemAssetId(id))
+        return { visible: true, source: SHOP_ITEM_ATLAS.src, position: shopItemIconBackgroundPosition(id) };
+    return { visible: false, source: '', position: '50% 50%' };
 }
 export function auditShopItemAtlas(itemIds) {
     const missing = [];

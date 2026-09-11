@@ -10,7 +10,7 @@ import { projectEquipmentSurvival, type EquipmentReadinessResult } from '../game
 import type { ShopDisplayOffer } from '../game/shop-data.js';
 import type { ShopOfferGuidance } from '../game/shop-guidance.js';
 import type { OpeningShopFastPathProfile } from '../game/opening-shop-fast-path.js';
-import { shopItemIconBackgroundPosition, shopItemIconPresentation } from '../game/shop-item-assets.js';
+import { equipmentIconPresentation, shopItemIconBackgroundPosition, shopItemIconPresentation } from '../game/shop-item-assets.js';
 import { projectShopPurchase } from '../game/shop-purchase-projection.js';
 import { shopPurchaseActionIdentityStyle } from '../game/shop-purchase-action-identity-assets.js';
 
@@ -108,12 +108,13 @@ export function shopRecipeView(model: ShopContext, recipe: EquipmentRecipePresen
     const hintOnly = recipe.visibility === 'hint';
     const result = hintOnly ? null : combineEquipment(model.state, recipe.id);
     return { title: '???', details: `${recipe.hint}${recipe.goldCost === undefined ? '' : ` · 🪙 ${recipe.goldCost.toLocaleString()}`}`,
-      projection: '', disabled: !result?.ok, reason: hintOnly ? '희귀 조합 재료를 보관함에 모으세요.' : result?.ok ? '' : result?.message ?? '재료가 부족합니다.' };
+      iconId: undefined, projection: '', disabled: !result?.ok, reason: hintOnly ? '희귀 조합 재료를 보관함에 모으세요.' : result?.ok ? '' : result?.message ?? '재료가 부족합니다.' };
   }
   const result = combineEquipment(model.state, recipe.id);
   const ingredients = recipe.ingredientIds?.map(id => `${equipmentDefinition(id)?.name ?? '알 수 없는 재료'} ${equipmentGrade(recipe.minimumIngredientRank ?? 1)} 이상 1개`).join(' + ') ?? '';
   const candidate = recipe.result ? { ...model.state, [recipe.result.kind]: recipe.result } : model.state;
   return { title: recipe.name,
+    iconId: recipe.result?.id,
     details: `${ingredients} · 🪙 ${recipe.goldCost?.toLocaleString()} · 결과 ${equipmentGrade(recipe.result?.rank ?? 1)} · ${recipe.description} ${recipe.result ? equipmentEffectText(recipe.result) : ''}`,
     projection: `결과 장착 시 · ${survivalSummary(model, candidate)}`,
     disabled: !result.ok, reason: result.ok ? (recipe.result && model.state[recipe.result.kind] ? '제작 후 보관함에 저장 · 선택해서 장착' : '빈 슬롯에 즉시 장착') : result.message };
@@ -384,7 +385,8 @@ export class ShopOverlay {
     if (!selected) actions.textContent = '장착 장비 또는 보관 장비를 클릭하면 장착·강화·판매 조건을 확인할 수 있습니다.';
     else {
       const title = document.createElement('h3');
-      title.textContent = selected.title;
+      title.className = 'shop-selected-equipment-title';
+      title.append(this.equipmentIcon(selected.item, 'shop-selected-equipment-icon'), document.createTextNode(selected.title));
       actions.append(title);
       for (const text of [selected.effects, selected.requirements]) {
         const line = document.createElement('p');
@@ -407,7 +409,9 @@ export class ShopOverlay {
       const card = document.createElement('article');
       card.className = 'shop-recipe-card';
       const title = document.createElement('h4');
-      title.textContent = view.title;
+      title.className = 'shop-recipe-title';
+      if (view.iconId) title.append(this.equipmentIcon({ id: view.iconId }, 'shop-recipe-result-icon'));
+      title.append(document.createTextNode(view.title));
       const details = document.createElement('p');
       details.textContent = view.details;
       card.append(title, details);
@@ -427,14 +431,38 @@ export class ShopOverlay {
     button.setAttribute('aria-pressed', String(model.selectedStackKey === key));
     if (!item) button.textContent = emptyText;
     else {
+      const heading = document.createElement('span');
+      heading.className = 'forge-item-heading';
       const title = document.createElement('strong');
       title.textContent = `${kindNames[item.kind]} · ${item.name} · ${equipmentGrade(item.rank)}${count === undefined ? '' : ` ×${count}`}`;
       const effect = document.createElement('small');
       effect.textContent = equipmentEffectText(item);
-      button.append(title, effect);
+      heading.append(this.equipmentIcon(item, 'forge-equipment-icon'));
+      const copy = document.createElement('span');
+      copy.append(title);
+      if (count !== undefined) {
+        const badge = document.createElement('b');
+        badge.className = 'forge-item-count';
+        badge.textContent = `×${count}`;
+        copy.append(badge);
+      }
+      heading.append(copy);
+      button.append(heading, effect);
       button.addEventListener('click', () => this.handlers?.onSelectStack(key));
     }
     return button;
+  }
+
+  private equipmentIcon(item: Pick<EquippedItem, 'id'>, className: string): HTMLSpanElement {
+    const icon = equipmentIconPresentation(item.id);
+    const element = document.createElement('span');
+    element.className = `${className}${icon.visible ? '' : ' forge-equipment-icon-fallback'}`;
+    element.setAttribute('aria-hidden', 'true');
+    if (icon.visible) {
+      element.style.setProperty('--forge-item-image', `url('${icon.source}')`);
+      element.style.setProperty('--forge-item-position', icon.position);
+    }
+    return element;
   }
 
   private actionButton(parent: HTMLElement, label: string, key: string, view: { disabled: boolean; reason: string; projection?: string }, action: () => void): void {

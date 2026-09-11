@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { equipmentReadiness, equipmentSurvivalDelta, projectEquipmentSurvival } from '../dist/game/equipment-survival-readiness.js';
+import * as readiness from '../dist/game/equipment-survival-readiness.js';
+const { equipmentReadiness, equipmentSurvivalDelta, projectEquipmentSurvival } = readiness;
 import { equipmentCatalog, equipmentBonuses } from '../dist/game/shop-data.js';
 import { enemyStats } from '../dist/game/enemies.js';
 import { directorSnapshot } from '../dist/domain/director.js';
@@ -34,6 +35,14 @@ test('readiness interpolates anchors and requires both metrics plus core for sta
  assert.equal(equipmentReadiness(context(strong)).label,'안정');
  assert.equal(equipmentReadiness(context({...rare,armor:null},480,10000)).label,'생존 가능');
 });
+test('readiness labels include the exact 0.80 and 1.20 boundaries',()=>{
+ assert.equal(typeof readiness.equipmentReadinessLabel,'function');
+ const {equipmentReadinessLabel}=readiness;
+ assert.equal(equipmentReadinessLabel(.8,.8,.5),'생존 가능');
+ assert.equal(equipmentReadinessLabel(.8-Number.EPSILON,.8,2),'준비 부족');
+ assert.equal(equipmentReadinessLabel(1.2,1.2,1),'안정');
+ assert.equal(equipmentReadinessLabel(1.2-Number.EPSILON,1.2,1),'생존 가능');
+});
 test('projection reports hero hits core and firepower independently without mutating either state',()=>{
  const before=JSON.stringify(empty),after=JSON.stringify(rare);
  const out=projectEquipmentSurvival(context(),rare);
@@ -49,6 +58,11 @@ test('purchase projection shows actual equipped gain and no gain for stored purc
  const stored=projectShopPurchase(rare,offer,{elapsedSeconds:480,heroMaxHp:333});
  assert.match(stored.summary,/보관함/);assert.match(stored.summary,/현재 장착 효과 유지/);
  assert.equal(stored.deltas.length,0);
+ const legendary={...rare,armor:item('iron-robe',10000)};
+ const legendaryStored=projectShopPurchase(legendary,offer,{elapsedSeconds:480,heroMaxHp:333});
+ assert.equal(legendaryStored.actionLabel,'보관');
+ assert.match(legendaryStored.summary,/보관함/);
+ assert.doesNotMatch(legendaryStored.summary,/전설 완성/);
 });
 test('both cumulative gold routes reach explicit defensive milestones through real transactions',async()=>{
  const {equipmentBalanceRows}=await import('../scripts/equipment-balance-report.mjs');

@@ -1,8 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {purchaseOffer} from '../dist/domain/economy.js';
-const empty={coins:100000,weapon:null,armor:null,accessory:null,healingPotions:1};
+const empty={coins:100000,weapon:null,armor:null,accessory:null,healingPotions:1,inventory:[],discoveredRecipes:[]};
 const charm={id:'sage-amulet',kind:'accessory',name:'현자의 부적',power:.08,price:180};
-test('accessory upgrades retain their slot and survive another slot purchase',()=>{
+test('accessory duplicates enter storage and survive another slot purchase',()=>{
  const first=purchaseOffer(empty,charm).state;
  const second=purchaseOffer(first,charm).state;
  assert.equal(second.accessory.rank,1); assert.equal(second.inventory[0].id,'sage-amulet');

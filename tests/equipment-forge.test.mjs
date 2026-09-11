@@ -93,6 +93,20 @@ test('hidden recipe produces a rank-five result and records discovery in the sam
   assert.equal(out.newlyDiscoveredRecipeId, 'celestial-fusion-staff');
 });
 
+test('failed hidden combine is atomic and does not reveal the recipe', () => {
+  const state = {
+    ...empty(), coins: 2799,
+    inventory: [stack('arcane-accelerator', 'weapon', 3), stack('alchemical-blast-staff', 'weapon', 3)],
+  };
+  const before = structuredClone(state);
+  const out = combineEquipment(state, 'celestial-fusion-staff');
+  assert.equal(out.ok, false);
+  assert.equal(out.state, state);
+  assert.deepEqual(state, before);
+  assert.deepEqual(out.state.discoveredRecipes, []);
+  assert.equal(out.newlyDiscoveredRecipeId, undefined);
+});
+
 test('equipped items are never counted as crafting material', () => {
   const state = {
     ...empty(), coins: 1000, weapon: item('arcane-staff', 'weapon', 2),

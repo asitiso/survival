@@ -1,5 +1,4 @@
 import { equipmentSetChange } from './equipment-sets.js';
-import { MAX_EQUIPMENT_RANK } from '../domain/economy.js';
 import type { EquipmentState } from '../domain/types.js';
 import { purchaseOffer } from '../domain/economy.js';
 import { equipmentBonuses, type EquipmentBonuses, type ShopDisplayOffer } from './shop-data.js';
@@ -44,7 +43,6 @@ export function shopPurchaseProjectionFromStates(before:EquipmentState,after:Equ
 }
 export function projectShopPurchase(state:EquipmentState,offer:ShopDisplayOffer,context?:SurvivalContext):ShopPurchaseProjection{
   const current=currentItem(state,offer);
-  if(offer.kind!=='potion'&&current?.id===offer.id&&current.rank>=MAX_EQUIPMENT_RANK)return{actionId:'legendary',actionLabel:ACTION_LABEL.legendary,summary:'전설 완성',deltas:[],affordable:state.coins>=offer.price};
   const simulated={...state,coins:Math.max(state.coins,offer.price)};
   const result=purchaseOffer(simulated,offer);
   if(!result.ok)return{actionId:offer.kind==='potion'?'potion':current?'upgrade':'equip',actionLabel:offer.kind==='potion'?ACTION_LABEL.potion:current?ACTION_LABEL.upgrade:ACTION_LABEL.equip,summary:result.message,deltas:[],affordable:state.coins>=offer.price};

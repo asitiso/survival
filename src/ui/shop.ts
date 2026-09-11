@@ -89,7 +89,7 @@ export function shopSelectionView(model: ShopContext, key: string | null) {
     requirements: `강화 재료 · 같은 장비 일반~${equipmentGrade(item.rank)} ${requirement.materialCount}개 (보유 ${available}개) · 🪙 ${requirement.goldCost.toLocaleString()} · ${timeLabel(requirement.unlockAtSeconds)} 해금`,
     strengthen: { disabled: !strengthened.ok, reason, projection: strengthened.ok ? survivalSummary(model, strengthened.state) : '' },
     equip: { disabled: !equip?.ok, reason: equippedKind ? '이미 장착 중입니다.' : equip?.ok ? '' : '기존 장비를 보관할 빈 칸이 필요합니다.', projection: equip?.ok ? survivalSummary(model, equip.state) : '' },
-    sell: { disabled: Boolean(equippedKind) || !definition, reason: equippedKind ? '보관 장비만 판매할 수 있습니다.' : definition ? '' : '알 수 없는 장비입니다.', refund: Math.floor((definition?.basePrice ?? definition?.price ?? 0) * .35) },
+    sell: { disabled: Boolean(equippedKind) || !definition, reason: equippedKind ? '보관 장비만 판매할 수 있습니다.' : definition ? '' : '알 수 없는 장비입니다.', refund: Math.floor((definition?.basePrice ?? definition?.price ?? 0) * 35 / 100) },
   };
 }
 

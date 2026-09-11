@@ -1,5 +1,4 @@
 import { equipmentSetForItem, equipmentSetStates } from './equipment-sets.js';
-import { MAX_EQUIPMENT_RANK } from '../domain/economy.js';
 import type { EquipmentState } from '../domain/types.js';
 import type { HeroId } from './hero-profiles.js';
 import type { ShopDisplayOffer } from './shop-data.js';
@@ -26,7 +25,7 @@ const HERO_WEIGHT:Record<HeroId,Readonly<Record<string,number>>>={
 };
 function currentItem(state:EquipmentState,offer:ShopDisplayOffer){return offer.kind==='potion'?null:state[offer.kind];}
 function reasonFor(offer:ShopDisplayOffer,context:ShopGuidanceContext,currentSame:boolean):string{
-  if(currentSame)return '현재 장비 강화 · 바로 누적';
+  if(currentSame)return '강화 재료 구매 · 보관함 저장';
   if(offer.kind==='accessory')return `${equipmentSetForItem(offer.id)?.name ?? '장신구'} · ${offer.description}`;
   if(offer.id==='guardian-plate')return context.heroId==='edric'?'에드릭 수호핵 특화':'수호핵 생존 강화';
   if(offer.id==='iron-robe')return '장기 생존 안정화';
@@ -42,7 +41,6 @@ export function shopGuidanceForOffers(offers:readonly ShopDisplayOffer[],context
   if (context.elapsedSeconds !== undefined && context.heroMaxHp !== undefined) return survivalGuidance(offers, context);
   const scored=offers.map((offer,index)=>{
     const current=currentItem(context.state,offer);
-    if(current?.id===offer.id&&current.rank>=MAX_EQUIPMENT_RANK)return{offerId:offer.id,label:'완성',reason:'이미 전설 완성',score:-100,best:false,index,affordable:true};
     let score=ARCHETYPE_WEIGHT[context.archetype][offer.id]??0;
     const set = equipmentSetForItem(offer.id);
     const matching = set ? equipmentSetStates(context.state).find(s => s.id === set.id) : null;
@@ -74,7 +72,6 @@ export function safeQuickPurchase(offer:ShopDisplayOffer,offers:readonly ShopDis
   const exact=offers.some((candidate)=>candidate===offer||(candidate.id===offer.id&&candidate.kind===offer.kind&&candidate.price===offer.price));
   if(!exact||offer.price>state.coins||protectedReplacement(offer,state))return false;
   const current=offer.kind==='potion'?null:state[offer.kind];
-  if (current?.id===offer.id&&current.rank>=MAX_EQUIPMENT_RANK) return false;
   if (current && offer.kind!=='potion' && !canStoreInventoryItem(state, { id: offer.id, rank: 1 })) return false;
   return true;
 }

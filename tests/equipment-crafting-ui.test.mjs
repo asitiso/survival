@@ -55,6 +55,8 @@ test('forge selection explains time, material, equip capacity and sale requireme
   assert.equal(selected.equip.disabled, false);
   assert.equal(selected.sell.refund, 77);
   assert.equal(selected.strengthen.disabled, true, 'selected copy cannot consume itself');
+  const crafted = { ...empty(), inventory: [item('celestial-fusion-staff', 5)] };
+  assert.equal(shop.shopSelectionView(model(crafted), 'celestial-fusion-staff@5').sell.refund, 980);
   assert.equal(JSON.stringify(state), original);
 });
 

@@ -73,7 +73,7 @@ test('snapshot remains compact and never serializes enemy or projectile swarms',
   ];
   snapshot.equipment.discoveredRecipes = ['celestial-fusion-staff', 'world-tree-armor', 'fate-core'];
   const json = JSON.stringify(snapshot);
-  assert.ok(json.length < 6000);
+  assert.ok(Buffer.byteLength(json, 'utf8') < 6000);
   assert.equal(json.includes('enemies'), false);
   assert.equal(json.includes('projectiles'), false);
 });
@@ -92,14 +92,14 @@ test('snapshot merges valid stacks, drops unknown items, clamps counts, and keep
   snapshot.equipment.inventory = [
     { id: 'arcane-staff', kind: 'weapon', name: 'first', rank: 1, power: .20, legendary: false, count: 60 },
     { id: 'arcane-staff', kind: 'weapon', name: 'second', rank: 1, power: .20, legendary: false, count: 60 },
+    { id: 'bad-id', kind: 'weapon', name: 'bad', rank: 1, power: 1, legendary: false, count: 1 },
+    { id: 'fortune-charm', kind: 'weapon', name: 'wrong kind', rank: 1, power: .10, legendary: false, count: 1 },
     { id: 'rapid-wand', kind: 'weapon', name: 'rapid', rank: 0, power: .09, legendary: false, count: 0 },
     { id: 'blast-rod', kind: 'weapon', name: 'blast', rank: 2, power: .12, legendary: false, count: 2 },
     { id: 'iron-robe', kind: 'armor', name: 'iron', rank: 3, power: .10, legendary: false, count: 3 },
     { id: 'gale-cloak', kind: 'armor', name: 'gale', rank: 4, power: .10, legendary: false, count: 4 },
     { id: 'sage-amulet', kind: 'accessory', name: 'sage', rank: 5, power: .08, legendary: true, count: 5 },
     { id: 'storm-ring', kind: 'accessory', name: 'storm', rank: 6, power: .04, legendary: true, count: 6 },
-    { id: 'bad-id', kind: 'weapon', name: 'bad', rank: 1, power: 1, legendary: false, count: 1 },
-    { id: 'fortune-charm', kind: 'weapon', name: 'wrong kind', rank: 1, power: .10, legendary: false, count: 1 },
   ];
   snapshot.equipment.discoveredRecipes = ['celestial-fusion-staff', 'bad-id', 'celestial-fusion-staff'];
   const restored = sanitizeRunSnapshot(snapshot);
@@ -109,6 +109,8 @@ test('snapshot merges valid stacks, drops unknown items, clamps counts, and keep
     'arcane-staff@1', 'rapid-wand@1', 'blast-rod@2', 'iron-robe@3', 'gale-cloak@4', 'sage-amulet@5',
   ]);
   assert.equal(restored.equipment.inventory[0].count, 99);
+  assert.equal(restored.equipment.inventory.some((stack) => stack.id === 'bad-id'), false);
+  assert.equal(restored.equipment.inventory.some((stack) => stack.id === 'fortune-charm'), false);
   assert.deepEqual(restored.equipment.discoveredRecipes, ['celestial-fusion-staff']);
 });
 

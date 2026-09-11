@@ -135,7 +135,7 @@ export function sellInventoryStack(
   if (inventory[index]!.count <= 0) inventory.splice(index, 1);
   const next: EquipmentState = {
     ...state,
-    coins: state.coins + Math.floor(basePrice * 0.35),
+    coins: state.coins + Math.floor(basePrice * 35 / 100),
     inventory,
     discoveredRecipes: normalizedRecipes(state),
   };

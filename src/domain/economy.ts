@@ -3,7 +3,6 @@ import { canStoreInventoryItem } from './equipment-inventory.js';
 import type { EquippedItem, EquipmentState, PurchaseResult, ShopOffer } from './types.js';
 
 export const MAX_EQUIPMENT_RANK = 10000;
-const MAX_RANK = MAX_EQUIPMENT_RANK;
 
 export function equipmentGrade(rank: number): string {
   return rank > 5 ? `전설 +${rank - 5}` : ['일반', '고급', '희귀', '영웅', '전설'][Math.max(0, rank - 1)] ?? '일반';
@@ -60,10 +59,6 @@ export function rerollCost(rerollsThisVisit: number): number {
 
 export function purchaseOffer(state: EquipmentState, offer: ShopOffer, elapsedSeconds = Infinity): PurchaseResult {
   const price = shopOfferPrice(state, offer);
-  const current = offer.kind === 'potion' ? null : state[offer.kind];
-  if (current?.id === offer.id && current.rank >= MAX_RANK) {
-    return { ok: false, state, message: current.legendary ? '이미 전설 완성' : '최대 단계' };
-  }
   if (state.coins < price) {
     return { ok: false, state, message: '금화 부족' };
   }

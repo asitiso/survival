@@ -39,6 +39,13 @@ test('sale refunds 35 percent of base price and removes one unit', () => {
   assert.equal(out.state.inventory.length, 0);
 });
 
+test('sale floors an exact integer-stable 35 percent refund', () => {
+  const state = addInventoryItem(empty(), item('w0')).state;
+  const sold = sellInventoryStack(state, inventoryStackKey('w0', 1), 2800);
+  assert.equal(sold.ok, true);
+  assert.equal(sold.state.coins, 980);
+});
+
 test('failed transactions preserve exact original state identity and data', () => {
   let state = empty();
   for (let i = 0; i < 6; i += 1) state = addInventoryItem(state, item(`w${i}`)).state;

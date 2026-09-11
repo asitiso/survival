@@ -2,7 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyMissionRewardToState, composeEnemyPressure } from '../dist/game/phase9-runtime.js';
 
-const baseEquipment = { coins: 200, weapon: null, armor: null, healingPotions: 1 };
+const baseEquipment = {
+  coins: 200,
+  weapon: null,
+  armor: null,
+  accessory: null,
+  healingPotions: 1,
+  inventory: [],
+  discoveredRecipes: [],
+};
 
 test('mission rewards reuse existing shop token gold and potion state without new currencies', () => {
   const token = applyMissionRewardToState({ shopTokens: 1, equipmentState: baseEquipment, goldEarned: 500 }, { kind: 'shopToken', amount: 1 });
@@ -15,6 +23,33 @@ test('mission rewards reuse existing shop token gold and potion state without ne
 
   const potion = applyMissionRewardToState({ shopTokens: 1, equipmentState: baseEquipment, goldEarned: 500 }, { kind: 'potion', amount: 1 });
   assert.equal(potion.equipmentState.healingPotions, 2);
+});
+
+test('mission rewards preserve the equipped accessory for every reward kind', () => {
+  const accessory = {
+    id: 'storm-ring',
+    name: '폭풍 반지',
+    description: '주문 재사용 대기시간 감소',
+    kind: 'accessory',
+    price: 200,
+    power: 0.04,
+    rank: 2,
+  };
+  const state = {
+    shopTokens: 1,
+    equipmentState: { ...baseEquipment, accessory },
+    goldEarned: 500,
+  };
+
+  for (const reward of [
+    { kind: 'shopToken', amount: 1 },
+    { kind: 'gold', amount: 320 },
+    { kind: 'potion', amount: 1 },
+  ]) {
+    const result = applyMissionRewardToState(state, reward);
+    assert.deepEqual(result.equipmentState.accessory, accessory);
+    assert.notEqual(result.equipmentState.accessory, accessory);
+  }
 });
 
 test('enemy pressure composes event catastrophe and threat directive multipliers exactly once', () => {

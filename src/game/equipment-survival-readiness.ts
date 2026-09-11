@@ -54,6 +54,14 @@ function recommendations(seconds: number): EquipmentRecommendation {
   const last = ANCHORS[ANCHORS.length - 1]!;
   return { heroSurvivalHits: last.heroSurvivalHits, coreDamageMultiplier: last.coreDamageMultiplier, firepowerIndex: last.firepowerIndex };
 }
+export function equipmentReadinessLabel(
+  heroRatio: number,
+  fireRatio: number,
+  coreRatio: number,
+): EquipmentReadinessResult['label'] {
+  return heroRatio < .8 || fireRatio < .8 ? '준비 부족'
+    : heroRatio >= 1.2 && fireRatio >= 1.2 && coreRatio >= 1 ? '안정' : '생존 가능';
+}
 export function equipmentReadiness(context: EquipmentReadinessContext): EquipmentReadinessResult {
   const seconds = Number.isFinite(context.elapsedSeconds) ? Math.max(0, context.elapsedSeconds) : 0;
   const hp = Number.isFinite(context.heroMaxHp) ? Math.max(0, context.heroMaxHp) : 0;
@@ -69,8 +77,7 @@ export function equipmentReadiness(context: EquipmentReadinessContext): Equipmen
   const fireRatio = firepowerIndex / recommended.firepowerIndex;
   const coreRatio = recommended.coreDamageMultiplier / coreDamageMultiplier;
   const weakestMetric = heroRatio <= fireRatio && heroRatio <= coreRatio ? 'hero' : fireRatio <= coreRatio ? 'firepower' : 'core';
-  const label = heroRatio < .8 || fireRatio < .8 ? '준비 부족'
-    : heroRatio >= 1.2 && fireRatio >= 1.2 && coreRatio >= 1 ? '안정' : '생존 가능';
+  const label = equipmentReadinessLabel(heroRatio, fireRatio, coreRatio);
   return { label, heroSurvivalHits, coreDamageMultiplier, firepowerIndex, recommended, weakestMetric,
     contactDamage, spellPowerMultiplier, cooldownMultiplier, areaMultiplier };
 }

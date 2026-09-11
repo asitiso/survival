@@ -8,6 +8,18 @@
   <link rel="apple-touch-icon" href="./assets/pwa/icon-192.png" />
   <title>Arcane Last Stand</title>
   <link rel="stylesheet" href="./src/styles.css" />
+  <style data-mobile-landscape-modal>
+    @media (orientation: landscape) and (max-height: 600px) and (max-width: 1024px) {
+      .modal-overlay {
+        place-items: start center;
+        overflow-y: auto;
+        padding: 12px 2vw;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-y;
+      }
+    }
+  </style>
 </head>
 <body>
   <main id="app" aria-label="Arcane Last Stand"></main>

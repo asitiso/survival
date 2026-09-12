@@ -35,3 +35,16 @@ test('phone landscape action buttons grow visually while preserving the establis
   assert.match(input, /hitTestActionButton\(p, ACTION_BUTTONS, actionTouchScale/);
   assert.match(input, /touchProfile\[button\.id\]\s*\?\?\s*actionTouchScale/);
 });
+
+test('phone landscape HUD expands into safe side gutters without changing the battlefield canvas', () => {
+  const helper = read('src/game/mobile-landscape-presentation.ts');
+  const main = read('src/main.ts');
+  assert.match(helper, /export function mobileLandscapeHudLayout/);
+  assert.match(helper, /Math\.min\(profile\.hudScale,\s*logicalWidth\s*\/\s*1600\)/);
+  assert.match(main, /mobileLandscapeHudLayout/);
+  assert.match(main, /mobile-landscape-hud-layer/);
+  assert.match(main, /gameHud\.drawHud\s*=\s*\(ctx\)/);
+  assert.match(main, /originalDrawHud\(hudContext\)/);
+  assert.match(main, /canvas\.width\s*=\s*LOGICAL_WIDTH/);
+  assert.match(main, /canvas\.height\s*=\s*LOGICAL_HEIGHT/);
+});

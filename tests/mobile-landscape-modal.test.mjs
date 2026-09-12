@@ -7,6 +7,7 @@ import { dirname, resolve } from 'node:path';
 const here = dirname(fileURLToPath(import.meta.url));
 const html = readFileSync(resolve(here, '../index.html'), 'utf8');
 const style = html.match(/<style data-mobile-landscape-modal>([\s\S]*?)<\/style>/)?.[1] ?? '';
+const modalSizingSource = readFileSync(resolve(here, '../src/game/mobile-landscape-modal-styles.ts'), 'utf8');
 
 test('mobile landscape modal remains reachable on short screens', () => {
   assert.match(style, /@media\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*600px\)\s*and\s*\(max-width:\s*1024px\)/);
@@ -66,4 +67,19 @@ test('arcane sanctum uses a compact shard chip and shorter upgrade cards in shor
 test('ultra-short landscape further compresses headers without shrinking touch targets', () => {
   assert.match(style, /@media\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*430px\)\s*and\s*\(max-width:\s*1024px\)[\s\S]*\.levelup-panel,[\s\S]*\.trait-panel\s*\{[\s\S]*height:\s*calc\(100dvh - 16px\);/);
   assert.match(style, /\.levelup-panel \.upgrade-card,[\s\S]*\.trait-panel \.trait-card,[\s\S]*\.lobby-overlay \.lobby-upgrade-card\s*\{[\s\S]*min-height:\s*116px;/);
+});
+
+test('phone landscape uses type-specific modal widths instead of treating results and decisions like full-width sheets', () => {
+  assert.match(modalSizingSource, /@media\s*\(orientation:\s*landscape\)\s*and\s*\(min-height:\s*431px\)\s*and\s*\(max-height:\s*600px\)\s*and\s*\(max-width:\s*1024px\)/);
+  assert.match(modalSizingSource, /\.results-overlay \.results-panel\s*\{[\s\S]*width:\s*min\(68%,\s*820px\);[\s\S]*max-height:\s*calc\(100dvh - 16px\);/);
+  assert.match(modalSizingSource, /\.levelup-overlay \.levelup-panel,[\s\S]*\.trait-select-overlay \.trait-panel,[\s\S]*\.fate-select-overlay \.trait-panel\s*\{[\s\S]*width:\s*min\(74%,\s*920px\);/);
+  assert.match(modalSizingSource, /\.lobby-overlay \.lobby-panel\s*\{[\s\S]*width:\s*min\(84%,\s*1080px\);/);
+});
+
+test('ultra-short phone landscape narrows results and decision panels while retaining 44px actions', () => {
+  assert.match(modalSizingSource, /@media\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*430px\)\s*and\s*\(max-width:\s*1024px\)/);
+  assert.match(modalSizingSource, /\.results-overlay \.results-panel\s*\{[\s\S]*width:\s*min\(66%,\s*760px\);[\s\S]*max-height:\s*calc\(100dvh - 8px\);/);
+  assert.match(modalSizingSource, /\.levelup-overlay \.levelup-panel,[\s\S]*\.trait-select-overlay \.trait-panel,[\s\S]*\.fate-select-overlay \.trait-panel\s*\{[\s\S]*width:\s*min\(72%,\s*900px\);/);
+  assert.match(modalSizingSource, /\.lobby-overlay \.lobby-panel\s*\{[\s\S]*width:\s*min\(82%,\s*1040px\);/);
+  assert.match(modalSizingSource, /\.results-overlay \.results-actions button\s*\{[\s\S]*min-height:\s*44px;/);
 });

@@ -1,4 +1,4 @@
-import { mobileLandscapeControlScale } from './mobile-landscape-presentation.js';
+import { mobileLandscapeActionX, mobileLandscapeControlScale } from './mobile-landscape-presentation.js';
 
 export const LOGICAL_WIDTH = 1600;
 export const LOGICAL_HEIGHT = 900;
@@ -17,9 +17,13 @@ export interface ActionButtonLayout {
 }
 
 function actionButton(layout: ActionButtonLayout): ActionButtonLayout {
+  const baseX = layout.x;
   const baseRadius = layout.radius;
   return {
     ...layout,
+    get x() {
+      return mobileLandscapeActionX(baseX, baseRadius, LOGICAL_WIDTH);
+    },
     get radius() {
       return Math.round(baseRadius * mobileLandscapeControlScale());
     },

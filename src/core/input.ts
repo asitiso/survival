@@ -6,7 +6,7 @@ import { landscapeSafeAreaProfile } from '../game/landscape-safe-area.js';
 import { foldableTouchScaleMap } from '../game/foldable-touch-density.js';
 import { foldableThumbIntent } from '../game/foldable-thumb-zones.js';
 import { resolveFoldableDeadSpace } from '../game/foldable-dead-space.js';
-import { mobileLandscapeTouchScale } from '../game/mobile-landscape-presentation.js';
+import { mobileLandscapeJoystickMaxX, mobileLandscapeTouchScale } from '../game/mobile-landscape-presentation.js';
 import { softFollowJoystickBase, thumbComfortProfile } from './thumb-fatigue.js';
 import { logicalPointerPosition } from './input-lifecycle.js';
 import { ActionHoldLeashTracker, actionHoldReleaseRadius } from './action-hold-leash.js';
@@ -120,6 +120,10 @@ export class InputState {
     }
     const rect = this.canvas.getBoundingClientRect();
     const safeArea = landscapeSafeAreaProfile(rect.width || LOGICAL_WIDTH, rect.height || LOGICAL_HEIGHT);
+    const joystickMaxX = mobileLandscapeJoystickMaxX(safeArea.joystickMaxX, rect.width, rect.height);
+    const joystickSafeArea = joystickMaxX === safeArea.joystickMaxX
+      ? safeArea
+      : { ...safeArea, joystickMaxX };
     const actionTouchScale = mobileLandscapeTouchScale(ACTION_TOUCH_SCALE);
     const touchProfile = foldableTouchScaleMap(safeArea, ACTION_BUTTONS, actionTouchScale);
     const deadSpace = safeArea.aspectClass === 'foldable' ? resolveFoldableDeadSpace(p, safeArea, ACTION_BUTTONS) : null;
@@ -161,8 +165,8 @@ export class InputState {
     }
 
     const joystickPoint = deadSpace?.joystickOrigin ?? p;
-    if ((safeArea.aspectClass !== 'foldable' || thumbIntent === 'left') && shouldStartLandscapeJoystick(joystickPoint, safeArea) && this.joystickPointer === null) {
-      const origin = deadSpace?.joystickOrigin ?? safeJoystickOrigin(p, safeArea);
+    if ((safeArea.aspectClass !== 'foldable' || thumbIntent === 'left') && shouldStartLandscapeJoystick(joystickPoint, joystickSafeArea) && this.joystickPointer === null) {
+      const origin = deadSpace?.joystickOrigin ?? safeJoystickOrigin(p, joystickSafeArea);
       this.joystickPointer = event.pointerId;
       this.joystickHome = { ...origin };
       this.joystickActive = true;

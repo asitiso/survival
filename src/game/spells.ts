@@ -92,11 +92,12 @@ export interface SpellTuning {
 
 export function spellTuning(id: SpellId, level: number): SpellTuning {
   const l = Math.max(1, Math.floor(level));
+  const lateRankSteps = Math.max(0, l - 5);
   switch (id) {
     case 'fireBolt':
-      return { damage: 34 + (l - 1) * 8, cooldown: Math.max(0.20, 0.50 - (l - 1) * 0.024), radius: 11 + Math.floor((l - 1) / 3) * 2, projectiles: 1 + Math.floor((l - 1) / 4), jumps: 0, duration: 0 };
+      return { damage: l <= 5 ? 34 + (l - 1) * 8 : 66 + lateRankSteps * 4.4, cooldown: Math.max(0.20, l <= 5 ? 0.50 - (l - 1) * 0.024 : 0.404 - lateRankSteps * 0.012), radius: 11 + Math.floor((l - 1) / 3) * 2, projectiles: 1 + Math.floor((l - 1) / 4), jumps: 0, duration: 0 };
     case 'chainLightning':
-      return { damage: 48 + (l - 1) * 10, cooldown: Math.max(1.05, 2.25 - (l - 1) * 0.07), radius: 0, projectiles: 1, jumps: 3 + Math.floor((l - 1) / 3), duration: 0 };
+      return { damage: l <= 5 ? 48 + (l - 1) * 10 : 88 + lateRankSteps * 5.5, cooldown: Math.max(1.05, l <= 5 ? 2.25 - (l - 1) * 0.07 : 1.97 - lateRankSteps * 0.035), radius: 0, projectiles: 1, jumps: 3 + Math.floor((l - 1) / 3), duration: 0 };
     case 'frostNova':
       return { damage: 42 + (l - 1) * 7, cooldown: Math.max(2.2, 5.4 - (l - 1) * 0.13), radius: 150 + (l - 1) * 11, projectiles: 1, jumps: 0, duration: 2.1 + (l - 1) * 0.08 };
     case 'flameField':

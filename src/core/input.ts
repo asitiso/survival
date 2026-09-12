@@ -30,7 +30,7 @@ export class InputState {
 
   private levelPoint(event: PointerEvent): Vec2 {
     const fallback = this.toLogical(event);
-    const app = this.canvas.closest<HTMLElement>('#app');
+    const app = typeof this.canvas.closest === 'function' ? this.canvas.closest<HTMLElement>('#app') : null;
     if (!app) return fallback;
     const style = window.getComputedStyle(app);
     const safeLeft = Number.parseFloat(style.paddingLeft) || 0;

@@ -8,17 +8,17 @@ const game=fs.readFileSync(new URL('../src/game/game.ts',import.meta.url),'utf8'
 const upgrades=fs.readFileSync(new URL('../src/game/upgrades.ts',import.meta.url),'utf8');
 const snapshot=fs.readFileSync(new URL('../src/game/endless/snapshot.ts',import.meta.url),'utf8');
 
-test('phase 2289 projects full generic stat gain through the frozen applyUpgrade implementation',async()=>{
+test('phase 2289 projects the flattened generic stat gain through applyUpgrade',async()=>{
   assert.equal(fs.existsSync(projectionUrl),true,'generic upgrade projection module must exist');
   const m=await import(projectionUrl.href);const {createHero}=await import(entitiesUrl.href);
   const hero=createHero('arkan');const before=hero.spellPower;
   const p=m.projectGenericUpgradeEffectiveGain(hero,'spellPower');
-  assert.equal(p.statusId,'full');assert.equal(p.before,before);assert.equal(p.after,before*1.12);assert.equal(p.delta,p.after-p.before);
-  assert.equal(m.genericUpgradeEffectiveGainHint(p),'실효 · 마법 화력 1.080×→1.210× (+12.0%)');
+  assert.equal(p.statusId,'full');assert.equal(p.before,before);assert.equal(p.after,before*1.096);assert.equal(p.delta,p.after-p.before);assert.equal(p.nominalPercent,9.6);
+  assert.equal(m.genericUpgradeEffectiveGainHint(p),'실효 · 마법 화력 1.080×→1.184× (+9.6%)');
   assert.equal(hero.spellPower,before,'projection must not mutate the live hero');
 });
 
-test('phase 2289 reports diminished cooldown gain when the 0.55 floor truncates the nominal six percent',async()=>{
+test('phase 2289 reports diminished cooldown gain when the 0.55 floor truncates the nominal 4.2 percent',async()=>{
   const m=await import(projectionUrl.href);const {createHero}=await import(entitiesUrl.href);const hero=createHero('arkan');hero.cooldownMultiplier=.56;
   const p=m.projectGenericUpgradeEffectiveGain(hero,'cooldown');
   assert.equal(p.statusId,'diminished');assert.equal(p.before,.56);assert.equal(p.after,.55);assert.ok(p.effectivePercent>1.7&&p.effectivePercent<1.9);
@@ -41,8 +41,8 @@ test('phase 2291 level-up cards add real effective gain only for generic stats w
   assert.doesNotMatch(game,/projectGenericUpgradeEffectiveGain[\s\S]{0,900}secondaryIdentityLimit:\s*[45]/);
 });
 
-test('phase 2291 is presentation-only and freezes generic upgrade values, cooldown floor, choices, actions and snapshots',()=>{
-  assert.match(upgrades,/hero\.maxHp \+= 42/);assert.match(upgrades,/hero\.speed \*= 1\.075/);assert.match(upgrades,/hero\.spellPower \*= 1\.12/);assert.match(upgrades,/Math\.max\(0\.55, hero\.cooldownMultiplier \* 0\.94\)/);assert.match(upgrades,/hero\.pickupRadius \+= 28/);
+test('phase 2291 preserves non-offense generic upgrades while locking the flattened offense values and cooldown floor',()=>{
+  assert.match(upgrades,/hero\.maxHp \+= 42/);assert.match(upgrades,/hero\.speed \*= 1\.075/);assert.match(upgrades,/hero\.spellPower \*= 1\.096/);assert.match(upgrades,/Math\.max\(0\.55, hero\.cooldownMultiplier \* 0\.958\)/);assert.match(upgrades,/hero\.pickupRadius \+= 28/);
   assert.match(upgrades,/while \(result\.length < 3/);
   assert.doesNotMatch(snapshot,/genericUpgradeEffective|gainStatus|effectiveGainProjection/);
 });

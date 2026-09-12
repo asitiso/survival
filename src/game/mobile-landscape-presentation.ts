@@ -1,7 +1,15 @@
+import { installMobileLandscapeModalStyles } from './mobile-landscape-modal-styles.js';
+
 const PHONE_LANDSCAPE_MAX_WIDTH = 1024;
 const PHONE_LANDSCAPE_MAX_HEIGHT = 520;
 const HUD_BASE_WIDTH = 1600;
 const HUD_BASE_HEIGHT = 900;
+
+export const MOBILE_ACTION_X_OFFSET = 72;
+export const MOBILE_ACTION_EDGE_MARGIN = 16;
+export const MOBILE_JOYSTICK_MAX_X_OFFSET = 60;
+
+installMobileLandscapeModalStyles();
 
 export interface MobileLandscapePresentationProfile {
   active: boolean;
@@ -62,6 +70,37 @@ export function mobileLandscapeHudLayout(
   const scale = Math.max(1, Math.min(profile.hudScale, logicalWidth / 1600));
   const offsetX = Math.max(0, (logicalWidth - HUD_BASE_WIDTH * scale) / 2);
   return { active: true, scale, logicalWidth, logicalHeight: HUD_BASE_HEIGHT, offsetX };
+}
+
+export function mobileLandscapeActionX(
+  baseX: number,
+  baseRadius: number,
+  logicalWidth = HUD_BASE_WIDTH,
+  viewportWidth?: number,
+  viewportHeight?: number,
+): number {
+  const [browserWidth, browserHeight] = browserViewport();
+  const width = viewportWidth === undefined ? browserWidth : viewportWidth;
+  const height = viewportHeight === undefined ? browserHeight : viewportHeight;
+  const profile = mobileLandscapePresentationProfile(width, height);
+  if (!profile.active) return baseX;
+  const scaledRadius = baseRadius * profile.controlScale;
+  const maxCenterX = logicalWidth - scaledRadius - MOBILE_ACTION_EDGE_MARGIN;
+  return Math.min(baseX + MOBILE_ACTION_X_OFFSET, maxCenterX);
+}
+
+export function mobileLandscapeJoystickMaxX(
+  baseMaxX: number,
+  viewportWidth?: number,
+  viewportHeight?: number,
+): number {
+  const [browserWidth, browserHeight] = browserViewport();
+  const width = viewportWidth === undefined ? browserWidth : viewportWidth;
+  const height = viewportHeight === undefined ? browserHeight : viewportHeight;
+  const profile = mobileLandscapePresentationProfile(width, height);
+  return profile.active
+    ? Math.max(0, baseMaxX - MOBILE_JOYSTICK_MAX_X_OFFSET)
+    : baseMaxX;
 }
 
 export function mobileLandscapeActorScale(): number {

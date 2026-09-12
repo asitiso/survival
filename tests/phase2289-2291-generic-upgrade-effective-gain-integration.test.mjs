@@ -42,7 +42,7 @@ test('phase 2291 level-up cards add real effective gain only for generic stats w
 });
 
 test('phase 2291 preserves non-offense generic upgrades while locking the flattened offense values and cooldown floor',()=>{
-  assert.match(upgrades,/hero\.maxHp \+= 42/);assert.match(upgrades,/hero\.speed \*= 1\.075/);assert.match(upgrades,/hero\.spellPower \*= 1\.096/);assert.match(upgrades,/Math\.max\(0\.55, hero\.cooldownMultiplier \* 0\.958\)/);assert.match(upgrades,/hero\.pickupRadius \+= 28/);
+  assert.match(upgrades,/hero\.maxHp \+= 42/);assert.match(upgrades,/hero\.speed \*= 1\.075/);assert.match(upgrades,/hero\.spellPowerUpgradeCount < 6 \? 1\.096 : 1\.03/);assert.match(upgrades,/hero\.cooldownUpgradeCount < 6 \? \.958 : \.985/);assert.match(upgrades,/hero\.pickupRadius \+= 28/);
   assert.match(upgrades,/while \(result\.length < 3/);
   assert.doesNotMatch(snapshot,/genericUpgradeEffective|gainStatus|effectiveGainProjection/);
 });

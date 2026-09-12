@@ -18,6 +18,8 @@ export interface Hero {
   kills: number;
   spellPower: number;
   cooldownMultiplier: number;
+  spellPowerUpgradeCount: number;
+  cooldownUpgradeCount: number;
   armor: number;
   critChance: number;
   pickupRadius: number;
@@ -47,7 +49,7 @@ export function createHero(profileId: HeroId = 'arkan'): Hero {
     profileId,
     pos: { x: 690, y: 470 }, facing: { x: 1, y: 0 }, radius: 23, speed: profile.baseSpeed,
     maxHp: profile.baseHp, hp: profile.baseHp, shield: 0, maxShield: 0, level: 1, xp: 0, xpNext: 36,
-    coins: 0, kills: 0, spellPower: profile.spellPower, cooldownMultiplier: profile.cooldownMultiplier, armor: 0, critChance: 0.05, pickupRadius: 110, healingPotions: 1,
+    coins: 0, kills: 0, spellPower: profile.spellPower, cooldownMultiplier: profile.cooldownMultiplier, spellPowerUpgradeCount: 0, cooldownUpgradeCount: 0, armor: 0, critChance: 0.05, pickupRadius: 110, healingPotions: 1,
     equipmentSpellPower: 1, equipmentCooldownMultiplier: 1, equipmentMoveSpeed: 1, equipmentDamageTakenMultiplier: 1,
     equipmentAreaMultiplier: 1, equipmentGoldMultiplier: 1, equipmentPickupMultiplier: 1, equipmentCoreDamageTakenMultiplier: 1, temporaryCooldownMultiplier: 1, temporaryChainJumpBonus: 0,
   };

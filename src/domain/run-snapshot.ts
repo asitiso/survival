@@ -27,7 +27,7 @@ export interface RunSnapshot {
   traitId: RunTraitId | null;
   threatLevel: ThreatLevel;
   elapsed: number;
-  hero: { level: number; xp: number; xpNext: number; hp: number; maxHp: number; coins: number; kills: number; armor?: number; critChance?: number };
+  hero: { level: number; xp: number; xpNext: number; hp: number; maxHp: number; coins: number; kills: number; armor?: number; critChance?: number; spellPowerUpgradeCount?: number; cooldownUpgradeCount?: number };
   coreHp: number;
   spellLevels: Record<SpellId, number>;
   equipment: EquipmentState;
@@ -90,6 +90,8 @@ export function sanitizeRunSnapshot(raw: unknown): RunSnapshot | null {
       hp: num(hero.hp, 0, 1e6), maxHp: num(hero.maxHp, 1, 1e6), coins: int(hero.coins, 0, 1e9), kills: int(hero.kills, 0, 1e8),
       ...(hero.armor !== undefined ? { armor: int(hero.armor, 0, 6) } : {}),
       ...(hero.critChance !== undefined ? { critChance: num(hero.critChance, 0.05, .20) } : {}),
+      ...(hero.spellPowerUpgradeCount !== undefined ? { spellPowerUpgradeCount: int(hero.spellPowerUpgradeCount, 0, 999) } : {}),
+      ...(hero.cooldownUpgradeCount !== undefined ? { cooldownUpgradeCount: int(hero.cooldownUpgradeCount, 0, 999) } : {}),
     },
     coreHp: num(o.coreHp, 0, 1e6),
     spellLevels,

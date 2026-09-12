@@ -10,7 +10,7 @@ const GENERIC_IDS=new Set<string>(GENERIC_UPGRADE_EFFECTIVE_IDS);
 function shadowHero(hero:Hero):Hero{return{...hero,pos:{...hero.pos},facing:{...hero.facing}};}
 function metric(hero:Hero,id:GenericUpgradeEffectiveId):number{return id==='maxHp'?hero.maxHp:id==='moveSpeed'?hero.speed:id==='spellPower'?hero.spellPower:id==='cooldown'?hero.cooldownMultiplier:hero.pickupRadius;}
 function label(id:GenericUpgradeEffectiveId):string{return id==='maxHp'?'최대 HP':id==='moveSpeed'?'이동속도':id==='spellPower'?'마법 화력':id==='cooldown'?'재사용시간':'흡수거리';}
-function nominal(id:GenericUpgradeEffectiveId):number{return id==='moveSpeed'?7.5:id==='spellPower'?9.6:id==='cooldown'?4.2:0;}
+function nominal(hero:Hero,id:GenericUpgradeEffectiveId):number{return id==='moveSpeed'?7.5:id==='spellPower'?(hero.spellPowerUpgradeCount<6?9.6:3):id==='cooldown'?(hero.cooldownUpgradeCount<6?4.2:1.5):0;}
 export function projectGenericUpgradeEffectiveGain(hero:Hero,id:UpgradeId):GenericUpgradeEffectiveProjection|null{
   if(!GENERIC_IDS.has(id))return null;
   const upgradeId=id as GenericUpgradeEffectiveId,before=metric(hero,upgradeId),beforeHp=hero.hp,shadow=shadowHero(hero),spells=new SpellSystem();
@@ -19,7 +19,7 @@ export function projectGenericUpgradeEffectiveGain(hero:Hero,id:UpgradeId):Gener
   const effectivePercent=upgradeId==='cooldown'?(before>0?Math.max(0,(1-after/before)*100):0):(upgradeId==='moveSpeed'||upgradeId==='spellPower')?(before>0?Math.max(0,(after/before-1)*100):0):0;
   let statusId:GenericUpgradeGainStatusId='full';
   if(upgradeId==='cooldown'){if(Math.abs(after-before)<1e-12)statusId='capped';else if(effectivePercent<4.199)statusId='diminished';}
-  return{upgradeId,statusId,label:label(upgradeId),before,after,delta,secondaryDelta,effectivePercent,nominalPercent:nominal(upgradeId)};
+  return{upgradeId,statusId,label:label(upgradeId),before,after,delta,secondaryDelta,effectivePercent,nominalPercent:nominal(hero,upgradeId)};
 }
 function signed(value:number,digits=1):string{return`${value>=0?'+':''}${value.toFixed(digits)}`;}
 export function genericUpgradeEffectiveGainHint(p:GenericUpgradeEffectiveProjection):string{

@@ -20,6 +20,19 @@ test('generic offense upgrades use the flattened late-run multipliers', () => {
   closeTo(hero.cooldownMultiplier, 0.958);
 });
 
+test('generic offense keeps six full-strength cards before using late-run soft caps', () => {
+  const hero = createHero();
+  const spells = new SpellSystem();
+  const initialPower = hero.spellPower;
+  for (let i = 0; i < 7; i++) applyUpgrade('spellPower', hero, spells);
+  for (let i = 0; i < 7; i++) applyUpgrade('cooldown', hero, spells);
+
+  closeTo(hero.spellPower, initialPower * Math.pow(1.096, 6) * 1.03);
+  closeTo(hero.cooldownMultiplier, Math.pow(.958, 6) * .985);
+  assert.equal(hero.spellPowerUpgradeCount, 7);
+  assert.equal(hero.cooldownUpgradeCount, 7);
+});
+
 test('fire bolt preserves rank five and flattens ranks six through ten', () => {
   assert.deepEqual(spellTuning('fireBolt', 5), { damage: 66, cooldown: 0.404, radius: 13, projectiles: 2, jumps: 0, duration: 0 });
   assert.deepEqual(spellTuning('fireBolt', 6), { damage: 70.4, cooldown: 0.392, radius: 13, projectiles: 2, jumps: 0, duration: 0 });

@@ -59,8 +59,8 @@ export function applyUpgrade(id: UpgradeId, hero: Hero, spells: SpellSystem): vo
       hero.hp = Math.min(hero.maxHp, hero.hp + 42);
       break;
     case 'moveSpeed': hero.speed *= 1.075; break;
-    case 'spellPower': hero.spellPower *= 1.096; break;
-    case 'cooldown': hero.cooldownMultiplier = Math.max(0.55, hero.cooldownMultiplier * 0.958); break;
+    case 'spellPower': hero.spellPower *= hero.spellPowerUpgradeCount < 6 ? 1.096 : 1.03; hero.spellPowerUpgradeCount += 1; break;
+    case 'cooldown': hero.cooldownMultiplier = Math.max(0.55, hero.cooldownMultiplier * (hero.cooldownUpgradeCount < 6 ? .958 : .985)); hero.cooldownUpgradeCount += 1; break;
     case 'armor': hero.armor = Math.min(6, hero.armor + 1); break;
     case 'critChance': hero.critChance = Math.min(0.20, hero.critChance + 0.03); break;
     case 'pickupRadius': hero.pickupRadius += 28; break;
@@ -78,8 +78,8 @@ export function buildUpgradeChoices(hero: Hero, spells: SpellSystem, rng: () => 
     }
   }
   pool.push(
-    { id: 'spellPower', title: '마력 증폭', description: `모든 마법 피해 +9.6%`, accent: '#df9dff' },
-    { id: 'cooldown', title: '고속 영창', description: `모든 마법 재사용시간 -4.2%`, accent: '#68c9ff' },
+    { id: 'spellPower', title: '마력 증폭', description: `모든 마법 피해 +${hero.spellPowerUpgradeCount < 6 ? '9.6' : '3.0'}%`, accent: '#df9dff' },
+    { id: 'cooldown', title: '고속 영창', description: `모든 마법 재사용시간 -${hero.cooldownUpgradeCount < 6 ? '4.2' : '1.5'}%`, accent: '#68c9ff' },
     { id: 'maxHp', title: '생명 각인', description: `최대 HP +42 · 즉시 42 회복`, accent: '#ff7185' },
     { id: 'moveSpeed', title: '질풍 걸음', description: `이동속도 +7.5%`, accent: '#6fe7bd' },
     { id: 'pickupRadius', title: '마력 자석', description: `경험치·금화 흡수거리 +28`, accent: '#f3d66d' },

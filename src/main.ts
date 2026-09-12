@@ -21,6 +21,11 @@ app.append(shell);
 
 const game = new Game(canvas);
 
+type DeferredInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+};
+
 const presentationControls = shell.querySelector<HTMLDivElement>('.presentation-controls');
 let syncPresentationSettingsLayout = (): void => {};
 if (presentationControls?.parentElement) {
@@ -51,6 +56,37 @@ if (presentationControls?.parentElement) {
   settingsBody.id = 'presentation-settings-body';
   settingsBody.className = 'presentation-settings-body';
 
+  const installButton = document.createElement('button');
+  installButton.type = 'button';
+  installButton.className = 'presentation-install-button';
+  installButton.textContent = '앱 설치';
+  installButton.setAttribute('aria-label', 'Arcane Last Stand 앱 설치');
+  installButton.style.minHeight = '44px';
+  installButton.style.padding = '0 12px';
+  installButton.style.borderRadius = '11px';
+  installButton.style.border = '1px solid rgba(160,214,255,.22)';
+  installButton.style.background = 'rgba(11,35,58,.86)';
+  installButton.style.color = '#d9edf9';
+  installButton.style.font = '800 11px system-ui';
+  installButton.hidden = true;
+
+  const installGuide = document.createElement('p');
+  installGuide.className = 'presentation-install-guide';
+  installGuide.textContent = '공유 메뉴에서 ‘홈 화면에 추가’를 선택하세요.';
+  installGuide.style.margin = '6px 2px 0';
+  installGuide.style.color = '#b9d6e9';
+  installGuide.style.font = '700 11px system-ui';
+  installGuide.hidden = true;
+
+  let installPromptEvent: DeferredInstallPromptEvent | null = null;
+  const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isInstalledApp = (): boolean => window.matchMedia('(display-mode: standalone)').matches
+    || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  const syncInstallAffordance = (): void => {
+    installButton.hidden = installPromptEvent === null || isInstalledApp();
+    installGuide.hidden = !isIos || isInstalledApp();
+  };
+
   presentationControls.style.position = 'static';
   presentationControls.style.top = 'auto';
   presentationControls.style.right = 'auto';
@@ -61,6 +97,28 @@ if (presentationControls?.parentElement) {
   settingsParent.append(settingsPanel);
   settingsPanel.append(settingsToggle, settingsBody);
   settingsBody.append(presentationControls);
+  settingsBody.append(installButton, installGuide);
+
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    installPromptEvent = event as DeferredInstallPromptEvent;
+    syncInstallAffordance();
+  });
+  window.addEventListener('appinstalled', () => {
+    installPromptEvent = null;
+    installButton.hidden = true;
+    installGuide.hidden = true;
+  });
+  installButton.addEventListener('click', async () => {
+    if (!installPromptEvent) return;
+    try {
+      await installPromptEvent.prompt();
+      if ((await installPromptEvent.userChoice).outcome === 'accepted') installPromptEvent = null;
+    } finally {
+      syncInstallAffordance();
+    }
+  });
+  syncInstallAffordance();
 
   const isPhoneLandscapeSettings = (): boolean => window.matchMedia('(orientation: landscape) and (max-height: 520px) and (max-width: 1024px)').matches;
   let expanded = !isPhoneLandscapeSettings();

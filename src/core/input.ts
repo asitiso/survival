@@ -6,6 +6,7 @@ import { landscapeSafeAreaProfile } from '../game/landscape-safe-area.js';
 import { foldableTouchScaleMap } from '../game/foldable-touch-density.js';
 import { foldableThumbIntent } from '../game/foldable-thumb-zones.js';
 import { resolveFoldableDeadSpace } from '../game/foldable-dead-space.js';
+import { mobileLandscapeJoystickMaxX, mobileLandscapeTouchScale } from '../game/mobile-landscape-presentation.js';
 import { softFollowJoystickBase, thumbComfortProfile } from './thumb-fatigue.js';
 import { logicalPointerPosition } from './input-lifecycle.js';
 import { ActionHoldLeashTracker, actionHoldReleaseRadius } from './action-hold-leash.js';
@@ -13,6 +14,20 @@ import { joystickNeutralRecoveryProfile, shouldCatchJoystickNeutralReturn } from
 import { StrategicActionReleaseTracker, strategicActionReleaseRadius, type StrategicActionId } from './strategic-action-release.js';
 
 export class InputState {
+  autoModeVisible = false;
+  private levelTapCount = 0;
+  private readonly levelPointers = new Set<number>();
+
+  resetAutoReveal(): void {
+    this.autoModeVisible = false;
+    this.levelTapCount = 0;
+    this.levelPointers.clear();
+  }
+
+  private inLevelLabel(p: Vec2): boolean {
+    return p.x >= 24 && p.x <= 145 && p.y >= 26 && p.y <= 65;
+  }
+
   move: Vec2 = { x: 0, y: 0 };
   joystickActive = false;
   joystickBase: Vec2 = { x: 170, y: 710 };
@@ -48,6 +63,7 @@ export class InputState {
   }
 
   isHeld(action: ActionId): boolean {
+    if (action === 'auto' && !this.autoModeVisible) return false;
     return this.held.has(action) || this.keyboardActionHeld(action);
   }
 
@@ -73,6 +89,7 @@ export class InputState {
   }
 
   resetTransient(): void {
+    this.levelPointers.clear();
     this.joystickPointer = null;
     this.joystickHome = null;
     this.actionPointers.clear();
@@ -96,17 +113,28 @@ export class InputState {
   private readonly onPointerDown = (event: PointerEvent): void => {
     event.preventDefault();
     const p = this.toLogical(event);
+    if (this.inLevelLabel(p)) {
+      this.levelPointers.add(event.pointerId);
+      this.canvas.setPointerCapture?.(event.pointerId);
+      return;
+    }
     const rect = this.canvas.getBoundingClientRect();
     const safeArea = landscapeSafeAreaProfile(rect.width || LOGICAL_WIDTH, rect.height || LOGICAL_HEIGHT);
-    const touchProfile = foldableTouchScaleMap(safeArea, ACTION_BUTTONS, ACTION_TOUCH_SCALE);
+    const joystickMaxX = mobileLandscapeJoystickMaxX(safeArea.joystickMaxX, rect.width, rect.height);
+    const joystickSafeArea = joystickMaxX === safeArea.joystickMaxX
+      ? safeArea
+      : { ...safeArea, joystickMaxX };
+    const actionTouchScale = mobileLandscapeTouchScale(ACTION_TOUCH_SCALE);
+    const touchProfile = foldableTouchScaleMap(safeArea, ACTION_BUTTONS, actionTouchScale);
     const deadSpace = safeArea.aspectClass === 'foldable' ? resolveFoldableDeadSpace(p, safeArea, ACTION_BUTTONS) : null;
     const thumbIntent = deadSpace?.intent ?? foldableThumbIntent(p, safeArea);
     const deadSpaceButton = deadSpace?.actionId ? ACTION_BUTTONS.find((entry)=>entry.id===deadSpace.actionId) ?? null : null;
     const button = safeArea.aspectClass === 'foldable'
-      ? deadSpaceButton ?? (thumbIntent === 'right' ? hitTestActionButton(p, ACTION_BUTTONS, ACTION_TOUCH_SCALE, touchProfile) : null)
-      : hitTestActionButton(p);
+      ? deadSpaceButton ?? (thumbIntent === 'right' ? hitTestActionButton(p, ACTION_BUTTONS, actionTouchScale, touchProfile) : null)
+      : hitTestActionButton(p, ACTION_BUTTONS, actionTouchScale);
+    if (button?.id === 'auto' && !this.autoModeVisible) return;
     if (button) {
-      const actualTouchScale = touchProfile[button.id] ?? ACTION_TOUCH_SCALE;
+      const actualTouchScale = touchProfile[button.id] ?? actionTouchScale;
       if (button.id === 'shop' || button.id === 'auto') {
         const armed = this.strategicReleases.arm(
           event.pointerId,
@@ -137,8 +165,8 @@ export class InputState {
     }
 
     const joystickPoint = deadSpace?.joystickOrigin ?? p;
-    if ((safeArea.aspectClass !== 'foldable' || thumbIntent === 'left') && shouldStartLandscapeJoystick(joystickPoint, safeArea) && this.joystickPointer === null) {
-      const origin = deadSpace?.joystickOrigin ?? safeJoystickOrigin(p, safeArea);
+    if ((safeArea.aspectClass !== 'foldable' || thumbIntent === 'left') && shouldStartLandscapeJoystick(joystickPoint, joystickSafeArea) && this.joystickPointer === null) {
+      const origin = deadSpace?.joystickOrigin ?? safeJoystickOrigin(p, joystickSafeArea);
       this.joystickPointer = event.pointerId;
       this.joystickHome = { ...origin };
       this.joystickActive = true;
@@ -169,6 +197,10 @@ export class InputState {
 
   private readonly onPointerUp = (event: PointerEvent): void => {
     event.preventDefault();
+    if (this.levelPointers.delete(event.pointerId)) {
+      if (this.inLevelLabel(this.toLogical(event)) && ++this.levelTapCount >= 3) this.autoModeVisible = true;
+      return;
+    }
     if (event.pointerId === this.joystickPointer) {
       this.joystickPointer = null;
       this.joystickHome = null;
@@ -190,6 +222,7 @@ export class InputState {
       this.move = { x: 0, y: 0 };
       this.joystickThumb = { ...this.joystickBase };
     }
+    this.levelPointers.delete(event.pointerId);
     this.strategicReleases.cancel(event.pointerId);
     this.releaseActionPointer(event.pointerId);
   };
@@ -202,6 +235,7 @@ export class InputState {
       this.move = { x: 0, y: 0 };
       this.joystickThumb = { ...this.joystickBase };
     }
+    this.levelPointers.delete(event.pointerId);
     this.strategicReleases.cancel(event.pointerId);
     this.releaseActionPointer(event.pointerId);
   };
@@ -222,7 +256,7 @@ export class InputState {
     const key = event.key.toLowerCase();
     this.keys.add(key);
     const action = this.actionFromKey(key);
-    if (action && !event.repeat) this.pressed.add(action);
+    if (action && (action !== 'auto' || this.autoModeVisible) && !event.repeat) this.pressed.add(action);
     if ([' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) event.preventDefault();
     this.refreshKeyboardMovement();
   };

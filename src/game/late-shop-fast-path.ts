@@ -1,7 +1,7 @@
 import type { EquipmentState } from '../domain/types.js';
 import type { ShopDisplayOffer } from './shop-data.js';
 export interface LateShopFastPathProfile{promoteQuickBuy:boolean;reason:'repeat-upgrade'|'safe-potion'|'none';newControlCount:0;estimatedPointerTravelReduction:number;}
-function currentItem(offer:ShopDisplayOffer,state:EquipmentState){return offer.kind==='weapon'?state.weapon:offer.kind==='armor'?state.armor:null;}
+function currentItem(offer:ShopDisplayOffer,state:EquipmentState){return offer.kind==='potion'?null:state[offer.kind];}
 export function lateShopFastPath(elapsedSeconds:number,quickOffer:ShopDisplayOffer|null,state:EquipmentState):LateShopFastPathProfile{
  const elapsed=Number.isFinite(elapsedSeconds)?Math.max(0,elapsedSeconds):0;
  if(elapsed<1800||elapsed>3600||!quickOffer||quickOffer.price>state.coins)return{promoteQuickBuy:false,reason:'none',newControlCount:0,estimatedPointerTravelReduction:0};

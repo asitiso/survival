@@ -21,7 +21,7 @@ export interface EightTwelveHourFlowHealthAudit {
   autoRewardSelection:false;
   passed:boolean;
 }
-const equipment:EquipmentState={coins:12000,weapon:{id:'arcane-staff',kind:'weapon',name:'Arcane',rank:5,power:.15,legendary:true},armor:{id:'iron-robe',kind:'armor',name:'Robe',rank:5,power:.08,legendary:true},healingPotions:3};
+const equipment:EquipmentState={coins:12000,weapon:{id:'arcane-staff',kind:'weapon',name:'Arcane',rank:5,power:.15,legendary:true},armor:{id:'iron-robe',kind:'armor',name:'Robe',rank:5,power:.08,legendary:true},healingPotions:3,inventory:[],discoveredRecipes:[]};
 const rewards=[{kind:'relic' as const,id:'relic:chrono-shard' as const,relicId:'chrono-shard' as const,title:'Time Gear',description:'swap',accent:'#fff',best:false},{kind:'upgrade' as const,id:'meteorStorm' as const,title:'Meteor',description:'grow',accent:'#fff',best:true},{kind:'upgrade' as const,id:'spellPower' as const,title:'Power',description:'grow',accent:'#fff',best:false}];
 function round(value:number):number{return Math.round(value*1000)/1000;}
 export function auditEightTwelveHourFlowHealth():EightTwelveHourFlowHealthAudit {

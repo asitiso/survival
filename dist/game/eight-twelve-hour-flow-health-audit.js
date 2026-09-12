@@ -2,7 +2,7 @@ import { eightTwelveHourShopFocus } from './eight-twelve-hour-shop-focus.js';
 import { focusEightTwelveHourBossRewards } from './eight-twelve-hour-reward-focus.js';
 import { eightTwelveHourToastFocus } from './eight-twelve-hour-toast-focus.js';
 import { eightTwelveHourHudFocus, eightTwelveHourBuildLabels } from './eight-twelve-hour-hud-focus.js';
-const equipment = { coins: 12000, weapon: { id: 'arcane-staff', kind: 'weapon', name: 'Arcane', rank: 5, power: .15, legendary: true }, armor: { id: 'iron-robe', kind: 'armor', name: 'Robe', rank: 5, power: .08, legendary: true }, healingPotions: 3 };
+const equipment = { coins: 12000, weapon: { id: 'arcane-staff', kind: 'weapon', name: 'Arcane', rank: 5, power: .15, legendary: true }, armor: { id: 'iron-robe', kind: 'armor', name: 'Robe', rank: 5, power: .08, legendary: true }, healingPotions: 3, inventory: [], discoveredRecipes: [] };
 const rewards = [{ kind: 'relic', id: 'relic:chrono-shard', relicId: 'chrono-shard', title: 'Time Gear', description: 'swap', accent: '#fff', best: false }, { kind: 'upgrade', id: 'meteorStorm', title: 'Meteor', description: 'grow', accent: '#fff', best: true }, { kind: 'upgrade', id: 'spellPower', title: 'Power', description: 'grow', accent: '#fff', best: false }];
 function round(value) { return Math.round(value * 1000) / 1000; }
 export function auditEightTwelveHourFlowHealth() {

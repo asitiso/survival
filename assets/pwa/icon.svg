@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="sky" cx="34%" cy="24%" r="82%">
+      <stop stop-color="#315fbc"/><stop offset=".52" stop-color="#101c4b"/><stop offset="1" stop-color="#050913"/>
+    </radialGradient>
+    <linearGradient id="crystal" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#fff7c9"/><stop offset=".3" stop-color="#91edff"/><stop offset=".72" stop-color="#468bff"/><stop offset="1" stop-color="#5c32bf"/>
+    </linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="12" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#sky)"/>
+  <circle cx="256" cy="256" r="184" fill="none" stroke="#64dbff" stroke-width="11" opacity=".38"/>
+  <circle cx="256" cy="256" r="145" fill="none" stroke="#c4f4ff" stroke-width="4" stroke-dasharray="8 16" opacity=".75"/>
+  <path d="M256 88 354 210 305 396 256 440 207 396 158 210Z" fill="url(#crystal)" stroke="#edfbff" stroke-width="9" filter="url(#glow)"/>
+  <path d="m256 88 0 352m-98-230 147 42m49-42-147 42" stroke="#eaffff" stroke-width="8" opacity=".72"/>
+  <circle cx="256" cy="254" r="38" fill="#f7ffff" filter="url(#glow)"/>
+</svg>

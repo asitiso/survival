@@ -12,7 +12,7 @@ test('phase 2385-2387 primed tactic identity reuses the existing boss icon and a
 });
 
 test('phase 2385-2387 tactic-link effect recall adds no new global HUD row input audio or haptic path',()=>{
-  const method=game.match(/private drawMythicTacticPrimedIcon\([\s\S]*?\n  }\n\n  private drawAscensionMutatorToastIcon/)?.[0]??'';
+  const method=game.match(/private drawMythicTacticPrimedIcon\([\s\S]*?\r?\n  }\r?\n\r?\n  private drawAscensionMutatorToastIcon/)?.[0]??'';
   assert.ok(method.length>0);
   assert.doesNotMatch(method,/showEventToast|playSound|haptic|pointer|keydown|ACTION_BUTTONS/);
   assert.match(method,/boss\.pos/);

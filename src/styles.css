@@ -34,7 +34,7 @@ body { overscroll-behavior:none; touch-action:none; }
 .shop-card:disabled { filter:saturate(.25); opacity:.48; }
 .shop-card:not(:disabled):active { transform:scale(.985); }
 .shop-item-heading { width:100%; display:flex; align-items:center; gap:10px; min-height:50px; }
-.shop-item-icon { flex:0 0 48px; width:48px; height:48px; border-radius:12px; border:1px solid color-mix(in srgb,var(--accent) 28%,rgba(255,255,255,.08)); background-image:url('../assets/ui/shop-items.png'),radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--accent) 35%,#fff),color-mix(in srgb,var(--accent) 12%,#0b1521) 62%,#07101b); background-size:300% 300%,100% 100%; background-position:var(--shop-item-position,50% 50%),center; background-repeat:no-repeat,no-repeat; box-shadow:inset 0 1px rgba(255,255,255,.08),0 5px 16px rgba(0,0,0,.18); }
+.shop-item-icon { flex:0 0 48px; width:48px; height:48px; border-radius:12px; border:1px solid color-mix(in srgb,var(--accent) 28%,rgba(255,255,255,.08)); background-image:url('../assets/ui/shop-items-enhanced.png'),radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--accent) 35%,#fff),color-mix(in srgb,var(--accent) 12%,#0b1521) 62%,#07101b); background-size:300% 300%,100% 100%; background-position:var(--shop-item-position,50% 50%),center; background-repeat:no-repeat,no-repeat; box-shadow:inset 0 1px rgba(255,255,255,.08),0 5px 16px rgba(0,0,0,.18); }
 .shop-item-icon.shop-item-icon-fallback { background-image:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--accent) 35%,#fff),color-mix(in srgb,var(--accent) 12%,#0b1521) 62%,#07101b); background-size:100% 100%; background-position:center; }
 .shop-item-copy { min-width:0; display:flex; flex-direction:column; gap:2px; }
 .shop-kind { color:var(--accent); font-size:12px; font-weight:900; letter-spacing:.08em; }
@@ -46,6 +46,7 @@ body { overscroll-behavior:none; touch-action:none; }
 .shop-purchase-delta{color:#c7d8e6;font-size:11px;line-height:1.35;font-weight:750;min-height:30px}
 .shop-price { margin-top:auto; color:#ffe07b; font-size:18px; }
 .shop-footer { margin-top:18px; display:flex; justify-content:flex-end; gap:12px; flex-wrap:wrap; }
+.shop-footer button { white-space:nowrap; }
 .primary-btn,.secondary-btn { min-height:52px; padding:0 24px; border-radius:14px; font:800 16px inherit; color:#fff; }
 .primary-btn { border:1px solid rgba(114,215,255,.45); background:linear-gradient(180deg,#236887,#164861); }
 .secondary-btn { border:1px solid rgba(255,255,255,.14); background:#111d2b; }
@@ -217,3 +218,59 @@ body { overscroll-behavior:none; touch-action:none; }
 @media(max-width:1000px){.upgrade-secondary-identities{height:20px;gap:5px}.upgrade-secondary-identity{width:19px;height:19px;border-radius:6px}}
 
 .fate-tradeoff-identities{display:flex;gap:8px;justify-content:center;align-items:center;margin-top:8px}.fate-vector-icon{display:inline-block;width:30px;height:30px;background-image:var(--fate-vector-image);background-size:var(--fate-vector-bg-size);background-position:var(--fate-vector-bg-position);background-repeat:no-repeat;border-radius:7px;border:1px solid rgba(255,255,255,.18);box-shadow:0 2px 8px rgba(0,0,0,.25)}
+
+/* Three equipment slots and set information stay inside the scrollable shop. */
+.shop-stage-hint{margin:8px 0;color:#f0c46b;font-size:13px;font-weight:700}
+.shop-set-summary{display:grid;gap:5px;padding:10px 12px;margin-bottom:12px;border:1px solid #42516a;border-radius:10px;color:#bfcedf;font-size:12px;line-height:1.5}
+.shop-set-name{font-size:11px;font-weight:800}
+.shop-unlock{color:#ffd48d;font-size:12px;font-weight:800}
+.shop-overlay{position:fixed;inset:0;padding:2vh 2vw;padding:2dvh 2vw}
+#app:has(.shop-overlay:not([hidden]))::after{display:none}
+.shop-panel{max-height:94vh;max-height:94dvh;overflow:hidden;display:flex;flex-direction:column;isolation:isolate;touch-action:pan-y;overscroll-behavior:contain}
+.shop-header,.shop-tabs,.shop-footer{flex-shrink:0;position:sticky;z-index:1;background:#0d1728}
+.shop-header{top:0}.shop-footer{bottom:0;padding-top:8px}
+.shop-tabs{top:0;padding:10px 0}
+.shop-tabs [role=tablist]{display:flex;gap:8px}
+.shop-tabs button{border:1px solid #657e9c;border-radius:10px;background:#132439;color:#dce8f5;font:inherit;font-weight:800;padding:9px 24px;min-height:44px}
+.shop-tabs button[aria-selected=true]{background:#38416c;border-color:#cbb7ff;color:#fff}
+.shop-content{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:0 6px 8px;text-align:left}
+.shop-readiness{padding:10px 12px;background:#192c3c;border:1px solid #5a8d93;border-radius:10px;color:#e7faf0;font-size:14px;font-weight:800;line-height:1.6}
+.shop-readiness-recommendation{margin:7px 0 12px;color:#f0d89f;font-size:13px;line-height:1.5}
+.shop-equipped-grid,.shop-inventory-grid,.shop-recipe-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.shop-inventory-grid{grid-template-columns:repeat(6,minmax(0,1fr))}
+.shop-equipped-slot,.shop-inventory-slot{min-height:90px;min-width:0;padding:10px;background:#14243a;border:1px solid #52647a;border-radius:12px;text-align:left;color:#e7eef7;line-height:1.5;cursor:pointer}
+.shop-equipped-slot strong,.shop-inventory-slot strong{display:block;font-size:13px}
+.shop-equipped-slot small,.shop-inventory-slot small{display:block;margin-top:5px;font-size:12px;color:#bdcedd}
+.shop-equipped-slot[aria-pressed=true],.shop-inventory-slot[aria-pressed=true]{border-color:#d5b2ff;box-shadow:inset 0 0 0 1px #d5b2ff;background:#292f50}
+.shop-equipped-slot:disabled,.shop-inventory-slot:disabled{cursor:default;color:#91a5bb;background:#0a1626}
+.shop-item-actions,.shop-recipe-card{margin:12px 0;padding:14px;border:1px solid #566880;border-radius:12px;background:#111f33;font-size:13px;line-height:1.6}
+.shop-recipe-card{margin:0}.shop-recipe-card h4,.shop-item-actions h3{margin:0 0 8px;font-size:16px;color:#e1cdff}
+.shop-content>h3{font-size:14px;margin:16px 0 9px}.shop-item-actions p,.shop-recipe-card p{margin:6px 0 12px;color:#c5d4e4}
+.shop-forge-action{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+.shop-forge-action button{min-height:44px;padding:9px 14px;font-size:13px}.shop-forge-action span{flex:1;min-width:120px;font-size:12px}
+.forge-item-heading,.shop-selected-equipment-title,.shop-recipe-title{display:flex;align-items:center;gap:9px}.forge-equipment-icon,.shop-selected-equipment-icon,.shop-recipe-result-icon{display:inline-block;flex:0 0 52px;width:52px;height:52px;border-radius:13px;background-image:var(--forge-item-image),radial-gradient(circle at 35% 30%,#e8fbff,#17355b 62%,#07101b);background-size:var(--forge-item-size,300% 300%),100% 100%;background-position:var(--forge-item-position,50% 50%),center;background-repeat:no-repeat;border:1px solid rgba(180,224,255,.32);box-shadow:inset 0 1px rgba(255,255,255,.16),0 5px 16px rgba(0,0,0,.24)}.shop-selected-equipment-icon,.shop-recipe-result-icon{flex-basis:34px;width:34px;height:34px;border-radius:9px}.forge-equipment-icon-fallback{background-image:radial-gradient(circle at 35% 30%,#d7f5ff,#17355b 62%,#07101b)}.forge-item-heading>span:last-child{min-width:0;display:flex;align-items:center;gap:6px;flex-wrap:wrap}.forge-item-count{padding:2px 6px;border-radius:999px;background:#244262;color:#dff7ff;font-size:11px;line-height:1.2}.shop-equipped-slot,.shop-inventory-slot{position:relative}.shop-equipped-slot[aria-pressed="true"],.shop-inventory-slot[aria-pressed="true"]{outline:2px solid #8ee8ff;box-shadow:0 0 16px rgba(98,212,255,.24)}
+.shop-disabled-reason{color:#ffd48d;font-size:12px;line-height:1.5}
+.shop-panel button:focus-visible,.shop-panel select:focus-visible,.shop-content:focus-visible{outline:3px solid #f1d584;outline-offset:2px}
+@media(max-width:1000px){.shop-inventory-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.shop-recipe-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.shop-panel{width:96%;padding:12px}.shop-header{gap:8px}.shop-header h2{font-size:22px}.shop-wallet{min-width:0;padding:7px}.shop-wallet strong{font-size:20px}.shop-tabs button{padding:8px 20px}.shop-equipped-grid,.shop-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.shop-recipe-grid{grid-template-columns:minmax(0,1fr)}.shop-footer{gap:6px}.shop-footer button{padding:10px;font-size:13px}.shop-readiness{font-size:12px}.shop-equipped-slot,.shop-inventory-slot{padding:8px}}
+
+.shop-accessory-icon{background-image:url('../assets/ui/shop-accessories.png');background-size:200% 200%;background-position:var(--shop-item-position);background-color:#07101b}
+
+.shop-accessory-picker{display:flex;align-items:center;gap:8px;margin:8px 0 12px;font-size:12px;color:#bfcedf}.shop-accessory-picker select{max-width:100%;padding:7px 10px;background:#0c1725;color:#f0e9dd;border:1px solid #53657b;border-radius:8px}
+
+@media (max-height:800px){
+  .shop-panel{padding:14px 20px 16px}
+  .shop-header h2{font-size:28px}.shop-header .eyebrow{font-size:11px}
+  .shop-wallet{padding:8px 12px}.shop-wallet strong{font-size:21px}
+  .shop-panel .equipped-row{margin:8px 0}.shop-panel .equipped-row span{padding:7px 8px;font-size:12px}
+  .shop-stage-hint{margin:5px 0}.shop-set-summary{padding:6px 10px;margin-bottom:6px;text-align:left}
+  .shop-accessory-picker{margin:6px 0 8px}.shop-card{padding:12px;gap:4px;min-height:170px}
+  .shop-card strong{font-size:18px}.shop-desc{min-height:20px}.shop-footer{margin-top:10px}
+}
+
+@media(max-height:500px){
+  .shop-panel{padding:8px 16px}.shop-header .eyebrow{display:none}.shop-header h2{font-size:22px}
+  .shop-wallet{padding:4px 8px;gap:1px}.shop-wallet span{font-size:11px}.shop-wallet strong{font-size:19px}
+  .shop-tabs{padding:5px 0}.shop-tabs button{padding:6px 20px}.shop-footer{margin-top:5px;padding-top:3px}
+  .shop-footer button{padding:8px 14px;min-height:44px;font-size:14px}
+}

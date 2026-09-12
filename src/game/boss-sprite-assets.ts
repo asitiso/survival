@@ -9,9 +9,9 @@ export const BOSS_SPRITE_ATLAS = {
   src: './assets/bosses/boss-sprites.png',
   columns: 3,
   rows: 2,
-  cellSize: 256,
-  width: 768,
-  height: 512,
+  cellSize: 512,
+  width: 1536,
+  height: 1024,
 } as const;
 
 const CELL_BY_ARCHETYPE: Readonly<Record<BossArchetype, readonly [column: number, row: number]>> = {

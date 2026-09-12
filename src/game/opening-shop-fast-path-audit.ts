@@ -21,7 +21,7 @@ const offers:readonly ShopDisplayOffer[]=[
 export function auditOpeningShopFastPathSuccess():OpeningShopFastPathSuccessAudit{
   const samples:{quick:ShopDisplayOffer|null;state:EquipmentState;promoted:boolean}[]=[];
   for(const heroId of heroes)for(const archetype of archetypes)for(const coins of [250,500]){
-    const state:EquipmentState={coins,weapon:null,armor:null,healingPotions:1};
+    const state:EquipmentState={coins,weapon:null,armor:null,healingPotions:1,inventory:[],discoveredRecipes:[]};
     const guidance=shopGuidanceForOffers(offers,{heroId,archetype,state});
     const quick=quickShopRecommendation(offers,guidance,state);
     samples.push({quick,state,promoted:openingShopFastPath(75,Boolean(quick)).promoteQuickBuy});

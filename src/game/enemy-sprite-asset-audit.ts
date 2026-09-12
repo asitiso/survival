@@ -32,8 +32,8 @@ export function auditEnemySpriteAssets(): EnemySpriteAssetAudit {
   add(samples, 'unique-cells', 12, atlas.uniqueCellCount);
   add(samples, 'atlas-columns', 4, ENEMY_SPRITE_ATLAS.columns);
   add(samples, 'atlas-rows', 3, ENEMY_SPRITE_ATLAS.rows);
-  add(samples, 'atlas-width', 512, ENEMY_SPRITE_ATLAS.width);
-  add(samples, 'atlas-height', 384, ENEMY_SPRITE_ATLAS.height);
+  add(samples, 'atlas-width', 1448, ENEMY_SPRITE_ATLAS.width);
+  add(samples, 'atlas-height', 1086, ENEMY_SPRITE_ATLAS.height);
   add(samples, 'no-missing-types', 0, atlas.missing.length);
   add(samples, 'no-out-of-bounds-types', 0, atlas.outOfBounds.length);
 

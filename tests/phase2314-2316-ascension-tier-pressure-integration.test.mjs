@@ -22,7 +22,7 @@ test('phase 2316 tier and mutator toasts reuse the authoritative outcome project
   assert.match(game,/effect\.type === 'ascension_tier'[\s\S]{0,180}showAscensionTierEventToast/);
   assert.match(game,/showAscensionTierEventToast[\s\S]{0,650}projectAscensionTierOutcome/);
   assert.match(game,/effect\.type === 'ascension_mutator'[\s\S]{0,300}showAscensionMutatorEventToast/);
-  const body=game.match(/private showEventToast\([\s\S]*?\n  }\n\n  private showHeroMeterEventToast/)?.[0]??'';assert.match(body,/eventToastAscensionTierProjection\s*=\s*null/);
+  const body=game.match(/private showEventToast\([\s\S]*?\r?\n  }\r?\n\r?\n  private showHeroMeterEventToast/)?.[0]??'';assert.match(body,/eventToastAscensionTierProjection\s*=\s*null/);
 });
 
 test('phase 2316 freezes ascension cadence modifiers rng actions and snapshot schema',()=>{
@@ -32,6 +32,6 @@ test('phase 2316 freezes ascension cadence modifiers rng actions and snapshot sc
 });
 
 test('phase 2316 catch-up mutator toast reuses the immediately preceding tier projection instead of final catch-up state',()=>{
-  const helper=game.match(/private showAscensionMutatorEventToast\([\s\S]*?\n  }\n/)?.[0]??'';
+  const helper=game.match(/private showAscensionMutatorEventToast\([\s\S]*?\r?\n  }\r?\n/)?.[0]??'';
   assert.match(helper,/this\.eventToastAscensionTierProjection\s*\?\?\s*projectAscensionTierOutcome/);
 });

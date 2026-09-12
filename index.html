@@ -4,11 +4,562 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
   <meta name="theme-color" content="#050913" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="./assets/pwa/icon-192.png" />
   <title>Arcane Last Stand</title>
   <link rel="stylesheet" href="./src/styles.css" />
+  <style data-mobile-landscape-modal>
+    @media (orientation: landscape) and (max-height: 600px) and (max-width: 1024px) {
+      .modal-overlay {
+        place-items: start center;
+        overflow-y: auto;
+        padding: 12px 2vw;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-y;
+      }
+
+      .lobby-overlay,
+      .levelup-overlay,
+      .trait-select-overlay,
+      .fate-select-overlay {
+        position: fixed;
+        inset: max(0px, env(safe-area-inset-top)) max(0px, env(safe-area-inset-right)) max(0px, env(safe-area-inset-bottom)) max(0px, env(safe-area-inset-left));
+      }
+
+      .modal-panel:not(.shop-panel) {
+        padding: 14px 18px 16px;
+        border-radius: 20px;
+      }
+
+      .modal-panel:not(.shop-panel) h1,
+      .modal-panel:not(.shop-panel) h2 {
+        margin-top: 2px;
+        margin-bottom: 2px;
+      }
+
+      .modal-panel:not(.shop-panel) .modal-subtitle {
+        margin-bottom: 8px;
+        line-height: 1.3;
+      }
+
+      .levelup-panel,
+      .trait-panel {
+        height: calc(100vh - 24px);
+        height: calc(100dvh - 24px);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .levelup-panel .upgrade-cards,
+      .trait-panel .trait-grid {
+        flex: 1 1 70%;
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        touch-action: pan-y;
+        align-items: stretch;
+      }
+
+      .levelup-panel .upgrade-card,
+      .trait-panel .trait-card {
+        min-height: 132px;
+        padding: 10px 12px;
+        gap: 7px;
+      }
+
+      .levelup-panel .upgrade-icon,
+      .trait-panel .trait-mark {
+        width: 40px;
+        height: 40px;
+      }
+
+      .levelup-panel .upgrade-card strong,
+      .trait-panel .trait-card strong {
+        font-size: 18px;
+      }
+
+      .levelup-panel .upgrade-card > strong + span,
+      .trait-panel .trait-card > span:not(.trait-mark):not(.fate-tradeoff-identities) {
+        font-size: 12px;
+        line-height: 1.3;
+      }
+
+      .lobby-overlay .lobby-panel {
+        width: min(1180px, 96%);
+      }
+
+      .lobby-overlay .lobby-heading {
+        align-items: center;
+        gap: 10px;
+      }
+
+      .lobby-overlay .lobby-heading > div:first-child {
+        min-width: 0;
+      }
+
+      .lobby-overlay .lobby-heading h1 {
+        margin: 0;
+        font-size: 26px;
+        line-height: 1.1;
+      }
+
+      .lobby-overlay .lobby-heading .modal-subtitle {
+        margin: 2px 0 0;
+        font-size: 12px;
+        line-height: 1.25;
+      }
+
+      .lobby-overlay .shard-wallet {
+        display: inline-flex;
+        min-width: 0;
+        padding: 5px 10px;
+        flex-direction: row;
+        align-items: baseline;
+        gap: 7px;
+        border-radius: 999px;
+        white-space: nowrap;
+      }
+
+      .lobby-overlay .shard-wallet span {
+        font-size: 10px;
+      }
+
+      .lobby-overlay .shard-wallet strong {
+        margin-top: 0;
+        font-size: 17px;
+      }
+
+      .lobby-overlay .lobby-grid {
+        margin-top: 6px;
+        gap: 8px;
+      }
+
+      .lobby-overlay .lobby-upgrade-card {
+        min-height: 132px;
+        padding: 9px 11px;
+        gap: 4px;
+        display: grid;
+        grid-template-columns: 34px minmax(0,1fr) auto;
+        grid-template-rows: repeat(3,auto) auto;
+        align-content: center;
+        align-items: center;
+        text-align: left;
+      }
+
+      .lobby-overlay .lobby-upgrade-icon {
+        width: 34px;
+        height: 34px;
+        flex-basis: 34px;
+        grid-column: 1;
+        grid-row: 1 / span 3;
+      }
+
+      .lobby-overlay .lobby-upgrade-name,
+      .lobby-overlay .lobby-upgrade-card strong,
+      .lobby-overlay .lobby-upgrade-pips {
+        grid-column: 2;
+      }
+
+      .lobby-overlay .lobby-upgrade-card strong {
+        font-size: 18px;
+      }
+
+      .lobby-overlay .lobby-upgrade-desc {
+        grid-column: 1 / -1;
+        grid-row: 4;
+        min-height: 0;
+        font-size: 11px;
+        line-height: 1.25;
+      }
+
+      .lobby-overlay .lobby-upgrade-price {
+        grid-column: 3;
+        grid-row: 1 / span 3;
+        align-self: center;
+        margin: 0;
+        font-size: 14px;
+      }
+
+      .shop-overlay {
+        position: fixed;
+        inset: max(0px, env(safe-area-inset-top)) max(0px, env(safe-area-inset-right)) max(0px, env(safe-area-inset-bottom)) max(0px, env(safe-area-inset-left));
+        place-items: stretch center;
+        overflow: hidden;
+        padding: 6px 1.5vw;
+      }
+
+      .shop-overlay .shop-panel {
+        width: 100%;
+        max-width: 1240px;
+        height: calc(100vh - 12px);
+        height: calc(100dvh - 12px);
+        max-height: none;
+        padding: 8px 12px 6px;
+      }
+
+      .shop-overlay .shop-header {
+        gap: 10px;
+      }
+
+      .shop-overlay .shop-header .eyebrow {
+        display: none;
+      }
+
+      .shop-overlay .shop-header h2 {
+        margin: 0;
+        font-size: 22px;
+      }
+
+      .shop-overlay .shop-wallet {
+        min-width: 0;
+        padding: 5px 10px;
+        flex-direction: row;
+        align-items: baseline;
+        gap: 8px;
+      }
+
+      .shop-overlay .shop-wallet span {
+        font-size: 11px;
+      }
+
+      .shop-overlay .shop-wallet strong {
+        font-size: 19px;
+      }
+
+      .shop-overlay .shop-tabs {
+        padding: 4px 0;
+      }
+
+      .shop-overlay .shop-tabs button {
+        min-height: 44px;
+        padding: 6px 18px;
+      }
+
+      .shop-overlay .shop-content {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 0 4px 4px;
+        overscroll-behavior: contain;
+      }
+
+      .shop-overlay .shop-readiness {
+        padding: 6px 8px;
+        font-size: 12px;
+        line-height: 1.35;
+      }
+
+      .shop-overlay .shop-readiness-recommendation {
+        margin: 4px 0 6px;
+        font-size: 11px;
+        line-height: 1.3;
+      }
+
+      .shop-overlay .equipped-row {
+        margin: 4px 0 6px;
+      }
+
+      .shop-overlay .equipped-row span {
+        padding: 5px 7px;
+        font-size: 11px;
+      }
+
+      .shop-overlay .shop-stage-hint {
+        margin: 4px 0;
+        font-size: 11px;
+      }
+
+      .shop-overlay .shop-set-summary {
+        padding: 5px 8px;
+        margin-bottom: 5px;
+        font-size: 10px;
+        line-height: 1.25;
+      }
+
+      .shop-overlay .shop-accessory-picker {
+        margin: 4px 0 6px;
+      }
+
+      .shop-overlay .shop-grid {
+        gap: 6px;
+      }
+
+      .shop-overlay .shop-card {
+        min-height: 100px;
+        padding: 7px 9px;
+        gap: 3px;
+        display: grid;
+        grid-template-columns: minmax(0,1fr) auto;
+        align-content: center;
+      }
+
+      .shop-overlay .shop-card > :not(.shop-price) {
+        grid-column: 1;
+        min-width: 0;
+      }
+
+      .shop-overlay .shop-price {
+        grid-column: 2;
+        grid-row: 1 / span 10;
+        align-self: center;
+        margin: 0 0 0 10px;
+        font-size: 16px;
+        white-space: nowrap;
+      }
+
+      .shop-overlay .shop-item-heading {
+        min-height: 36px;
+        gap: 7px;
+      }
+
+      .shop-overlay .shop-item-icon {
+        flex-basis: 34px;
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+      }
+
+      .shop-overlay .shop-kind {
+        font-size: 10px;
+      }
+
+      .shop-overlay .shop-card strong {
+        font-size: 16px;
+      }
+
+      .shop-overlay .shop-desc {
+        min-height: 0;
+        font-size: 11px;
+        line-height: 1.25;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .shop-overlay .shop-rank-row {
+        min-height: 18px;
+      }
+
+      .shop-overlay .shop-rank,
+      .shop-overlay .shop-purchase-delta,
+      .shop-overlay .shop-reason,
+      .shop-overlay .shop-disabled-reason {
+        font-size: 10px;
+        line-height: 1.2;
+      }
+
+      .shop-overlay .shop-purchase-delta {
+        min-height: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .shop-overlay .shop-equipped-grid {
+        grid-template-columns: repeat(3,minmax(0,1fr));
+        gap: 6px;
+      }
+
+      .shop-overlay .shop-inventory-grid {
+        grid-template-columns: repeat(6,minmax(0,1fr));
+        gap: 6px;
+      }
+
+      .shop-overlay .shop-equipped-slot,
+      .shop-overlay .shop-inventory-slot {
+        min-height: 64px;
+        padding: 6px;
+        font-size: 11px;
+      }
+
+      .shop-overlay .shop-equipped-slot strong,
+      .shop-overlay .shop-inventory-slot strong {
+        font-size: 11px;
+      }
+
+      .shop-overlay .shop-equipped-slot small,
+      .shop-overlay .shop-inventory-slot small {
+        margin-top: 2px;
+        font-size: 10px;
+      }
+
+      .shop-overlay .shop-content > h3 {
+        margin: 8px 0 5px;
+      }
+
+      .shop-overlay .shop-item-actions,
+      .shop-overlay .shop-recipe-card {
+        margin: 6px 0;
+        padding: 8px;
+        font-size: 11px;
+        line-height: 1.35;
+      }
+
+      .shop-overlay .shop-footer {
+        margin-top: 4px;
+        padding-top: 3px;
+        gap: 6px;
+      }
+
+      .shop-overlay .shop-footer button {
+        min-height: 44px;
+        padding: 6px 12px;
+        font-size: 13px;
+      }
+    }
+
+    @media (orientation: landscape) and (max-height: 500px) and (max-width: 1024px) {
+      .modal-overlay {
+        padding: 8px 1.5vw;
+      }
+
+      .shop-overlay {
+        padding: 4px 1vw;
+      }
+
+      .shop-overlay .shop-panel {
+        height: calc(100vh - 8px);
+        height: calc(100dvh - 8px);
+        padding: 4px 10px;
+      }
+
+      .shop-overlay .shop-header h2 {
+        font-size: 19px;
+      }
+
+      .shop-overlay .shop-wallet span {
+        display: none;
+      }
+
+      .shop-overlay .shop-tabs {
+        padding: 2px 0;
+      }
+
+      .shop-overlay .shop-tabs button {
+        min-height: 44px;
+        padding: 4px 16px;
+      }
+
+      .shop-overlay .shop-card {
+        min-height: 96px;
+        padding: 6px 8px;
+      }
+    }
+
+    @media (orientation: landscape) and (max-height: 430px) and (max-width: 1024px) {
+      .modal-panel:not(.shop-panel) {
+        padding: 8px 10px 10px;
+        border-radius: 16px;
+      }
+
+      .modal-panel:not(.shop-panel) .eyebrow {
+        font-size: 11px;
+        letter-spacing: .16em;
+      }
+
+      .modal-panel:not(.shop-panel) h1,
+      .modal-panel:not(.shop-panel) h2 {
+        margin: 0;
+        font-size: 20px;
+        line-height: 1.15;
+      }
+
+      .modal-panel:not(.shop-panel) .modal-subtitle {
+        margin-bottom: 4px;
+        font-size: 11px;
+        line-height: 1.2;
+      }
+
+      .levelup-panel,
+      .trait-panel {
+        height: calc(100vh - 16px);
+        height: calc(100dvh - 16px);
+      }
+
+      .levelup-panel .upgrade-card,
+      .trait-panel .trait-card,
+      .lobby-overlay .lobby-upgrade-card {
+        min-height: 116px;
+        padding: 7px 9px;
+        gap: 3px;
+      }
+
+      .levelup-panel .upgrade-icon,
+      .trait-panel .trait-mark {
+        width: 34px;
+        height: 34px;
+      }
+
+      .lobby-overlay .lobby-heading h1 {
+        font-size: 20px;
+      }
+
+      .lobby-overlay .lobby-heading .modal-subtitle {
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+
+      .lobby-overlay .shard-wallet span {
+        display: none;
+      }
+
+      .shop-overlay .shop-grid {
+        gap: 4px;
+      }
+
+      .shop-overlay .shop-card {
+        min-height: 88px;
+        padding: 5px 7px;
+        gap: 2px;
+      }
+
+      .shop-overlay .shop-item-heading {
+        min-height: 32px;
+        gap: 6px;
+      }
+
+      .shop-overlay .shop-item-icon {
+        flex-basis: 30px;
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+      }
+
+      .shop-overlay .shop-card strong {
+        font-size: 14px;
+      }
+
+      .shop-overlay .shop-desc {
+        font-size: 10px;
+        -webkit-line-clamp: 1;
+      }
+
+      .shop-overlay .shop-rank-row {
+        min-height: 16px;
+      }
+
+      .shop-overlay .shop-purchase-delta {
+        font-size: 9px;
+      }
+
+      .shop-overlay .shop-price {
+        margin-left: 8px;
+        font-size: 15px;
+      }
+    }
+  </style>
 </head>
 <body>
   <main id="app" aria-label="Arcane Last Stand"></main>
   <script type="module" src="./dist/main.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("./service-worker.js");
+    }
+  </script>
 </body>
 </html>

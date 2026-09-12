@@ -18,7 +18,7 @@ test('shop always produces six concise offers', () => {
   assert.equal(offers.length, 6);
   assert.equal(offers.filter((o) => o.kind === 'weapon').length, 2);
   assert.equal(offers.filter((o) => o.kind === 'armor').length, 2);
-  assert.equal(offers.filter((o) => o.kind === 'potion').length, 2);
+  assert.equal(offers.filter((o) => o.kind === 'potion').length, 1);
 });
 
 test('blast rod and golden wand create distinct offense versus economy builds', () => {

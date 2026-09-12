@@ -19,7 +19,7 @@ test('game wires tactic attack link, Last Law timeline, and twelve-form finisher
 
 test('foldable dead-space resolver is additive and normal action path remains unchanged',()=>{
   assert.match(input,/resolveFoldableDeadSpace\(/);
-  assert.match(input,/: hitTestActionButton\(p\);/);
+  assert.match(input,/: hitTestActionButton\(p, ACTION_BUTTONS, actionTouchScale\);/);
 });
 
 test('phase 263-282 does not add transient combat state to endless snapshot schema',()=>{

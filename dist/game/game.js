@@ -25,16 +25,20 @@ import { HeroSelectOverlay } from '../ui/hero-select.js';
 import { ResultsOverlay } from '../ui/results.js';
 import { LobbyOverlay } from '../ui/lobby.js';
 import { TraitSelectOverlay } from '../ui/trait-select.js';
-import { generateShopOffers } from './shop-data.js';
-import { quickShopRecommendation, safeQuickPurchase, shopGuidanceForOffers } from './shop-guidance.js';
+import { refreshEquipmentPowers, priceShopOffers, ensureEquippedOffers, generateShopOffers, equipmentDefinition } from './shop-data.js';
+import { quickShopRecommendation, safeQuickPurchase, shopGuidanceForOffers, shopTopRecommendations } from './shop-guidance.js';
 import { purchaseOffer, rerollCost, SHOP_FIRST_TOKEN_AT, SHOP_TOKEN_INTERVAL } from '../domain/economy.js';
+import { equipInventoryStack, sellInventoryStack, inventoryStackKey } from '../domain/equipment-inventory.js';
+import { strengthenEquipment, combineEquipment } from '../domain/equipment-forge.js';
+import { recipesForOwnedItems } from './equipment-recipes.js';
+import { equipmentReadiness, projectEquipmentSurvival } from './equipment-survival-readiness.js';
 import { HERO_PROFILES, heroProfile } from './hero-profiles.js';
 import { CombatFeedbackSystem, KillChainVfxTracker, killChainVfxProfile } from './combat-feedback.js';
 import { kainOverloadCooldownMultiplier, kainOverloadNext } from './hero-passives.js';
 import { heroActionLabel } from './hero-spells.js';
 import { FieldEventDirector, eliteRushCount, fieldEventArenaPosition, fieldEventModifiers } from './field-events.js';
 import { calculateArcaneShards } from '../domain/meta-rewards.js';
-import { defaultMetaProfile, loadMetaProfile, metaBonuses, purchaseMetaUpgrade, saveMetaProfile } from '../domain/meta-profile.js';
+import { defaultMetaProfile, discoverEquipmentRecipe, loadMetaProfile, metaBonuses, purchaseMetaUpgrade, saveMetaProfile } from '../domain/meta-profile.js';
 import { MASTERY_RUN_TRAITS, RUN_TRAITS, runTraitBonuses } from './run-traits.js';
 import { composeRunStartStats } from './run-start.js';
 import { relicDefinition, relicDisplayName } from './relics.js';
@@ -94,6 +98,7 @@ import { bossHazardActivationDensityBudgetPresentation, bossHazardFootprintDensi
 import { bossClearedGroundSafeLaneRecoveryCoherencePresentation, bossClearedGroundSafeLaneRecoveryHandoffPresentation, bossClearedGroundSafeLaneRecoveryDensityBudgetPresentation, bossHazardAftermathDensityBudgetPresentation, bossHazardAftermathOwnerArbitrationPresentation, bossHazardEndAftermathOwnershipPresentation, bossHazardExpirationGroundStateDensityBudgetPresentation, bossHazardExpirationGroundStateHandoffPresentation, bossHazardLifecycleOwnerPresentation, bossHazardPersistentExpirationGroundStatePresentation, bossHazardRespawnGroundCoherencePresentation, bossHazardRespawnGroundDensityBudgetPresentation, bossHazardRespawnGroundHandoffPresentation, bossHazardRespawnMaterializationDensityBudgetPresentation, bossHazardRespawnMaterializationOwnershipPresentation, bossHazardRespawnMaterializationSettlePresentation } from './boss-hazard-lifecycle-owner-rendering.js';
 import { bossGroundOriginRebasePresentation } from './boss-ground-origin-rebase-rendering.js';
 import { enemyDeathTransitionPresentation, enemyFinisherDeathAfterglowContinuityPresentation, enemyFinisherDeathAfterglowHandoffPresentation, enemyFinisherDeathAfterglowDensityBudgetPresentation } from './enemy-hit-death-transition-rendering.js';
+import { stableWorldYDepthOrdered } from './enemy-actor-depth-ordering.js';
 import { specialistDefeatGroundRetirementPresentation } from './specialist-defeat-ground-retirement-rendering.js';
 import { regularDefeatGroundRetirementPresentation } from './regular-defeat-ground-retirement-rendering.js';
 import { characterGroundContactPresentation, characterHitRecoilPresentation } from './character-contact-recoil-rendering.js';
@@ -165,11 +170,15 @@ import { BUILD_OVERDRIVE_EFFECT_ATLAS, buildOverdriveEffectIdentityIcon } from '
 import { buildOverdriveActivationToastLabel, projectBuildOverdriveEffects } from './build-overdrive-effect-projection.js';
 import { FINAL_FORM_IDENTITY_ATLAS, finalFormIdentityIcon } from './final-form-identity-assets.js';
 import { BATTLEFIELD_ENVIRONMENT_ATLAS, battlefieldEnvironmentSprite } from './battlefield-environment-assets.js';
+import { battlefieldDepthTerrainPresentation } from './battlefield-depth-terrain-readability.js';
+import { BATTLEFIELD_GAMEPLAY_ART, BATTLEFIELD_DECORATION_ANCHORS, battlefieldGameplayArtProfile, battlefieldGameplayPropSprite } from './battlefield-gameplay-art.js';
 import { BATTLEFIELD_ATMOSPHERE_VFX_ATLAS, battlefieldAtmosphereVfxSprite } from './battlefield-atmosphere-vfx-assets.js';
 import { BATTLEFIELD_DEPTH_OVERLAY_ATLAS, battlefieldDepthOverlaySprite } from './battlefield-depth-overlay-assets.js';
 import { BATTLEFIELD_ENVIRONMENT_REACTION_VFX_ATLAS, battlefieldEnvironmentReactionVfxSprite } from './battlefield-environment-reaction-vfx-assets.js';
 import { BATTLEFIELD_PROP_VFX_ATLAS, battlefieldPropSprite } from './battlefield-props-vfx-assets.js';
 import { BATTLEFIELD_OBSTACLE_STATE_VFX_ATLAS, battlefieldObstacleStateForEvolution, battlefieldObstacleStateVfxSprite } from './battlefield-obstacle-state-vfx-assets.js';
+import { terrainForegroundOcclusionPresentation, terrainForegroundSpriteRegistration } from './terrain-foreground-occlusion.js';
+import { criticalThreatOcclusionArbitrationPresentation, criticalThreatWallCapOverlap } from './critical-threat-occlusion-arbitration.js';
 import { BATTLEFIELD_INTERACTION_VFX_ATLAS, battlefieldCoreVisualState, battlefieldInteractionSprite } from './battlefield-interaction-vfx-assets.js';
 import { PICKUP_FLOW_VFX_ATLAS } from './pickup-flow-vfx-assets.js';
 import { SPAWN_PRESSURE_VFX_ATLAS } from './spawn-pressure-vfx-assets.js';
@@ -353,6 +362,8 @@ import { longRunHudFocusPolicy } from './long-run-hud-focus.js';
 import { openingHudFocusPolicy } from './opening-hud-focus.js';
 import { autoTargetIndicator, primaryWeakpointNode, weakpointIndicator } from './auto-target-visibility.js';
 import { advanceDamageReason, recordDamageReason } from './damage-reason-feedback.js';
+import { consumeCoreAttackAttribution } from './core-attack-outcome-attribution.js';
+import { attackResolutionHandoffPresentation, createAttackResolutionHandoffState, recordAttackResolutionHandoff } from './attack-resolution-handoff.js';
 import { purchaseImpactFeedback } from './purchase-impact-feedback.js';
 import { dangerProjectileCues } from './projectile-threat-visibility.js';
 import { BOSS_RESPONSE_ACK_SECONDS, bossActionAssist, bossResponseActions } from './boss-action-assist.js';
@@ -497,10 +508,14 @@ export class Game {
     fateSelectOverlay;
     queuedLevelUps = 0;
     queuedBossRewards = 0;
-    equipmentState = { coins: 0, weapon: null, armor: null, healingPotions: 1 };
+    equipmentState = { coins: 0, weapon: null, armor: null, accessory: null, healingPotions: 1, inventory: [], discoveredRecipes: [] };
     shopOffers = [];
+    shopAccessoryChoice = null;
     shopImpactMessage = '';
+    shopActiveTab = 'purchase';
+    shopSelectedStackKey = null;
     damageReasonState = null;
+    attackResolutionHandoffState = createAttackResolutionHandoffState();
     rerollsThisVisit = 0;
     nextShopTokenAt = SHOP_FIRST_TOKEN_AT;
     catastrophe = null;
@@ -511,6 +526,8 @@ export class Game {
     heroMeter = createHeroMeterState('arkan');
     goldenGoblinEnemyId = null;
     supplyCrate = null;
+    supplyCrateOffer = null;
+    supplyCrateBlocked = false;
     eventToast = '';
     eventToastTimer = 0;
     eventToastLastLawId = null;
@@ -890,6 +907,10 @@ export class Game {
     activeWorldVfxOccupancyPolicy = resolveWorldVfxOccupancy({ quality: 'high', combatPrimary: 'normal', viewportArea: LOGICAL_WIDTH * LOGICAL_HEIGHT, candidates: [] });
     battlefieldEnvironmentAtlasImage = null;
     battlefieldEnvironmentAtlasReady = false;
+    battlefieldGameplayBackdropImage = null;
+    battlefieldGameplayBackdropReady = false;
+    battlefieldGameplayPropsImage = null;
+    battlefieldGameplayPropsReady = false;
     battlefieldAtmosphereVfxAtlasImage = null;
     battlefieldAtmosphereVfxAtlasReady = false;
     battlefieldDepthOverlayAtlasImage = null;
@@ -1046,6 +1067,7 @@ export class Game {
         this.initializeFieldEventLifecycleWorldVfxAtlas();
         this.initializeElitePackApproachFormationVfxAtlas();
         this.initializeBattlefieldEnvironmentAtlas();
+        this.initializeBattlefieldGameplayArt();
         this.initializeBattlefieldAtmosphereVfxAtlas();
         this.initializeBattlefieldDepthOverlayAtlas();
         this.initializeBattlefieldEnvironmentReactionVfxAtlas();
@@ -2070,6 +2092,22 @@ export class Game {
         return; const image = new Image(); image.decoding = 'async'; image.onload = () => { this.fieldEventLifecycleWorldVfxAtlasReady = true; }; image.onerror = () => { this.fieldEventLifecycleWorldVfxAtlasReady = false; }; image.src = FIELD_EVENT_LIFECYCLE_WORLD_VFX_ATLAS.src; this.fieldEventLifecycleWorldVfxAtlasImage = image; }
     initializeElitePackApproachFormationVfxAtlas() { if (typeof Image === 'undefined')
         return; const image = new Image(); image.decoding = 'async'; image.onload = () => { this.elitePackApproachFormationVfxAtlasReady = true; }; image.onerror = () => { this.elitePackApproachFormationVfxAtlasReady = false; }; image.src = ELITE_PACK_APPROACH_FORMATION_VFX_ATLAS.src; this.elitePackApproachFormationVfxAtlasImage = image; }
+    initializeBattlefieldGameplayArt() {
+        if (typeof Image === 'undefined')
+            return;
+        const backdrop = new Image();
+        backdrop.decoding = 'async';
+        backdrop.onload = () => { this.battlefieldGameplayBackdropReady = true; };
+        backdrop.onerror = () => { this.battlefieldGameplayBackdropReady = false; };
+        backdrop.src = BATTLEFIELD_GAMEPLAY_ART.backdrop.src;
+        this.battlefieldGameplayBackdropImage = backdrop;
+        const props = new Image();
+        props.decoding = 'async';
+        props.onload = () => { this.battlefieldGameplayPropsReady = true; };
+        props.onerror = () => { this.battlefieldGameplayPropsReady = false; };
+        props.src = BATTLEFIELD_GAMEPLAY_ART.props.src;
+        this.battlefieldGameplayPropsImage = props;
+    }
     initializeBattlefieldEnvironmentAtlas() {
         if (typeof Image === 'undefined')
             return;
@@ -2356,6 +2394,7 @@ export class Game {
         this.bossesKilled = 0;
         this.goldEarned = 0;
         this.autoCastNormal = openingAutoReadyProfile().initialAutoEnabled;
+        this.input.resetAutoReveal();
         this.autoTargetId = null;
         this.autoCombatBrain.reset();
         this.enemies.reset();
@@ -2449,10 +2488,11 @@ export class Game {
         this.shopOverlay.hide();
         this.queuedLevelUps = 0;
         this.queuedBossRewards = 0;
-        this.equipmentState = { coins: startStats.startingGold, weapon: null, armor: null, healingPotions: 1 };
+        this.equipmentState = { coins: startStats.startingGold + 180, weapon: null, armor: null, accessory: null, healingPotions: 1, inventory: [], discoveredRecipes: [] };
         this.rerollsThisVisit = 0;
         this.shopImpactMessage = '';
         this.damageReasonState = null;
+        this.attackResolutionHandoffState = createAttackResolutionHandoffState();
         this.nextShopTokenAt = SHOP_FIRST_TOKEN_AT;
         this.catastrophe = null;
         this.lastCatastropheId = null;
@@ -2697,7 +2737,7 @@ export class Game {
         this.input.refreshKeyboardMovement();
         if (this.input.consumePressed('potion'))
             this.useHealingPotion();
-        if (this.input.consumePressed('auto')) {
+        if (this.input.consumePressed('auto') && this.input.autoModeVisible) {
             this.autoCastNormal = !this.autoCastNormal;
             this.manualTargetMemory.clear();
             this.autoCombatBrain.reset();
@@ -2831,7 +2871,11 @@ export class Game {
                     else
                         this.queueHeroCrisisVfx(crisisKind);
                     this.frameEndlessEvents.push({ type: 'hero_damaged', amount: applied });
-                    this.damageReasonState = recordDamageReason(this.damageReasonState, source, applied, this.hero.maxHp, this.elapsed);
+                    const previousDamageReason = this.damageReasonState;
+                    const nextDamageReason = recordDamageReason(previousDamageReason, source, applied, this.hero.maxHp, this.elapsed);
+                    this.damageReasonState = nextDamageReason;
+                    if (nextDamageReason !== previousDamageReason && nextDamageReason.attackIntent)
+                        this.attackResolutionHandoffState = recordAttackResolutionHandoff(this.attackResolutionHandoffState, nextDamageReason.attackIntent, this.elapsed);
                 }
                 const prevented = Math.max(0, amount - applied);
                 if (prevented >= this.hero.maxHp * .002)
@@ -2844,8 +2888,11 @@ export class Game {
                 this.core.hp = Math.max(0, this.core.hp - applied);
                 const prevented = Math.max(0, amount - applied), mitigationRatio = amount > 0 ? Math.max(0, Math.min(1, prevented / amount)) : 0;
                 if (applied > 0) {
+                    const coreAttackAttribution = consumeCoreAttackAttribution(source, origin);
+                    if (coreAttackAttribution?.attackIntent)
+                        this.attackResolutionHandoffState = recordAttackResolutionHandoff(this.attackResolutionHandoffState, coreAttackAttribution.attackIntent, this.elapsed);
                     this.frameEndlessEvents.push({ type: 'core_damaged', amount: applied });
-                    this.queueSurvivalResponseVfx('coreHit', { mitigationRatio, damageSource: source, ...(origin ? { pressureVector: { x: this.core.pos.x - origin.x, y: this.core.pos.y - origin.y } } : {}) });
+                    this.queueSurvivalResponseVfx('coreHit', { mitigationRatio, damageSource: source, ...(coreAttackAttribution ? { coreAttackAttribution } : {}), ...(origin ? { pressureVector: { x: this.core.pos.x - origin.x, y: this.core.pos.y - origin.y } } : {}) });
                 }
                 if (prevented >= this.core.maxHp * .002)
                     this.queueSurvivalResponseVfx('coreGuard');
@@ -3646,8 +3693,10 @@ export class Game {
         this.drawArena(ctx);
         this.drawBattlefieldAtmosphereVfx(ctx);
         this.drawBattlefieldDepthOverlays(ctx);
-        this.terrain.render(ctx, residualMotion);
+        const battlefieldTerrainReadability = this.drawBattlefieldTerrainReadability(ctx);
+        this.terrain.render(ctx, residualMotion, battlefieldTerrainReadability);
         this.drawTerrainSpriteOverlays(ctx, residualMotion);
+        this.drawBattlefieldGameplayProps(ctx);
         this.drawMapCombatBoundaryWarnings(ctx);
         this.drawBattlefieldEnvironmentReactionVfx(ctx);
         this.drawMapEvolutionAftermathVfx(ctx);
@@ -3668,19 +3717,22 @@ export class Game {
         this.drawBossSignatureVfx(ctx);
         this.drawBossArenaTransitionWorldVfx(ctx);
         this.drawBossPhaseTransitionVfx(ctx);
-        this.drawEnemySpawnLaneReadability(ctx);
+        this.spells.renderGroundLayer(ctx, residualMotion, this.battlefieldPropVfxAtlasImage, this.battlefieldPropVfxAtlasReady, this.heroSpellSignatureVfxAtlasImage, this.heroSpellSignatureVfxAtlasReady, this.heroUltimateSignatureVfxAtlasImage, this.heroUltimateSignatureVfxAtlasReady, this.persistentSpellZoneVfxAtlasImage, this.persistentSpellZoneVfxAtlasReady, this.crowdControlPropagationVfxAtlasImage, this.crowdControlPropagationVfxAtlasReady, this.presentationSettings.reducedFlash, this.ultimatePostImpactResidueVfxAtlasImage, this.ultimatePostImpactResidueVfxAtlasReady);
+        // Enemy arrival arrows are intentionally hidden.
         this.enemies.renderEnemies(ctx, this.enemySpriteAtlasImage, this.enemySpriteAtlasReady, this.bossSpriteAtlasImage, this.bossSpriteAtlasReady, residualMotion, this.eliteAffixIdentityAtlasImage, this.eliteAffixIdentityAtlasReady, this.specialistIntentAtlasImage, this.specialistIntentAtlasReady, this.hero.pos, this.specialistCombatVfxAtlasImage, this.specialistCombatVfxAtlasReady, this.bossPhaseOverlayVfxAtlasImage, this.bossPhaseOverlayVfxAtlasReady, this.battlefieldInteractionVfxAtlasImage, this.battlefieldInteractionVfxAtlasReady, this.spawnPressureVfxAtlasImage, this.spawnPressureVfxAtlasReady, this.regularEnemyActionVfxAtlasImage, this.regularEnemyActionVfxAtlasReady, this.eliteAffixLifecycleVfxAtlasImage, this.eliteAffixLifecycleVfxAtlasReady, this.enemyTargetPressureVfxAtlasImage, this.enemyTargetPressureVfxAtlasReady, this.core.pos, this.specialistReactionLifecycleVfxAtlasImage, this.specialistReactionLifecycleVfxAtlasReady, this.presentationSettings.reducedFlash, this.presentationSettings.reducedMotion, Math.min(1, this.bossArena.hazards.length / 6));
         this.drawEnemyDefeatBodyTransitions(ctx);
-        this.drawElitePackApproachFormationVfx(ctx);
         this.drawEnemyCombatImageVfx(ctx);
         this.drawEnemyFinisherVfx(ctx);
         this.drawFreezeShatterVfx(ctx);
+        this.drawTerrainForegroundOcclusion(ctx);
+        this.spells.renderPersistentReadabilityLayer(ctx, this.heroSpellSignatureVfxAtlasImage, this.heroSpellSignatureVfxAtlasReady, this.heroUltimateSignatureVfxAtlasImage, this.heroUltimateSignatureVfxAtlasReady, this.crowdControlPropagationVfxAtlasImage, this.crowdControlPropagationVfxAtlasReady, this.presentationSettings.reducedFlash);
+        this.drawElitePackApproachFormationVfx(ctx);
         this.drawGoldenGoblinEventResponseIdentity(ctx);
         this.drawMythicTacticPrimedIcon(ctx);
         this.drawBossSpecialIntentCue(ctx);
         this.drawBossSafeResponseWindowConfirmation(ctx);
         // Preserve the residual-motion render contract: this.spells.render(ctx, residualMotion)
-        this.spells.render(ctx, residualMotion, this.battlefieldPropVfxAtlasImage, this.battlefieldPropVfxAtlasReady, this.heroProjectileVfxAtlasImage, this.heroProjectileVfxAtlasReady, this.heroSpellSignatureVfxAtlasImage, this.heroSpellSignatureVfxAtlasReady, this.heroUltimateSignatureVfxAtlasImage, this.heroUltimateSignatureVfxAtlasReady, this.persistentSpellZoneVfxAtlasImage, this.persistentSpellZoneVfxAtlasReady, this.crowdControlPropagationVfxAtlasImage, this.crowdControlPropagationVfxAtlasReady, this.presentationSettings.reducedFlash, this.ultimatePostImpactResidueVfxAtlasImage, this.ultimatePostImpactResidueVfxAtlasReady, this.presentationSettings.reducedMotion, this.presentation.quality, this.enemies.projectileImpactLabelBlockers(this.presentation.quality, this.presentationSettings.reducedFlash), this.hero.pos, this.bossArena.hazards.filter((hazard) => hazard.telegraph > 0).map((hazard) => ({ pos: hazard.pos, radius: hazard.radius })));
+        this.spells.render(ctx, residualMotion, this.battlefieldPropVfxAtlasImage, this.battlefieldPropVfxAtlasReady, this.heroProjectileVfxAtlasImage, this.heroProjectileVfxAtlasReady, this.heroSpellSignatureVfxAtlasImage, this.heroSpellSignatureVfxAtlasReady, this.heroUltimateSignatureVfxAtlasImage, this.heroUltimateSignatureVfxAtlasReady, this.persistentSpellZoneVfxAtlasImage, this.persistentSpellZoneVfxAtlasReady, this.crowdControlPropagationVfxAtlasImage, this.crowdControlPropagationVfxAtlasReady, this.presentationSettings.reducedFlash, this.ultimatePostImpactResidueVfxAtlasImage, this.ultimatePostImpactResidueVfxAtlasReady, this.presentationSettings.reducedMotion, this.presentation.quality, this.enemies.projectileImpactLabelBlockers(this.presentation.quality, this.presentationSettings.reducedFlash), this.hero.pos, this.bossArena.hazards.filter((hazard) => hazard.telegraph > 0).map((hazard) => ({ pos: hazard.pos, radius: hazard.radius })), false);
         this.drawFinalFormWorldVfx(ctx);
         this.drawFusionWorldVfx(ctx);
         this.drawEnemyStatusCues(ctx, secondaryMotion);
@@ -4075,7 +4127,7 @@ export class Game {
     }
     drawEnemyDefeatBodyTransitions(ctx) {
         this.enemyDefeatBodyTransitions = this.enemyDefeatBodyTransitions.filter((cue) => cue.until > this.elapsed);
-        for (const cue of this.enemyDefeatBodyTransitions) {
+        for (const cue of stableWorldYDepthOrdered(this.enemyDefeatBodyTransitions, (cue) => cue.death.y)) {
             const pose = cue.death.deathPose;
             if (!pose || !isEnemySpriteType(cue.death.type))
                 continue;
@@ -4130,7 +4182,7 @@ export class Game {
         if (!this.enemyCombatVfxAtlasReady || !this.enemyCombatVfxAtlasImage)
             return;
         const alphaCap = this.presentationSettings.reducedFlash ? 0.5 : 0.78;
-        for (const enemy of this.enemies.enemies) {
+        for (const enemy of stableWorldYDepthOrdered(this.enemies.enemies, (enemy) => enemy.pos.y)) {
             if (!enemy.alive || !isEnemyCombatVfxType(enemy.type) || enemy.hitFlash <= 0)
                 continue;
             const sprite = enemyCombatVfxSprite(enemy.type, 'hit');
@@ -4141,7 +4193,7 @@ export class Game {
             ctx.drawImage(this.enemyCombatVfxAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, enemy.pos.x - size / 2, enemy.pos.y - size / 2, size, size);
             ctx.restore();
         }
-        for (const burst of this.enemyDeathImageBursts) {
+        for (const burst of stableWorldYDepthOrdered(this.enemyDeathImageBursts, (burst) => burst.y)) {
             const duration = Math.max(0.001, burst.until - burst.startedAt);
             const progress = Math.max(0, Math.min(1, (this.elapsed - burst.startedAt) / duration));
             const sprite = enemyCombatVfxSprite(burst.type, 'death');
@@ -4490,7 +4542,7 @@ export class Game {
             return;
         const activeFinisherCount = this.enemyFinisherVfx.length;
         const finisherRank = new Map(this.enemyFinisherVfx.map((cue, index) => [cue, Math.max(0, this.enemyFinisherVfx.length - 1 - index)]));
-        for (const cue of this.enemyFinisherVfx) {
+        for (const cue of stableWorldYDepthOrdered(this.enemyFinisherVfx, (cue) => cue.y)) {
             const progress = 1 - Math.max(0, cue.ttl / cue.maxTtl);
             const state = progress < 0.38 ? 'burst' : 'afterglow';
             const sprite = enemyFinisherVfxSprite(cue.source, state);
@@ -4604,6 +4656,33 @@ export class Game {
             ctx.restore();
         }
     }
+    drawBattlefieldGameplayProps(ctx) {
+        if (!this.battlefieldGameplayPropsReady || !this.battlefieldGameplayPropsImage)
+            return;
+        const criticalThreat = this.hero.hp <= this.hero.maxHp * .30 || this.core.hp <= this.core.maxHp * .30;
+        const profile = battlefieldGameplayArtProfile(this.presentationSettings.reducedFlash, criticalThreat);
+        if (profile.propAlpha <= 0)
+            return;
+        ctx.save();
+        ctx.globalAlpha = profile.propAlpha;
+        for (const anchor of BATTLEFIELD_DECORATION_ANCHORS) {
+            const sprite = battlefieldGameplayPropSprite(anchor.kind);
+            const x = anchor.x * LOGICAL_WIDTH;
+            const y = anchor.y * LOGICAL_HEIGHT;
+            const size = anchor.size;
+            if (anchor.mirror) {
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.scale(-1, 1);
+                ctx.drawImage(this.battlefieldGameplayPropsImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, -size / 2, -size / 2, size, size);
+                ctx.restore();
+            }
+            else {
+                ctx.drawImage(this.battlefieldGameplayPropsImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, x - size / 2, y - size / 2, size, size);
+            }
+        }
+        ctx.restore();
+    }
     drawBattlefieldAtmosphereVfx(ctx) {
         const layerAlpha = this.worldVfxLayerAlpha('decorative');
         if (layerAlpha <= 0)
@@ -4636,6 +4715,63 @@ export class Game {
         ctx.globalAlpha = Math.min(this.presentationSettings.reducedFlash ? .08 : baseAlpha * .65 + stageBoost * .5, .15) * layerAlpha;
         ctx.drawImage(this.battlefieldDepthOverlayAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, -6 + driftX * .55, -4 + driftY * .45, LOGICAL_WIDTH + 12, LOGICAL_HEIGHT + 8);
         ctx.restore();
+    }
+    drawBattlefieldTerrainReadability(ctx) {
+        const liveEnemyCount = this.enemies.enemies.reduce((count, enemy) => count + (enemy.alive ? 1 : 0), 0);
+        const battlefieldStress = Math.max(0, Math.min(1, (liveEnemyCount + this.bossArena.hazards.length * 2 - 8) / 22));
+        const readability = battlefieldDepthTerrainPresentation({
+            battlefieldStress,
+            evolutionStage: this.terrain.evolutionStage,
+            reducedMotion: this.presentationSettings.reducedMotion,
+            reducedFlash: this.presentationSettings.reducedFlash,
+        });
+        const palette = this.terrain.currentLayout.palette;
+        const arenaTop = ARENA_MARGIN + 38;
+        const arenaWidth = LOGICAL_WIDTH - ARENA_MARGIN * 2;
+        const arenaHeight = LOGICAL_HEIGHT - ARENA_MARGIN * 2 - 38;
+        ctx.save();
+        const groundDepth = ctx.createRadialGradient(LOGICAL_WIDTH / 2, LOGICAL_HEIGHT / 2, LOGICAL_HEIGHT * 0.14, LOGICAL_WIDTH / 2, LOGICAL_HEIGHT / 2, LOGICAL_WIDTH * 0.5 * readability.ground.radiusScale);
+        groundDepth.addColorStop(0, `rgba(5,9,16,${readability.ground.centerAlpha.toFixed(3)})`);
+        groundDepth.addColorStop(1, `rgba(5,9,16,${readability.ground.edgeAlpha.toFixed(3)})`);
+        ctx.fillStyle = groundDepth;
+        ctx.fillRect(ARENA_MARGIN, arenaTop, arenaWidth, arenaHeight);
+        const lanePulse = 1 + Math.sin(this.elapsed * 0.72) * readability.lane.pulseAmplitude;
+        ctx.globalAlpha = readability.lane.alpha * lanePulse;
+        ctx.strokeStyle = palette.border;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([readability.lane.segmentLength, readability.lane.gapLength]);
+        ctx.lineDashOffset = -this.elapsed * 4 * readability.lane.pulseAmplitude;
+        const approachAnchors = [
+            { x: ARENA_MARGIN + 18, y: LOGICAL_HEIGHT * 0.32 },
+            { x: LOGICAL_WIDTH - ARENA_MARGIN - 18, y: LOGICAL_HEIGHT * 0.68 },
+            { x: LOGICAL_WIDTH * 0.34, y: arenaTop + 12 },
+            { x: LOGICAL_WIDTH * 0.66, y: LOGICAL_HEIGHT - ARENA_MARGIN - 12 },
+        ];
+        for (const anchor of approachAnchors) {
+            ctx.beginPath();
+            ctx.moveTo(anchor.x, anchor.y);
+            ctx.lineTo(this.core.pos.x, this.core.pos.y);
+            ctx.stroke();
+        }
+        ctx.setLineDash([]);
+        const foundation = ctx.createRadialGradient(this.core.pos.x, this.core.pos.y + 8, 10, this.core.pos.x, this.core.pos.y + 8, readability.core.foundationRadius);
+        foundation.addColorStop(0, 'rgba(6,11,18,.72)');
+        foundation.addColorStop(0.58, 'rgba(6,11,18,.30)');
+        foundation.addColorStop(1, 'rgba(6,11,18,0)');
+        ctx.globalAlpha = readability.core.foundationAlpha;
+        ctx.fillStyle = foundation;
+        ctx.beginPath();
+        ctx.ellipse(this.core.pos.x, this.core.pos.y + 10, readability.core.foundationRadius, readability.core.foundationRadius * 0.42, 0, 0, Math.PI * 2);
+        ctx.fill();
+        const corePulse = 1 + Math.sin(this.elapsed * 1.9) * readability.core.pulseAmplitude;
+        ctx.globalAlpha = readability.core.ringAlpha;
+        ctx.strokeStyle = palette.accent;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(this.core.pos.x, this.core.pos.y + 5, readability.core.ringRadius * corePulse, readability.core.ringRadius * 0.46 * corePulse, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+        return readability;
     }
     drawBossHealthPressure(ctx) {
         const boss = this.enemies.enemies.find((enemy) => enemy.alive && enemy.type === 'boss');
@@ -4825,31 +4961,32 @@ export class Game {
             const enemy = this.enemies.enemies.find((candidate) => candidate.id === cue.enemyId);
             if (!enemy)
                 continue;
-            ctx.globalAlpha = cue.style === 'support-ring' ? 0.42 : 0.78;
+            const handoff = cue.attackIntent ? attackResolutionHandoffPresentation(this.attackResolutionHandoffState, cue.attackIntent.key, this.elapsed, this.presentationSettings.reducedMotion, this.presentationSettings.reducedFlash) : { resolved: false, alphaScale: 1, sizeScale: 1 };
+            ctx.globalAlpha = (cue.style === 'support-ring' ? 0.42 : 0.78) * handoff.alphaScale;
             ctx.strokeStyle = cue.color;
-            ctx.lineWidth = cue.style === 'boss-ring' ? 5 : 3.5;
+            ctx.lineWidth = (cue.style === 'boss-ring' ? 5 : 3.5) * handoff.sizeScale;
             if (enemy.type === 'boss') {
                 const phase = bossPhaseForRatio(enemy.hp / Math.max(1, enemy.maxHp));
                 const pattern = bossPatternTelegraph(enemy.bossArchetype ?? 'inferno', phase);
                 ctx.strokeStyle = pattern.color;
-                ctx.globalAlpha = pattern.opacity;
+                ctx.globalAlpha = pattern.opacity * handoff.alphaScale;
                 if (pattern.style === 'lane') {
-                    ctx.lineWidth = Math.max(10, pattern.width * 0.12);
+                    ctx.lineWidth = Math.max(7, pattern.width * 0.12 * handoff.sizeScale);
                     ctx.beginPath();
                     ctx.moveTo(enemy.pos.x, enemy.pos.y);
                     ctx.lineTo(this.hero.pos.x, this.hero.pos.y);
                     ctx.stroke();
                 }
                 else {
-                    ctx.lineWidth = pattern.width;
+                    ctx.lineWidth = pattern.width * handoff.sizeScale;
                     ctx.beginPath();
-                    ctx.arc(enemy.pos.x, enemy.pos.y, pattern.radius, 0, Math.PI * 2);
+                    ctx.arc(enemy.pos.x, enemy.pos.y, pattern.radius * handoff.sizeScale, 0, Math.PI * 2);
                     ctx.stroke();
                 }
             }
             else {
                 ctx.beginPath();
-                ctx.arc(enemy.pos.x, enemy.pos.y, cue.radius, 0, Math.PI * 2);
+                ctx.arc(enemy.pos.x, enemy.pos.y, cue.radius * handoff.sizeScale, 0, Math.PI * 2);
                 ctx.stroke();
             }
         }
@@ -4922,6 +5059,22 @@ export class Game {
         grad.addColorStop(1, palette.edge);
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+        const gameplayArtCritical = this.hero.hp <= this.hero.maxHp * .30 || this.core.hp <= this.core.maxHp * .30;
+        const gameplayArtProfile = battlefieldGameplayArtProfile(this.presentationSettings.reducedFlash, gameplayArtCritical);
+        if (this.battlefieldGameplayBackdropReady && this.battlefieldGameplayBackdropImage) {
+            ctx.save();
+            ctx.globalAlpha = gameplayArtProfile.backdropAlpha;
+            ctx.filter = `saturate(${gameplayArtProfile.backdropSaturation})`;
+            ctx.drawImage(this.battlefieldGameplayBackdropImage, 0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+            ctx.filter = 'none';
+            const vignette = ctx.createRadialGradient(LOGICAL_WIDTH * .5, LOGICAL_HEIGHT * .5, LOGICAL_HEIGHT * .18, LOGICAL_WIDTH * .5, LOGICAL_HEIGHT * .5, LOGICAL_WIDTH * .62);
+            vignette.addColorStop(0, 'rgba(5,12,18,0)');
+            vignette.addColorStop(1, `rgba(5,12,18,${gameplayArtProfile.vignetteAlpha})`);
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = vignette;
+            ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+            ctx.restore();
+        }
         if (this.battlefieldEnvironmentAtlasReady && this.battlefieldEnvironmentAtlasImage) {
             const sprite = battlefieldEnvironmentSprite(this.terrain.currentLayout.id, this.terrain.evolutionStage);
             ctx.save();
@@ -5010,6 +5163,74 @@ export class Game {
         ctx.drawImage(this.bossSignatureVfxAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, -size / 2, -size / 2, size, size);
         ctx.restore();
     }
+    drawTerrainForegroundOcclusion(ctx) {
+        const liveActorCount = this.enemies.enemies.reduce((count, enemy) => count + (enemy.alive ? 1 : 0), 0);
+        const battlefieldStress = Math.max(Math.min(1, this.bossArena.hazards.length / 6), Math.min(1, Math.max(0, liveActorCount - 8) / 22));
+        const mapId = this.terrain.currentLayout.id;
+        const obstacleState = battlefieldObstacleStateForEvolution(this.terrain.evolutionStage);
+        const obstacleSprite = battlefieldObstacleStateVfxSprite(mapId, obstacleState);
+        const wallSprite = battlefieldPropSprite(mapId, 'wall');
+        const criticalThreatClassFor = (enemy) => enemy.type === 'boss' ? 'boss' : enemy.type === 'elite' ? 'elite' : enemy.type === 'shieldbearer' || enemy.type === 'assassin' || enemy.type === 'siegeGolem' || enemy.type === 'nullifier' ? 'specialist' : 'none';
+        const criticalThreats = this.enemies.enemies.filter((enemy) => enemy.alive && criticalThreatClassFor(enemy) !== 'none');
+        for (const wall of this.terrain.walls) {
+            const foreground = terrainForegroundOcclusionPresentation({
+                wallWidth: wall.w,
+                wallHeight: wall.h,
+                battlefieldStress,
+                reducedFlash: this.presentationSettings.reducedFlash,
+            });
+            const registration = terrainForegroundSpriteRegistration({
+                wallX: wall.x,
+                wallY: wall.y,
+                wallWidth: wall.w,
+                wallHeight: wall.h,
+                spriteCropRatio: foreground.spriteCropRatio,
+            });
+            let criticalThreatOcclusion = criticalThreatOcclusionArbitrationPresentation({ threatClass: 'none', overlap: 0 });
+            for (const enemy of criticalThreats) {
+                const threatClass = criticalThreatClassFor(enemy);
+                const overlap = criticalThreatWallCapOverlap({
+                    wallX: registration.capDrawX,
+                    wallY: registration.capDrawY,
+                    wallWidth: registration.capDrawWidth,
+                    capHeight: registration.capDrawHeight,
+                    threatX: enemy.pos.x,
+                    threatY: enemy.pos.y,
+                    threatRadius: enemy.radius,
+                });
+                if (overlap <= 0)
+                    continue;
+                const candidate = criticalThreatOcclusionArbitrationPresentation({ threatClass, overlap });
+                if (candidate.capAlphaScale < criticalThreatOcclusion.capAlphaScale)
+                    criticalThreatOcclusion = candidate;
+            }
+            const atlasImage = this.battlefieldObstacleStateVfxAtlasReady && this.battlefieldObstacleStateVfxAtlasImage
+                ? this.battlefieldObstacleStateVfxAtlasImage
+                : this.battlefieldPropVfxAtlasReady && this.battlefieldPropVfxAtlasImage
+                    ? this.battlefieldPropVfxAtlasImage
+                    : null;
+            const sprite = atlasImage === this.battlefieldObstacleStateVfxAtlasImage ? obstacleSprite : wallSprite;
+            ctx.save();
+            if (atlasImage) {
+                const sourceHeight = Math.max(1, sprite.sh * foreground.spriteCropRatio);
+                ctx.globalAlpha = foreground.capAlpha * criticalThreatOcclusion.capAlphaScale;
+                ctx.drawImage(atlasImage, sprite.sx, sprite.sy, sprite.sw, sourceHeight, registration.capDrawX, registration.capDrawY, registration.capDrawWidth, registration.capDrawHeight);
+            }
+            else {
+                ctx.globalAlpha = foreground.capAlpha * 0.48 * criticalThreatOcclusion.capAlphaScale;
+                ctx.fillStyle = this.terrain.currentLayout.palette.border;
+                ctx.fillRect(registration.capDrawX, registration.capDrawY, registration.capDrawWidth, registration.capDrawHeight);
+            }
+            ctx.globalAlpha = foreground.edgeAlpha * criticalThreatOcclusion.edgeAlphaScale;
+            ctx.strokeStyle = '#f4fbff';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(registration.capDrawX + 2, registration.capDrawY + 1);
+            ctx.lineTo(registration.capDrawX + Math.max(2, registration.capDrawWidth - 2), registration.capDrawY + 1);
+            ctx.stroke();
+            ctx.restore();
+        }
+    }
     drawTerrainSpriteOverlays(ctx, motion) {
         if (!this.battlefieldPropVfxAtlasReady || !this.battlefieldPropVfxAtlasImage)
             return;
@@ -5019,10 +5240,14 @@ export class Game {
         const obstacleSprite = battlefieldObstacleStateVfxSprite(mapId, obstacleState);
         const crystalSprite = battlefieldPropSprite(mapId, 'crystal');
         for (const wall of this.terrain.walls) {
-            const drawWidth = Math.max(wall.w + 18, 72);
-            const drawHeight = Math.max(wall.h + 18, 72);
-            const dx = wall.x + wall.w / 2 - drawWidth / 2;
-            const dy = wall.y + wall.h / 2 - drawHeight / 2;
+            const registration = terrainForegroundSpriteRegistration({
+                wallX: wall.x,
+                wallY: wall.y,
+                wallWidth: wall.w,
+                wallHeight: wall.h,
+                spriteCropRatio: 0,
+            });
+            const { drawX: dx, drawY: dy, drawWidth, drawHeight } = registration;
             ctx.save();
             ctx.globalAlpha = 0.92;
             if (this.battlefieldObstacleStateVfxAtlasReady && this.battlefieldObstacleStateVfxAtlasImage) {
@@ -5081,7 +5306,8 @@ export class Game {
             this.coreGuardPressureVectorLastAt = this.elapsed;
             pressureVector = this.coreGuardPressureVectorHysteresisState.vector ?? pressureVector;
         }
-        this.survivalResponseVfx.push({ kind, x: target.x, y: target.y, ttl: maxTtl, maxTtl, ...(metadata?.mitigationRatio !== undefined ? { mitigationRatio: metadata.mitigationRatio } : {}), ...(damageSource ? { damageSource } : {}), ...(mixedPressure ? { mixedPressure: true } : {}), ...(pressureVector ? { pressureVector: { ...pressureVector } } : {}) });
+        const attackerLabel = kind === 'coreHit' ? metadata?.coreAttackAttribution?.label : undefined;
+        this.survivalResponseVfx.push({ kind, x: target.x, y: target.y, ttl: maxTtl, maxTtl, ...(metadata?.mitigationRatio !== undefined ? { mitigationRatio: metadata.mitigationRatio } : {}), ...(damageSource ? { damageSource } : {}), ...(mixedPressure ? { mixedPressure: true } : {}), ...(pressureVector ? { pressureVector: { ...pressureVector } } : {}), ...(attackerLabel ? { attackerLabel } : {}) });
         if (this.survivalResponseVfx.length > 12)
             this.survivalResponseVfx.splice(0, this.survivalResponseVfx.length - 12);
     }
@@ -5208,6 +5434,18 @@ export class Game {
             ctx.globalAlpha = Math.min(this.presentationSettings.reducedFlash ? .48 : .82, t * (cue.kind === 'coreHit' ? .78 : .92)) * arbitrationAlphaScale;
             ctx.drawImage(this.survivalResponseVfxAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, cue.x - drawW / 2, cue.y - drawH / 2, drawW, drawH);
             ctx.restore();
+            if (cue.kind === 'coreHit' && cue.attackerLabel && arbitrationAlphaScale > 0) {
+                ctx.save();
+                ctx.globalAlpha = Math.min(this.presentationSettings.reducedFlash ? .38 : .66, t * .72) * arbitrationAlphaScale;
+                ctx.fillStyle = '#d9f8ff';
+                ctx.font = '800 11px system-ui';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.shadowColor = 'rgba(0,0,0,.72)';
+                ctx.shadowBlur = this.presentationSettings.reducedFlash ? 2 : 5;
+                ctx.fillText(cue.attackerLabel, cue.x, cue.y - 54 * arbitrationSizeScale);
+                ctx.restore();
+            }
         }
     }
     queueFreezeShatterVfx(type, x, y) {
@@ -5219,7 +5457,7 @@ export class Game {
     drawFreezeShatterVfx(ctx) {
         if (!this.freezeControlVfxAtlasReady || !this.freezeControlVfxAtlasImage)
             return;
-        for (const cue of this.freezeShatterVfx) {
+        for (const cue of stableWorldYDepthOrdered(this.freezeShatterVfx, (cue) => cue.y)) {
             const sprite = freezeControlVfxSprite(cue.enemyClass, 'shatter'), t = Math.max(0, Math.min(1, cue.ttl / cue.maxTtl)), progress = 1 - t, base = cue.enemyClass === 'boss' ? 164 : cue.enemyClass === 'elite' ? 126 : cue.enemyClass === 'specialist' ? 104 : 88, size = base * (1 + progress * .28);
             ctx.save();
             ctx.globalAlpha = Math.min(this.presentationSettings.reducedFlash ? .5 : .84, t * .92);
@@ -5491,12 +5729,12 @@ export class Game {
         ctx.fillStyle = 'rgba(4,8,15,.72)';
         ctx.fillRect(18, 114, 440, this.hero.profileId === 'kain' ? 48 : 28);
         const meterRatio = this.heroMeter.activeTimer > 0 ? 1 : this.heroMeter.charge;
-        this.drawHeroMeterIdentityHud(ctx, 101, 116, 22);
-        this.drawBar(ctx, 132, 122, 290, 10, meterRatio, meterLabel.color, '#211b35');
+        this.drawHeroMeterIdentityHud(ctx, 236, 116, 22);
+        this.drawBar(ctx, 268, 122, 154, 10, meterRatio, meterLabel.color, '#211b35');
         ctx.fillStyle = meterLabel.color;
         ctx.font = '800 12px system-ui';
         if (density.showMeterText && ((focus.showMeterText && ultraHudFocus.showMeterText) || this.heroMeter.activeTimer > 0))
-            ctx.fillText(this.heroMeter.activeTimer > 0 ? `${meterLabel.activeName} ${this.heroMeter.activeTimer.toFixed(1)}s` : `${meterLabel.name} ${Math.round(this.heroMeter.charge * 100)}%`, 34, 134);
+            ctx.fillText(this.heroMeter.activeTimer > 0 ? `${meterLabel.activeName} ${this.heroMeter.activeTimer.toFixed(1)}s` : `${meterLabel.name} ${Math.round(this.heroMeter.charge * 100)}%`, 34, 134, 190);
         if (this.hero.profileId === 'kain') {
             this.drawBar(ctx, 132, 145, 290, 7, this.kainOverload, '#a88cff', '#211b35');
             if (density.showMeterText && focus.showMeterText && ultraHudFocus.showMeterText) {
@@ -6207,6 +6445,8 @@ export class Game {
             ctx.fill();
         }
         for (const button of ACTION_BUTTONS) {
+            if (button.id === 'auto' && !this.input.autoModeVisible)
+                continue;
             const held = this.input.isHeld(button.id);
             const unavailableShop = button.id === 'shop' && this.shopTokens <= 0;
             const autoActive = button.id === 'auto' && this.autoCastNormal;
@@ -6324,6 +6564,8 @@ export class Game {
         }
         else if (event.id === 'supplyDrop') {
             this.supplyCrate = fieldEventArenaPosition();
+            this.supplyCrateOffer = null;
+            this.supplyCrateBlocked = false;
             anchor = { id: event.id, x: this.supplyCrate.x, y: this.supplyCrate.y };
         }
         else if (event.id === 'eliteRush') {
@@ -6364,17 +6606,23 @@ export class Game {
             return;
         if (distance(this.hero.pos, this.supplyCrate) > this.hero.radius + 58)
             return;
-        if (Math.random() < 0.45) {
+        if (!this.supplyCrateOffer && Math.random() < 0.45) {
             this.equipmentState = { ...this.equipmentState, healingPotions: this.equipmentState.healingPotions + 1 };
             this.showTacticalStatusEventToast('보급 획득 · 체력 물약 +1', 'supplyDrop');
         }
         else {
             const equipmentOffers = generateShopOffers().filter((offer) => offer.kind !== 'potion');
-            const offer = equipmentOffers[Math.floor(Math.random() * equipmentOffers.length)] ?? equipmentOffers[0];
+            const offer = this.supplyCrateOffer ?? equipmentOffers[Math.floor(Math.random() * equipmentOffers.length)] ?? equipmentOffers[0];
             if (offer) {
-                const result = purchaseOffer(this.equipmentState, { ...offer, price: 0 });
-                if (result.ok)
-                    this.equipmentState = result.state;
+                this.supplyCrateOffer = offer;
+                const result = purchaseOffer(this.equipmentState, { ...offer, price: 0, basePrice: 0 }, this.elapsed);
+                if (!result.ok) {
+                    if (!this.supplyCrateBlocked)
+                        this.showTacticalStatusEventToast(`보급 대기 · ${result.message}`, 'supplyDrop');
+                    this.supplyCrateBlocked = true;
+                    return;
+                }
+                this.equipmentState = result.state;
                 this.showTacticalStatusEventToast(`무료 보급 · ${offer.name}`, 'supplyDrop');
             }
         }
@@ -9177,12 +9425,18 @@ export class Game {
         this.paused = true;
         this.rerollsThisVisit = 0;
         this.shopImpactMessage = '';
+        this.shopAccessoryChoice = null;
+        this.shopActiveTab = 'purchase';
+        this.shopSelectedStackKey = null;
         this.shopOffers = generateShopOffers();
         this.refreshShopOverlay();
     }
     refreshShopOverlay() {
-        const guidance = shopGuidanceForOffers(this.shopOffers, { heroId: this.hero.profileId, archetype: this.currentBuildArchetype(), state: this.equipmentState });
-        const quickOffer = quickShopRecommendation(this.shopOffers, guidance, this.equipmentState);
+        this.shopOffers = priceShopOffers(ensureEquippedOffers(this.shopOffers, this.equipmentState, this.shopAccessoryChoice), this.equipmentState, this.elapsed);
+        const guidanceContext = { heroId: this.hero.profileId, archetype: this.currentBuildArchetype(), state: this.equipmentState, elapsedSeconds: this.elapsed, heroMaxHp: this.hero.maxHp, permanentRecipeDiscoveries: this.metaProfile.discoveredEquipmentRecipes };
+        const guidance = shopGuidanceForOffers(this.shopOffers, { heroId: this.hero.profileId, archetype: this.currentBuildArchetype(), state: this.equipmentState, elapsedSeconds: this.elapsed, heroMaxHp: this.hero.maxHp, permanentRecipeDiscoveries: this.metaProfile.discoveredEquipmentRecipes });
+        const topRecommendations = shopTopRecommendations(this.shopOffers, guidanceContext, guidance);
+        const quickOffer = quickShopRecommendation(this.shopOffers, guidance, this.equipmentState, topRecommendations);
         const openingFastPath = openingShopFastPath(this.elapsed, Boolean(quickOffer));
         const repeatFast = repeatShopFastPath(this.elapsed, quickOffer, this.equipmentState);
         const lateFast = lateShopFastPath(this.elapsed, quickOffer, this.equipmentState);
@@ -9190,31 +9444,75 @@ export class Game {
         const fastPath = promotedFast.promoteQuickBuy
             ? { promoteQuickBuy: true, position: 'before-grid', estimatedPointerTravelReduction: promotedFast.estimatedPointerTravelReduction, newControlCount: 0 }
             : openingFastPath;
-        const model = { state: this.equipmentState, offers: this.shopOffers, rerollPrice: rerollCost(this.rerollsThisVisit), guidance, impactMessage: this.shopImpactMessage, quickOffer, fastPath };
-        const purchase = (offer, closeAfterPurchase = false) => {
+        const readinessContext = { elapsedSeconds: this.elapsed, heroMaxHp: this.hero.maxHp, state: this.equipmentState };
+        const model = { ...readinessContext, activeTab: this.shopActiveTab, selectedStackKey: this.shopSelectedStackKey,
+            permanentRecipeDiscoveries: this.metaProfile.discoveredEquipmentRecipes,
+            recipes: recipesForOwnedItems(this.equipmentState, this.metaProfile.discoveredEquipmentRecipes),
+            readiness: equipmentReadiness(readinessContext), offers: this.shopOffers, rerollPrice: rerollCost(this.rerollsThisVisit), guidance, topRecommendations, impactMessage: this.shopImpactMessage, quickOffer, fastPath };
+        const applyEquipmentTransaction = (result) => {
+            if (!result.ok) {
+                this.shopImpactMessage = result.message;
+                this.refreshShopOverlay();
+                return false;
+            }
             const beforeState = this.equipmentState;
-            const beforeWeaponLegendary = this.equipmentState.weapon?.legendary ?? false;
-            const beforeArmorLegendary = this.equipmentState.armor?.legendary ?? false;
-            const result = purchaseOffer(this.equipmentState, offer);
-            if (!result.ok)
-                return;
             this.equipmentState = result.state;
-            this.shopImpactMessage = purchaseImpactFeedback(beforeState, result.state, offer).message;
-            const becameLegendary = (!beforeWeaponLegendary && (result.state.weapon?.legendary ?? false)) || (!beforeArmorLegendary && (result.state.armor?.legendary ?? false));
+            if (result.newlyDiscoveredRecipeId) {
+                this.recordEquipmentRecipeDiscovery(result.newlyDiscoveredRecipeId);
+            }
+            const messages = { 'Item equipped.': '장비를 장착했습니다.', 'Item sold.': '장비 1개를 판매했습니다.' };
+            this.shopImpactMessage = `${messages[result.message] ?? result.message} · ${projectEquipmentSurvival({ elapsedSeconds: this.elapsed, heroMaxHp: this.hero.maxHp, state: beforeState }, result.state).summary}`;
+            if (this.shopSelectedStackKey && !this.shopSelectedStackKey.startsWith('equipped:')
+                && !result.state.inventory.some(stack => inventoryStackKey(stack.id, stack.rank) === this.shopSelectedStackKey))
+                this.shopSelectedStackKey = null;
+            const becameLegendary = ['weapon', 'armor', 'accessory'].some(kind => !beforeState[kind]?.legendary && result.state[kind]?.legendary);
             this.audio.play(becameLegendary ? 'legendary' : 'purchase');
             this.syncEquipmentState();
+            this.refreshShopOverlay();
+            return true;
+        };
+        const purchase = (offer, closeAfterPurchase = false) => {
+            const beforeState = this.equipmentState;
+            const result = purchaseOffer(this.equipmentState, offer, this.elapsed);
+            if (!applyEquipmentTransaction(offer.kind === 'potion' && result.ok ? { ...result, message: purchaseImpactFeedback(beforeState, result.state, offer).message } : result))
+                return;
             if (closeAfterPurchase) {
                 this.shopOverlay.hide();
                 this.paused = false;
                 return;
             }
-            this.refreshShopOverlay();
         };
         const handlers = {
+            onTabChange: (tab) => { this.shopActiveTab = tab; this.refreshShopOverlay(); },
+            onSelectStack: (stackKey) => { this.shopSelectedStackKey = stackKey; this.refreshShopOverlay(); },
+            onEquip: (stackKey) => {
+                const stack = this.equipmentState.inventory.find(item => inventoryStackKey(item.id, item.rank) === stackKey);
+                const result = equipInventoryStack(this.equipmentState, stackKey);
+                if (result.ok && stack)
+                    this.shopSelectedStackKey = `equipped:${stack.kind}`;
+                applyEquipmentTransaction(result);
+            },
+            onStrengthen: (target) => {
+                const stack = target.place === 'inventory' ? this.equipmentState.inventory.find(item => inventoryStackKey(item.id, item.rank) === target.stackKey) : null;
+                const result = strengthenEquipment(this.equipmentState, target, this.elapsed);
+                if (result.ok && stack)
+                    this.shopSelectedStackKey = inventoryStackKey(stack.id, stack.rank + 1);
+                applyEquipmentTransaction(result);
+            },
+            onCombine: (recipeId) => { applyEquipmentTransaction(combineEquipment(this.equipmentState, recipeId)); },
+            onSell: (stackKey) => {
+                const stack = this.equipmentState.inventory.find(item => inventoryStackKey(item.id, item.rank) === stackKey);
+                const definition = stack ? equipmentDefinition(stack.id) : null;
+                applyEquipmentTransaction(definition ? sellInventoryStack(this.equipmentState, stackKey, definition.basePrice ?? definition.price)
+                    : { ok: false, state: this.equipmentState, message: '판매할 장비를 찾을 수 없습니다.' });
+            },
+            onAccessoryChange: (id) => { this.shopAccessoryChoice = id; this.refreshShopOverlay(); },
             onPurchase: (offer) => purchase(offer, false),
             onQuickPurchase: (offer) => {
-                const currentGuidance = shopGuidanceForOffers(this.shopOffers, { heroId: this.hero.profileId, archetype: this.currentBuildArchetype(), state: this.equipmentState });
-                const currentQuick = quickShopRecommendation(this.shopOffers, currentGuidance, this.equipmentState);
+                const currentContext = { heroId: this.hero.profileId, archetype: this.currentBuildArchetype(), state: this.equipmentState, elapsedSeconds: this.elapsed, heroMaxHp: this.hero.maxHp, permanentRecipeDiscoveries: this.metaProfile.discoveredEquipmentRecipes };
+                const currentGuidance = shopGuidanceForOffers(this.shopOffers, { heroId: this.hero.profileId, archetype: this.currentBuildArchetype(), state: this.equipmentState, elapsedSeconds: this.elapsed, heroMaxHp: this.hero.maxHp, permanentRecipeDiscoveries: this.metaProfile.discoveredEquipmentRecipes });
+                const currentTopRecommendations = shopTopRecommendations(this.shopOffers, currentContext, currentGuidance);
+                const currentQuick = quickShopRecommendation(this.shopOffers, currentGuidance, this.equipmentState, currentTopRecommendations);
                 if (!currentQuick || currentQuick.id !== offer.id || currentQuick.kind !== offer.kind || currentQuick.price !== offer.price || !safeQuickPurchase(offer, this.shopOffers, this.equipmentState))
                     return;
                 purchase(offer, true);
@@ -9233,7 +9531,7 @@ export class Game {
             onClose: () => { this.shopOverlay.hide(); this.paused = false; },
         };
         if (this.shopOverlay.isOpen)
-            this.shopOverlay.refresh(model);
+            this.shopOverlay.refresh(model, handlers);
         else
             this.shopOverlay.open(model, handlers);
     }
@@ -9479,6 +9777,10 @@ export class Game {
             // Persistent storage is optional; a run should never fail because the browser blocks it.
         }
     }
+    recordEquipmentRecipeDiscovery(recipeId) {
+        this.metaProfile = discoverEquipmentRecipe(this.metaProfile, recipeId);
+        this.saveStoredMetaProfile();
+    }
     loadStoredRunSnapshot() {
         try {
             return typeof window === 'undefined' ? null : loadRunSnapshotWithJournal(this.storage);
@@ -9545,7 +9847,7 @@ export class Game {
         this.core.hp = Math.min(this.core.maxHp, snapshot.coreHp);
         for (const id of Object.keys(snapshot.spellLevels))
             this.spells.levels[id] = snapshot.spellLevels[id];
-        this.equipmentState = structuredClone(snapshot.equipment);
+        this.equipmentState = refreshEquipmentPowers(structuredClone(snapshot.equipment));
         this.activeRelic = snapshot.relic;
         this.fusionRuntime.restore(snapshot.fusions);
         this.fateRuntime.restore(snapshot.fateChoices);

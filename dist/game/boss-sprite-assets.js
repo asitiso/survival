@@ -6,9 +6,9 @@ export const BOSS_SPRITE_ATLAS = {
     src: './assets/bosses/boss-sprites.png',
     columns: 3,
     rows: 2,
-    cellSize: 256,
-    width: 768,
-    height: 512,
+    cellSize: 512,
+    width: 1536,
+    height: 1024,
 };
 const CELL_BY_ARCHETYPE = {
     inferno: [0, 0],
@@ -19,12 +19,12 @@ const CELL_BY_ARCHETYPE = {
     timeEater: [2, 1],
 };
 const SIZE_SCALE = {
-    inferno: 2.44,
-    summoner: 2.34,
-    juggernaut: 2.5,
-    abyssWitch: 2.38,
-    twinMaw: 2.42,
-    timeEater: 2.38,
+    inferno: 2.68,
+    summoner: 2.62,
+    juggernaut: 2.72,
+    abyssWitch: 2.64,
+    twinMaw: 2.67,
+    timeEater: 2.64,
 };
 export function bossSpriteRect(archetype) {
     const [column, row] = CELL_BY_ARCHETYPE[archetype];
@@ -43,6 +43,10 @@ export function bossSpritePresentation(archetype, radius, atlasReady) {
         motionAmplitude: 0,
         drawSize: Math.round(safeRadius * SIZE_SCALE[archetype]),
         fallbackBodyVisible: true,
+        bodyAlpha: atlasReady ? 0.10 : 1,
+        groundShadowScale: atlasReady ? 1.22 : 1,
+        groundShadowAlphaBoost: atlasReady ? 0.10 : 0,
+        imageShadowBlur: atlasReady ? 12 : 0,
     };
 }
 export function auditBossSpriteAtlas(archetypes) {

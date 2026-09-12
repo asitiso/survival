@@ -4,7 +4,7 @@ import { focusFourEightHourBossRewards } from './four-eight-hour-reward-focus.js
 import { fourEightHourToastFocus } from './four-eight-hour-toast-focus.js';
 import { fourEightHourPriorityFocus, priorityBuildLabels } from './four-eight-hour-priority-focus.js';
 export interface FourEightHourFlowHealthAudit{samples:number;childAuditCount:4;shopSilenceCoverage:number;rewardScanCoverage:number;toastSilenceCoverage:number;priorityPreservationCoverage:number;maxCombatStatInflation:0;estimatedDecisionPauseReduction:number;actionCount:9;snapshotMutation:false;economyMutation:false;criticalInfoPreserved:true;finalFormIdentityPreserved:true;autoRewardSelection:false;passed:boolean;}
-const equipment:EquipmentState={coins:9000,weapon:{id:'arcane-staff',kind:'weapon',name:'Arcane',rank:5,power:.15,legendary:true},armor:{id:'iron-robe',kind:'armor',name:'Robe',rank:5,power:.08,legendary:true},healingPotions:3};
+const equipment:EquipmentState={coins:9000,weapon:{id:'arcane-staff',kind:'weapon',name:'Arcane',rank:5,power:.15,legendary:true},armor:{id:'iron-robe',kind:'armor',name:'Robe',rank:5,power:.08,legendary:true},healingPotions:3,inventory:[],discoveredRecipes:[]};
 const rewards=[{kind:'relic' as const,id:'relic:chrono-shard' as const,relicId:'chrono-shard' as const,title:'Time Gear',description:'swap',accent:'#fff',best:false},{kind:'upgrade' as const,id:'meteorStorm' as const,title:'Meteor',description:'grow',accent:'#fff',best:true},{kind:'upgrade' as const,id:'spellPower' as const,title:'Power',description:'grow',accent:'#fff',best:false}];
 function round(v:number){return Math.round(v*1000)/1000;}
 export function auditFourEightHourFlowHealth():FourEightHourFlowHealthAudit{

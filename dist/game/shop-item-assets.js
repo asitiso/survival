@@ -10,12 +10,22 @@ export const SHOP_ITEM_IDS = [
     'healing-potion',
 ];
 export const SHOP_ITEM_ATLAS = {
-    src: './assets/ui/shop-items.png',
+    src: './assets/ui/shop-items-enhanced.png',
     columns: 3,
     rows: 3,
-    cellSize: 128,
-    width: 384,
-    height: 384,
+    cellSize: 418,
+    width: 1254,
+    height: 1254,
+};
+export const FORGE_ITEM_ATLAS = {
+    src: './assets/ui/equipment-forge-items.png',
+    columns: 3,
+    rows: 3,
+};
+const FORGE_CELL_BY_ITEM = {
+    'arcane-accelerator': [0, 0], 'alchemical-blast-staff': [1, 0], 'celestial-fusion-staff': [2, 0],
+    'wind-iron-armor': [0, 1], 'gravity-guardian-armor': [1, 1], 'world-tree-armor': [2, 1],
+    'thunder-wisdom-seal': [0, 2], 'golden-bastion-talisman': [1, 2], 'fate-core': [2, 2],
 };
 const CELL_BY_ITEM = {
     'arcane-staff': [0, 0],
@@ -42,6 +52,11 @@ export function shopItemIconSprite(id) {
         sh: SHOP_ITEM_ATLAS.cellSize,
     };
 }
+export const ACCESSORY_ICON_POSITIONS = {
+    'sage-amulet': '0% 0%', 'storm-ring': '100% 0%',
+    'bastion-talisman': '0% 100%', 'fortune-charm': '100% 100%',
+};
+export function accessoryIconPosition(id) { return ACCESSORY_ICON_POSITIONS[id] ?? null; }
 export function shopItemIconBackgroundPosition(id) {
     if (!isShopItemAssetId(id))
         return '50% 50%';
@@ -51,8 +66,22 @@ export function shopItemIconBackgroundPosition(id) {
     return `${x}% ${y}%`;
 }
 export function shopItemIconPresentation(id) {
-    const visible = isShopItemAssetId(id);
+    const visible = isShopItemAssetId(id) || accessoryIconPosition(id) !== null;
     return { visible, animated: false, motionAmplitude: 0, size: 48, compactSize: 38 };
+}
+export function equipmentIconPresentation(id) {
+    const craftedCell = FORGE_CELL_BY_ITEM[id];
+    if (craftedCell) {
+        const [column, row] = craftedCell;
+        return { visible: true, source: FORGE_ITEM_ATLAS.src,
+            position: `${column * 50}% ${row * 50}%`, backgroundSize: '300% 300%' };
+    }
+    const accessory = accessoryIconPosition(id);
+    if (accessory)
+        return { visible: true, source: './assets/ui/shop-accessories.png', position: accessory, backgroundSize: '200% 200%' };
+    if (isShopItemAssetId(id))
+        return { visible: true, source: SHOP_ITEM_ATLAS.src, position: shopItemIconBackgroundPosition(id), backgroundSize: '300% 300%' };
+    return { visible: false, source: '', position: '50% 50%', backgroundSize: '100% 100%' };
 }
 export function auditShopItemAtlas(itemIds) {
     const missing = [];

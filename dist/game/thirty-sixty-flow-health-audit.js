@@ -3,7 +3,7 @@ import { lateShopFastPath } from './late-shop-fast-path.js';
 import { completedBuildHudFocus } from './completed-build-hud-focus.js';
 import { reduceRepeatBossRewardDecision } from './repeat-boss-reward-guidance.js';
 const HEROES = ['arkan', 'seria', 'kain', 'edric'];
-const equipment = { coins: 2200, weapon: { id: 'arcane-staff', kind: 'weapon', name: 'Arcane', rank: 4, power: .15, legendary: false }, armor: { id: 'iron-robe', kind: 'armor', name: 'Robe', rank: 4, power: .08, legendary: false }, healingPotions: 3 };
+const equipment = { coins: 2200, weapon: { id: 'arcane-staff', kind: 'weapon', name: 'Arcane', rank: 4, power: .15, legendary: false }, armor: { id: 'iron-robe', kind: 'armor', name: 'Robe', rank: 4, power: .08, legendary: false }, healingPotions: 3, inventory: [], discoveredRecipes: [] };
 const offer = { kind: 'weapon', id: 'arcane-staff', name: 'Arcane', description: '', accent: '#fff', price: 600, power: .15 };
 const rewardChoices = [{ kind: 'relic', id: 'relic:chrono-shard', relicId: 'chrono-shard', title: 'Time Gear', description: 'swap', accent: '#fff', best: false, badge: '유물 교체', hint: '교체' }, { kind: 'upgrade', id: 'meteorStorm', title: 'Meteor', description: 'grow', accent: '#fff', best: true, badge: '궁극기 성장', hint: '성장' }, { kind: 'upgrade', id: 'spellPower', title: 'Power', description: 'grow', accent: '#fff', best: false, badge: '기본 성장', hint: '성장' }];
 const levels = { fireBolt: 10, chainLightning: 10, frostNova: 10, flameField: 10, meteorStorm: 4, blackHole: 4 };

@@ -18,7 +18,7 @@ test('phase 2306 map evolution toast uses actual projection delta and clears sta
   assert.match(game,/showBattlefieldEvolutionToast[\s\S]{0,650}projectBattlefieldEvolutionImpact/);
   assert.match(game,/battlefieldEvolutionImpactHint/);
   assert.match(game,/eventToastBattlefieldEvolutionProjection\s*=\s*null/);
-  const body=game.match(/private showEventToast\([\s\S]*?\n  }\n\n  private showHeroMeterEventToast/)?.[0]??'';assert.match(body,/this\.eventToastBattlefieldEvolutionProjection\s*=\s*null/);
+  const body=game.match(/private showEventToast\([\s\S]*?\r?\n  }\r?\n\r?\n  private showHeroMeterEventToast/)?.[0]??'';assert.match(body,/this\.eventToastBattlefieldEvolutionProjection\s*=\s*null/);
 });
 
 test('phase 2307 freezes map timing geometry mechanics actions and snapshot schema',()=>{

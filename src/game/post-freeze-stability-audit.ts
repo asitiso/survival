@@ -20,7 +20,7 @@ function sample(savedAt:number,elapsed:number):RunSnapshot {
   return {version:1,savedAt,heroId:'arkan',traitId:'destruction',threatLevel:5,elapsed,
     hero:{level:20,xp:100,xpNext:200,hp:500,maxHp:600,coins:250,kills:800},coreHp:700,
     spellLevels:{fireBolt:3,chainLightning:3,frostNova:3,flameField:3,meteorStorm:2,blackHole:2},
-    equipment:{coins:250,weapon:null,armor:null,healingPotions:1},relic:null,fusions:[],fateChoices:[],
+    equipment:{coins:250,weapon:null,armor:null,healingPotions:1,inventory:[],discoveredRecipes:[]},relic:null,fusions:[],fateChoices:[],
     map:{id:'ruinedGate',evolutionStage:1},progression:{bossesKilled:5,goldEarned:2500,shopTokens:1}};
 }
 

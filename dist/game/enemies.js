@@ -1,3 +1,4 @@
+import { equipmentEnemyPressure } from '../domain/equipment-progression.js';
 import { distance, normalize } from '../core/math.js';
 import { ARENA_MARGIN, LOGICAL_HEIGHT, LOGICAL_WIDTH } from './config.js';
 import { directorSnapshot } from '../domain/director.js';
@@ -13,6 +14,8 @@ import { activeMythicTacticAttackLink } from './endless/mythic-tactic-attack-lin
 import { enemySpritePresentation, enemySpriteRect, isEnemySpriteType } from './enemy-sprite-assets.js';
 import { bossSpritePresentation, bossSpriteRect } from './boss-sprite-assets.js';
 import { advanceFrenziedThresholdLifecycle, advanceSwiftCadenceLifecycle, eliteAffixIdentityEmphasis, eliteAffixIdentityIcon, eliteAffixIdentityRowLayout, frenziedThresholdDensityPresentation, frenziedThresholdPresentation, swiftCadenceDensityPresentation, swiftCadencePresentation, swiftStrikeOwnershipPresentation } from './elite-affix-identity-assets.js';
+import { advanceEliteAffixCueOwnership, eliteAffixCueLayerPresentation } from './elite-affix-cue-arbitration.js';
+import { advanceEliteAffixCueLane, eliteAffixCueDesiredLane, eliteAffixCueLanePresentation } from './elite-affix-cue-lanes.js';
 import { isSpecialistIntentType, specialistIntentEmphasis, specialistIntentIcon, specialistIntentOnBodyLayout } from './specialist-intent-identity-assets.js';
 import { projectileImpactSourceContinuity } from './projectile-impact-source-continuity.js';
 import { projectileImpactClusters } from './projectile-impact-cluster-compression.js';
@@ -34,6 +37,8 @@ import { enemyTargetPressureClassForEnemyType, enemyTargetPressureVfxSprite, ene
 import { specialistReactionLifecycleVfxSprite } from './specialist-reaction-lifecycle-vfx-assets.js';
 import { advanceEnemyMotionRenderState, enemyMotionRenderPresentation } from './enemy-motion-rendering.js';
 import { enemyAttackMotionPresentation } from './enemy-attack-motion-rendering.js';
+import { enemySpriteActionPresentation } from './enemy-sprite-action-readability.js';
+import { enemyActorDepthOrdered } from './enemy-actor-depth-ordering.js';
 import { advanceEnemyAttackResolveState, enemyAttackResolvePresentation } from './enemy-attack-resolve-rendering.js';
 import { bossLocomotionWeightPresentation } from './boss-locomotion-weight-rendering.js';
 import { advanceSpecialistLocomotionSignatureState, specialistLocomotionSignaturePresentation } from './specialist-locomotion-signature-rendering.js';
@@ -90,6 +95,7 @@ import { coreContactGuardMemoryPresentation } from './core-contact-guard-memory-
 import { advanceCoreMixedPressureGuardArbitration, coreMixedPressureGuardArbitrationPresentation, createCoreMixedPressureGuardArbitrationState } from './core-mixed-pressure-guard-arbitration-rendering.js';
 import { bossSpecialLaunchOriginPresentation } from './boss-special-launch-origin-rendering.js';
 import { characterGroundContactPresentation, characterHitRecoilPresentation } from './character-contact-recoil-rendering.js';
+import { actorGroundingDepthPresentation } from './actor-grounding-depth-separation.js';
 import { characterMotionLayerBudgetPresentation } from './character-motion-layer-budget-rendering.js';
 import { characterSilhouetteDirectionOwnerPresentation } from './character-silhouette-direction-owner-rendering.js';
 import { characterSilhouetteDirectionPivotPresentation } from './character-silhouette-direction-pivot-rendering.js';
@@ -138,15 +144,16 @@ const BASE = {
     elite: { hp: 380, speed: 76, radius: 34, damage: 24, xp: 60, gold: 55, attackInterval: 0.86, preferredRange: 0, color: '#e8bc55' },
     boss: { hp: 2100, speed: 46, radius: 58, damage: 36, xp: 260, gold: 320, attackInterval: 0.72, preferredRange: 0, color: '#ff4f63' },
 };
-export function enemyStats(type, danger) {
+export function enemyStats(type, danger, elapsedSeconds) {
+    const equipmentPressure = elapsedSeconds === undefined ? { health: 1, damage: 1 } : equipmentEnemyPressure(elapsedSeconds);
     const base = BASE[type];
     const d = Math.max(1, danger);
     const bossScale = type === 'boss' ? 1 + (d - 1) * 0.11 : 1;
     const eliteScale = type === 'elite' ? 1 + (d - 1) * 0.06 : 1;
     return {
         ...base,
-        hp: Math.round(base.hp * (1 + (d - 1) * 0.14) * bossScale * eliteScale),
-        damage: base.damage * (1 + (d - 1) * 0.08),
+        hp: Math.round(base.hp * (1 + (d - 1) * 0.14) * bossScale * eliteScale * equipmentPressure.health),
+        damage: base.damage * (1 + (d - 1) * 0.08) * equipmentPressure.damage,
         xp: Math.round(base.xp * (1 + (d - 1) * 0.09)),
         gold: Math.max(1, Math.round(base.gold * (1 + (d - 1) * 0.06))),
     };
@@ -210,6 +217,7 @@ export class EnemyManager {
     bossTimer = 120;
     bossSpawnCount = 0;
     bossEncounterModifiers = { bossDamageTakenMultiplier: 1, specialCadenceMultiplier: 1, summonCountMultiplier: 1, dashDistanceMultiplier: 1 };
+    equipmentElapsed = 0;
     endlessHealthMultiplier = 1;
     endlessDamageMultiplier = 1;
     endlessProjectileSpeedMultiplier = 1;
@@ -247,6 +255,7 @@ export class EnemyManager {
         this.bossTimer = 120;
         this.bossSpawnCount = 0;
         this.bossEncounterModifiers = { bossDamageTakenMultiplier: 1, specialCadenceMultiplier: 1, summonCountMultiplier: 1, dashDistanceMultiplier: 1 };
+        this.equipmentElapsed = 0;
         this.endlessHealthMultiplier = 1;
         this.endlessDamageMultiplier = 1;
         this.endlessProjectileSpeedMultiplier = 1;
@@ -261,6 +270,7 @@ export class EnemyManager {
     setBossEncounterModifiers(modifiers) { this.bossEncounterModifiers = { ...modifiers }; }
     getBossEncounterModifiers() { return { ...this.bossEncounterModifiers }; }
     update(dt, ctx) {
+        this.equipmentElapsed = ctx.elapsed;
         this.activeReducedMotion = ctx.reducedMotion ?? false;
         const director = directorSnapshot(ctx.elapsed);
         this.spawnTimer -= dt;
@@ -410,6 +420,8 @@ export class EnemyManager {
             const contact = enemy.radius + targetObj.radius + 5;
             if (enemy.eliteAffixes?.includes('swift'))
                 enemy.swiftCadencePresentation = advanceSwiftCadenceLifecycle(enemy.swiftCadencePresentation, { inAttackRange: dist <= contact, attackTimer: enemy.attackTimer, attackInterval: enemy.attackInterval, struck: false, dt });
+            if (enemy.type === 'elite' && enemy.eliteAffixes?.length)
+                enemy.eliteAffixCueOwnership = advanceEliteAffixCueOwnership(enemy.eliteAffixCueOwnership, { affixes: enemy.eliteAffixes, dt, swiftPhase: enemy.swiftCadencePresentation?.phase, frenziedPhase: enemy.frenziedPresentation?.phase, manaShieldActive: (enemy.manaShield ?? 0) > 0, regeneratingActive: (enemy.regenPerSecondRatio ?? 0) > 0 && enemy.hp < enemy.maxHp, commanderActive: (enemy.commandAuraMultiplier ?? 1) > 1, armoredActive: enemy.eliteAffixes.includes('armored') });
             if (enemy.type === 'nullifier') {
                 const inside = distance(enemy.pos, ctx.hero.pos) <= SPECIALIST_COMBAT_CONTRACT.nullifierEffectRadius + enemy.radius;
                 const wasInside = this.nullifierHeroInside.has(enemy.id);
@@ -508,7 +520,7 @@ export class EnemyManager {
                 // Legacy Phase 2473 source contract: this.queueEliteAffixResponseVfx(enemy,'swift');
                 if (enemy.eliteAffixes?.includes('swift')) {
                     enemy.swiftCadencePresentation = advanceSwiftCadenceLifecycle(enemy.swiftCadencePresentation, { inAttackRange: true, attackTimer: enemy.attackTimer, attackInterval: enemy.attackInterval, struck: true, dt: 0 });
-                    this.queueEliteAffixResponseVfx(enemy, 'swift', targetObj.pos);
+                    this.queueEliteAffixResponseVfx(enemy, 'swift', 'strike', targetObj.pos);
                 }
                 enemy.attackTimer = enemy.attackInterval;
             }
@@ -529,6 +541,18 @@ export class EnemyManager {
         const impactHoldDisplayClusters = impactHoldClusters.map((cluster, index) => ({ ...cluster, count: impactHoldCounts[index] ?? cluster.count }));
         const impactHoldPlacements = projectileImpactLabelPlacements({ clusters: impactHoldDisplayClusters, stamps: impactHoldInputs.map((entry) => entry.impact), width: LOGICAL_WIDTH, height: LOGICAL_HEIGHT });
         this.projectileImpactLabelAnchorHold = updateProjectileImpactLabelAnchorHold(this.projectileImpactLabelAnchorHold, impactHoldDisplayClusters, impactHoldPlacements, dt, impactIdentity.keys);
+        const laneElites = this.enemies.filter((enemy) => enemy.alive && enemy.type === 'elite' && Boolean(enemy.eliteAffixes?.length));
+        const lanePriority = [...laneElites].sort((a, b) => { const score = (enemy) => { const target = enemy.target === 'core' ? ctx.core.pos : ctx.hero.pos; const d = distance(enemy.pos, target); const activeAttack = enemy.swiftCadencePresentation?.phase === 'strike' || (enemy.attackResolveMotion?.resolve ?? 0) > .12 || (enemy.attackTimer > 0 && enemy.attackTimer <= Math.min(.18, enemy.attackInterval * .3)); const important = (enemy.eliteAffixCueOwnership?.eventPriority ?? 0) === 3 && ((enemy.eliteAffixCueOwnership?.holdTtl ?? 0) > 0 || (enemy.eliteAffixCueOwnership?.releaseTtl ?? 0) > 0); return (important ? 8 : 0) + (enemy.target === 'core' ? 5 : 0) + (d <= 120 ? 4 : 0) + (enemy.hitFlash > 0 ? 3 : 0) + (activeAttack ? 2 : 0); }; return score(b) - score(a) || a.id - b.id; });
+        const lanePriorityRank = new Map(lanePriority.map((enemy, index) => [enemy, index]));
+        const laneStress = Math.min(1, Math.max(0, laneElites.length - 3) / 5);
+        for (const enemy of laneElites) {
+            const target = enemy.target === 'core' ? ctx.core.pos : ctx.hero.pos;
+            const d = distance(enemy.pos, target);
+            const activeAttack = enemy.swiftCadencePresentation?.phase === 'strike' || (enemy.attackResolveMotion?.resolve ?? 0) > .12 || (enemy.attackTimer > 0 && enemy.attackTimer <= Math.min(.18, enemy.attackInterval * .3));
+            const importantEvent = (enemy.eliteAffixCueOwnership?.eventPriority ?? 0) === 3 && ((enemy.eliteAffixCueOwnership?.holdTtl ?? 0) > 0 || (enemy.eliteAffixCueOwnership?.releaseTtl ?? 0) > 0);
+            const desiredLane = eliteAffixCueDesiredLane({ enemyId: enemy.id, priorityIndex: lanePriorityRank.get(enemy) ?? laneElites.length, activeEliteCount: laneElites.length, priorityTarget: enemy.target === 'core' || d <= 120 || enemy.hitFlash > 0, activeAttack, importantEvent, battlefieldStress: laneStress });
+            enemy.eliteAffixCueLane = advanceEliteAffixCueLane(enemy.eliteAffixCueLane, { desiredLane, dt, importantEvent });
+        }
         this.enemies = this.enemies.filter((enemy) => enemy.alive);
         const liveNullifiers = new Set(this.enemies.filter((enemy) => enemy.type === 'nullifier').map((enemy) => enemy.id));
         for (const id of this.nullifierHeroInside)
@@ -562,8 +586,12 @@ export class EnemyManager {
             shieldAbsorbed = absorbed;
             enemy.manaShield = Math.max(0, (enemy.manaShield ?? 0) - absorbed);
             remaining -= absorbed;
-            if (absorbed > 0 && enemy.eliteAffixes?.includes('manaShield'))
-                this.queueEliteAffixResponseVfx(enemy, 'manaShield');
+            if (absorbed > 0 && enemy.eliteAffixes?.includes('manaShield')) {
+                if (shieldBeforeDamage > 0 && (enemy.manaShield ?? 0) <= 0)
+                    this.queueEliteAffixResponseVfx(enemy, 'manaShield', 'shieldBreak');
+                else
+                    this.queueEliteAffixResponseVfx(enemy, 'manaShield');
+            }
         }
         const bossEncounterMultiplier = enemy.type === 'boss' ? this.bossEncounterModifiers.bossDamageTakenMultiplier : 1;
         const damageTakenMultiplier = enemy.damageTakenMultiplier ?? 1;
@@ -576,7 +604,7 @@ export class EnemyManager {
         if (enemy.eliteAffixes?.includes('frenzied'))
             enemy.frenziedPresentation = advanceFrenziedThresholdLifecycle(enemy.frenziedPresentation, enemy.hp / Math.max(1, enemy.maxHp), 0);
         if (hpRatioBeforeDamage > 0.42 && enemy.hp / Math.max(1, enemy.maxHp) <= 0.42 && enemy.eliteAffixes?.includes('frenzied'))
-            this.queueEliteAffixResponseVfx(enemy, 'frenzied');
+            this.queueEliteAffixResponseVfx(enemy, 'frenzied', 'thresholdEntry');
         enemy.hitFlash = 0.10;
         const killed = enemy.hp <= 0;
         const impactTier = impactTierForDamage(amount, enemy.maxHp);
@@ -989,7 +1017,15 @@ export class EnemyManager {
         const activeSwift = this.enemies.filter((enemy) => enemy.eliteAffixes?.includes('swift') && enemy.swiftCadencePresentation);
         const swiftPriority = [...activeSwift].sort((a, b) => { const score = (enemy) => { const target = enemy.target === 'core' ? corePos : heroPos; const d = target ? distance(enemy.pos, target) : 9999; return (enemy.target === 'core' ? 4 : 0) + (d <= 120 ? 4 : 0) + (enemy.hitFlash > 0 ? 2 : 0) + (enemy.swiftCadencePresentation?.phase === 'strike' ? 3 : enemy.swiftCadencePresentation?.phase === 'ready' ? 1 : 0); }; return score(b) - score(a); });
         const swiftPriorityRank = new Map(swiftPriority.map((enemy, index) => [enemy, index]));
-        for (const enemy of this.enemies) {
+        const activeAffixElites = this.enemies.filter((enemy) => enemy.type === 'elite' && Boolean(enemy.eliteAffixes?.length));
+        const eliteAffixCuePriority = [...activeAffixElites].sort((a, b) => { const score = (enemy) => { const target = enemy.target === 'core' ? corePos : heroPos; const d = target ? distance(enemy.pos, target) : 9999; const activeAttack = enemy.swiftCadencePresentation?.phase === 'strike' || (enemy.attackResolveMotion?.resolve ?? 0) > .12 || (enemy.attackTimer > 0 && enemy.attackTimer <= Math.min(.18, enemy.attackInterval * .3)); return (enemy.target === 'core' ? 5 : 0) + (d <= 120 ? 4 : 0) + (enemy.hitFlash > 0 ? 3 : 0) + (activeAttack ? 2 : 0); }; return score(b) - score(a); });
+        const eliteAffixCuePriorityRank = new Map(eliteAffixCuePriority.map((enemy, index) => [enemy, index]));
+        const eliteAffixBattlefieldStress = Math.max(Math.max(0, Math.min(1, hazardPressure)), Math.min(1, Math.max(0, activeAffixElites.length - 3) / 5));
+        const liveActorCount = this.enemies.reduce((count, enemy) => count + (enemy.alive ? 1 : 0), 0);
+        const actorGroundingBattlefieldStress = Math.max(Math.max(0, Math.min(1, hazardPressure)), Math.min(1, Math.max(0, liveActorCount - 8) / 22));
+        const eliteAffixLayerFor = (enemy, affixId) => { const target = enemy.target === 'core' ? corePos : heroPos; const d = target ? distance(enemy.pos, target) : 9999; const activeAttack = enemy.swiftCadencePresentation?.phase === 'strike' || (enemy.attackResolveMotion?.resolve ?? 0) > .12 || (enemy.attackTimer > 0 && enemy.attackTimer <= Math.min(.18, enemy.attackInterval * .3)); return eliteAffixCueLayerPresentation(enemy.eliteAffixCueOwnership, affixId, { activeEliteCount: activeAffixElites.length, indexFromPriority: eliteAffixCuePriorityRank.get(enemy) ?? activeAffixElites.length, priorityTarget: enemy.target === 'core' || d <= 120 || enemy.hitFlash > 0, activeAttack, higherPriorityCue: hazardPressure >= .72, battlefieldStress: eliteAffixBattlefieldStress, reducedMotion, reducedFlash }); };
+        const eliteAffixCueLaneFor = (enemy) => eliteAffixCueLanePresentation(enemy.eliteAffixCueLane, { enemyRadius: enemy.radius, battlefieldStress: eliteAffixBattlefieldStress, higherPriorityCue: hazardPressure >= .72, reducedMotion, reducedFlash });
+        for (const enemy of enemyActorDepthOrdered(this.enemies)) {
             ctx.save();
             ctx.translate(enemy.pos.x, enemy.pos.y);
             const targetPos = enemy.target === 'core' ? corePos : heroPos;
@@ -1034,6 +1070,7 @@ export class EnemyManager {
             const genericRecoilScale = (bossHeavyHitStagger?.genericRecoilScale ?? 1) * (bossStaggerRecoveryArbitration?.genericRecoilScale ?? 1);
             const hitRecoil = { ...baseHitRecoil, intensity: baseHitRecoil.intensity * genericRecoilScale, offsetX: baseHitRecoil.offsetX * genericRecoilScale, offsetY: baseHitRecoil.offsetY * genericRecoilScale, rotation: baseHitRecoil.rotation * genericRecoilScale, maxDisplacement: baseHitRecoil.maxDisplacement * genericRecoilScale };
             const enemyHitStagger = enemy.type !== 'boss' ? enemyHitStaggerPresentation(enemy.type, enemy.hitFlash, enemy.hitImpactTier ?? 'normal', enemy.hitDirectionX ?? -renderFacingX, enemy.hitDirectionY ?? -renderFacingY, enemy.renderMotion, reducedMotion) : null;
+            const spriteActionPresentation = enemySpriteActionPresentation(enemy.type, { motionBlend: enemy.renderMotion?.motionBlend ?? 0, stride: enemy.renderMotion?.stride ?? 0, facingX: renderFacingX, facingY: renderFacingY, turn: enemy.renderMotion?.turn ?? 0, pullback: attackMotion.pullback, lunge: attackMotion.lunge, hitStagger: enemy.type === 'boss' ? (bossHeavyHitStagger?.stagger ?? 0) : (enemyHitStagger?.stagger ?? 0), hitOffsetX: enemy.type === 'boss' ? (bossHeavyHitStagger?.offsetX ?? 0) : (enemyHitStagger?.offsetX ?? 0), hitOffsetY: enemy.type === 'boss' ? (bossHeavyHitStagger?.offsetY ?? 0) : (enemyHitStagger?.offsetY ?? 0) }, reducedMotion);
             const specialistAttackHitArbitration = isSpecialistEnemyType(enemy.type) ? specialistAttackHitArbitrationPresentation(enemy.type, { pullback: attackMotion.pullback, lunge: attackMotion.lunge, resolve: attackResolve.resolve, hitStagger: enemyHitStagger?.stagger ?? 0, tier: enemy.hitImpactTier ?? 'normal', fatal: false }, reducedMotion) : null;
             const specialistRecoveryHandoff = isSpecialistEnemyType(enemy.type) ? specialistRecoveryHitHandoffPresentation({ pullback: attackMotion.pullback, lunge: attackMotion.lunge, resolve: attackResolve.resolve, hitStagger: enemyHitStagger?.stagger ?? 0, tier: enemy.hitImpactTier ?? 'normal' }, reducedMotion) : null;
             const bossRecoveryStaggerHandoff = enemy.type === 'boss' ? bossRecoveryStaggerHandoffPresentation({ recovery: enemy.bossSpecialRecovery?.recovery ?? 0, stagger: enemy.bossHeavyHitStagger?.stagger ?? 0, tier: enemy.bossHeavyHitStagger?.tier ?? null, specialTimer: enemy.specialTimer ?? 99 }, reducedMotion) : null;
@@ -1152,21 +1189,25 @@ export class EnemyManager {
             const spritePresentation = enemySpritePresentation(enemy.type, enemy.radius, spriteAtlasReady);
             const bossArchetype = enemy.type === 'boss' ? (enemy.bossArchetype ?? bossArchetypeForOrdinal(enemy.bossOrdinal ?? 0)) : null;
             const bossPresentation = bossArchetype ? bossSpritePresentation(bossArchetype, enemy.radius, bossSpriteAtlasReady) : null;
+            const actorGroundingClass = enemy.type === 'boss' ? 'boss' : enemy.type === 'elite' || Boolean(enemy.eliteAffixes?.length) ? 'elite' : enemy.type === 'brute' || enemy.type === 'shieldbearer' || enemy.type === 'siegeGolem' ? 'heavy' : enemy.type === 'hound' || enemy.type === 'assassin' || enemy.type === 'golden' ? 'agile' : 'regular';
+            const actorGrounding = actorGroundingDepthPresentation({ actorClass: actorGroundingClass, battlefieldStress: actorGroundingBattlefieldStress, reducedMotion, reducedFlash });
+            const imagePresenceShadowScale = bossPresentation?.visible ? bossPresentation.groundShadowScale : spritePresentation.groundShadowScale;
+            const imagePresenceShadowAlphaBoost = bossPresentation?.visible ? bossPresentation.groundShadowAlphaBoost : spritePresentation.groundShadowAlphaBoost;
             const shadowBaseWidth = enemy.radius * 1.12, shadowBaseHeight = enemy.radius * .48;
-            const ownedShadowWidth = (shadowBaseWidth + (motionPresentation.shadowWidth - shadowBaseWidth) * shadowMotionScale) * spawnGroundMaterialize.shadowWidthScale;
-            const ownedShadowHeight = shadowBaseHeight + (motionPresentation.shadowHeight - shadowBaseHeight) * shadowMotionScale;
+            const ownedShadowWidth = (shadowBaseWidth + (motionPresentation.shadowWidth - shadowBaseWidth) * shadowMotionScale) * spawnGroundMaterialize.shadowWidthScale * imagePresenceShadowScale * actorGrounding.shadowWidthScale;
+            const ownedShadowHeight = (shadowBaseHeight + (motionPresentation.shadowHeight - shadowBaseHeight) * shadowMotionScale) * imagePresenceShadowScale * actorGrounding.shadowHeightScale;
             const locomotionShadowBoost = bossLocomotion.shadowBoost * (bossGroundCue ? bossGroundCue.locomotionShadowBoostScale : 1);
             const recoveryShadowBoost = (bossSpecialRecovery?.shadowBoost ?? 0) * recoveryScale * bossRecoveryShadowBoostScale;
             ctx.save();
             const specialOriginGroundOffsetX = enemy.type === 'boss' ? 0 : bossSpecialOriginHandoff.groundOffsetX, specialOriginGroundOffsetY = enemy.type === 'boss' ? 0 : bossSpecialOriginHandoff.groundOffsetY;
             ctx.translate(groundContact.offsetX * shadowMotionScale - motionPresentation.shadowOffsetX * shadowMotionScale + specialistGroundFollowX + bossGroundRebase.groundOffsetX + specialOriginGroundOffsetX, groundContact.offsetY * 0.35 + attackWeightSettle * attackScale + bossGroundRebase.groundOffsetY + specialOriginGroundOffsetY + spawnGroundMaterialize.groundOffsetY);
-            ctx.fillStyle = `rgba(8,12,18,${Math.min(0.42, (groundContact.alpha + locomotionShadowBoost + recoveryShadowBoost) * bossSpecialOriginHandoff.shadowAlphaScale * spawnGroundMaterialize.shadowAlphaScale)})`;
+            ctx.fillStyle = `rgba(8,12,18,${Math.min(0.46, (groundContact.alpha + locomotionShadowBoost + recoveryShadowBoost + imagePresenceShadowAlphaBoost) * bossSpecialOriginHandoff.shadowAlphaScale * spawnGroundMaterialize.shadowAlphaScale * actorGrounding.shadowAlphaScale)})`;
             ctx.beginPath();
             ctx.ellipse(motionPresentation.shadowOffsetX * shadowMotionScale, enemy.radius + 8 + motionPresentation.shadowOffsetY * shadowMotionScale, Math.max(ownedShadowWidth, groundContact.width), Math.max(ownedShadowHeight, groundContact.height), 0, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
             if (bossLocomotion.showContactPulse && bossContactPulseScale > .01) {
-                const bossContactAlpha = bossLocomotion.contactAlpha * bossContactPulseScale;
+                const bossContactAlpha = bossLocomotion.contactAlpha * bossContactPulseScale * actorGrounding.contactPulseScale;
                 ctx.save();
                 ctx.translate(bossAftermath.originOffsetX, bossAftermath.originOffsetY);
                 ctx.globalAlpha = reducedFlash ? Math.min(0.14, bossContactAlpha * bossAftermath.aftermathAlphaScale) : bossContactAlpha * bossAftermath.aftermathAlphaScale;
@@ -1178,7 +1219,7 @@ export class EnemyManager {
                 ctx.restore();
             }
             if (specialistLocomotionSignature && specialistLocomotionSignature.groundPulseAlpha > 0.01 && specialistGroundPulseScale > .01) {
-                const specialistPulseAlpha = specialistLocomotionSignature.groundPulseAlpha * specialistGroundPulseScale;
+                const specialistPulseAlpha = specialistLocomotionSignature.groundPulseAlpha * specialistGroundPulseScale * actorGrounding.contactPulseScale;
                 ctx.save();
                 ctx.translate(specialistGroundFollowX, 0);
                 ctx.globalAlpha = reducedFlash ? Math.min(0.10, specialistPulseAlpha) : specialistPulseAlpha;
@@ -1263,7 +1304,7 @@ export class EnemyManager {
                 ctx.restore();
             }
             ctx.save();
-            ctx.globalAlpha = spritePresentation.visible || bossPresentation?.visible ? 0.22 : 1;
+            ctx.globalAlpha = bossPresentation?.visible ? bossPresentation.bodyAlpha : spritePresentation.bodyAlpha;
             ctx.fillStyle = enemy.hitFlash > 0 ? '#ffffff' : enemy.color;
             ctx.beginPath();
             ctx.arc(0, 0, enemy.radius, 0, Math.PI * 2);
@@ -1275,7 +1316,14 @@ export class EnemyManager {
             if (spritePresentation.visible && spriteAtlasImage && isEnemySpriteType(enemy.type)) {
                 const sprite = enemySpriteRect(enemy.type);
                 const size = spritePresentation.drawSize;
+                ctx.save();
+                ctx.translate(spriteActionPresentation.offsetX, spriteActionPresentation.offsetY);
+                ctx.rotate(spriteActionPresentation.rotation);
+                ctx.scale(spriteActionPresentation.scaleX, spriteActionPresentation.scaleY);
+                ctx.shadowColor = 'rgba(6,10,16,.72)';
+                ctx.shadowBlur = spritePresentation.imageShadowBlur;
                 ctx.drawImage(spriteAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, -size / 2, -size / 2, size, size);
+                ctx.restore();
                 if (enemy.hitFlash > 0) {
                     ctx.save();
                     ctx.globalAlpha = 0.38;
@@ -1289,7 +1337,14 @@ export class EnemyManager {
             if (bossPresentation?.visible && bossSpriteAtlasImage && bossArchetype) {
                 const sprite = bossSpriteRect(bossArchetype);
                 const size = bossPresentation.drawSize;
+                ctx.save();
+                ctx.translate(spriteActionPresentation.offsetX, spriteActionPresentation.offsetY);
+                ctx.rotate(spriteActionPresentation.rotation);
+                ctx.scale(spriteActionPresentation.scaleX, spriteActionPresentation.scaleY);
+                ctx.shadowColor = 'rgba(20,8,18,.78)';
+                ctx.shadowBlur = bossPresentation.imageShadowBlur;
                 ctx.drawImage(bossSpriteAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, -size / 2, -size / 2, size, size);
+                ctx.restore();
                 if (enemy.hitFlash > 0) {
                     ctx.save();
                     ctx.globalAlpha = 0.34;
@@ -1438,21 +1493,27 @@ export class EnemyManager {
                     const count = Math.min(2, enemy.eliteAffixes.length);
                     for (let index = 0; index < count; index += 1) {
                         const affixId = enemy.eliteAffixes[index];
+                        const affixLayer = eliteAffixLayerFor(enemy, affixId);
+                        if (!affixLayer.visible)
+                            continue;
                         const activeSprite = eliteAffixLifecycleVfxSprite(affixId, 'active');
                         const size = enemy.radius * (index === 0 ? 2.9 : 2.45);
+                        const eliteCueLane = eliteAffixCueLaneFor(enemy);
                         ctx.save();
-                        ctx.rotate((index === 0 ? 1 : -1) * (0.10 + index * 0.04));
-                        ctx.globalAlpha = reducedFlash ? 0.26 : 0.42;
+                        ctx.translate(eliteCueLane.offsetX, eliteCueLane.offsetY);
+                        ctx.rotate((index === 0 ? 1 : -1) * (0.10 + index * 0.04) * affixLayer.motionScale * eliteCueLane.motionScale);
+                        ctx.globalAlpha = (reducedFlash ? 0.26 : 0.42) * affixLayer.alphaScale * eliteCueLane.alphaScale;
                         ctx.drawImage(eliteAffixLifecycleVfxAtlasImage, activeSprite.sx, activeSprite.sy, activeSprite.sw, activeSprite.sh, -size / 2, -size / 2, size, size);
                         ctx.restore();
                     }
                 }
                 if (enemy.eliteAffixes.includes('swift') && enemy.swiftCadencePresentation && targetPos) {
-                    const swift = swiftCadencePresentation(enemy.swiftCadencePresentation, reducedMotion, reducedFlash), swiftPriorityTarget = enemy.target === 'core' || targetDistance <= 120 || enemy.hitFlash > 0 || enemy.swiftCadencePresentation?.phase === 'strike', swiftDensity = swiftCadenceDensityPresentation(enemy.swiftCadencePresentation, { activeCount: activeSwift.length, indexFromPriority: swiftPriorityRank.get(enemy) ?? activeSwift.length, priorityTarget: swiftPriorityTarget, higherPriorityCue: hazardPressure >= .72, battlefieldStress: Math.max(0, Math.min(1, hazardPressure)), reducedMotion, reducedFlash });
-                    if (swift.alpha > 0 && swiftDensity.visible) {
-                        const mag = Math.max(1, targetDistance), nx = targetDx / mag, ny = targetDy / mag, start = enemy.radius + 8, end = start + swift.chevronLength * (.8 + .2 * swiftDensity.motionScale), perpX = -ny, perpY = nx, wing = 4;
+                    const swift = swiftCadencePresentation(enemy.swiftCadencePresentation, reducedMotion, reducedFlash), swiftPriorityTarget = enemy.target === 'core' || targetDistance <= 120 || enemy.hitFlash > 0 || enemy.swiftCadencePresentation?.phase === 'strike', swiftDensity = swiftCadenceDensityPresentation(enemy.swiftCadencePresentation, { activeCount: activeSwift.length, indexFromPriority: swiftPriorityRank.get(enemy) ?? activeSwift.length, priorityTarget: swiftPriorityTarget, higherPriorityCue: hazardPressure >= .72, battlefieldStress: Math.max(0, Math.min(1, hazardPressure)), reducedMotion, reducedFlash }), swiftLayer = eliteAffixLayerFor(enemy, 'swift');
+                    if (swift.alpha > 0 && swiftDensity.visible && swiftLayer.visible) {
+                        const mag = Math.max(1, targetDistance), nx = targetDx / mag, ny = targetDy / mag, start = enemy.radius + 8, end = start + swift.chevronLength * (.8 + .2 * swiftDensity.motionScale * swiftLayer.motionScale), perpX = -ny, perpY = nx, wing = 4, eliteCueLane = eliteAffixCueLaneFor(enemy);
                         ctx.save();
-                        ctx.globalAlpha = swift.alpha * swiftDensity.alphaScale;
+                        ctx.translate(eliteCueLane.offsetX, eliteCueLane.offsetY);
+                        ctx.globalAlpha = swift.alpha * swiftDensity.alphaScale * swiftLayer.alphaScale * eliteCueLane.alphaScale;
                         ctx.strokeStyle = '#9edfff';
                         ctx.lineWidth = swift.lineWidth;
                         ctx.beginPath();
@@ -1469,11 +1530,12 @@ export class EnemyManager {
                     }
                 }
                 if (enemy.eliteAffixes.includes('frenzied')) {
-                    const frenzy = frenziedThresholdPresentation(enemy.frenziedPresentation, reducedMotion, reducedFlash), frenzyPriority = enemy.target === 'core' || targetDistance <= 120 || enemy.hitFlash > 0, frenzyDensity = frenziedThresholdDensityPresentation(enemy.frenziedPresentation, { activeCount: activeFrenzied.length, indexFromPriority: frenziedPriorityRank.get(enemy) ?? activeFrenzied.length, priorityTarget: frenzyPriority, battlefieldStress: Math.max(0, Math.min(1, hazardPressure)), reducedMotion, reducedFlash });
-                    if (frenzy.alpha > 0 && frenzyDensity.visible) {
-                        const hpRatio = enemy.hp / Math.max(1, enemy.maxHp), pulse = Math.sin((1 - hpRatio) * Math.PI * 4) * frenzy.pulse * frenzyDensity.pulseScale;
+                    const frenzy = frenziedThresholdPresentation(enemy.frenziedPresentation, reducedMotion, reducedFlash), frenzyPriority = enemy.target === 'core' || targetDistance <= 120 || enemy.hitFlash > 0, frenzyDensity = frenziedThresholdDensityPresentation(enemy.frenziedPresentation, { activeCount: activeFrenzied.length, indexFromPriority: frenziedPriorityRank.get(enemy) ?? activeFrenzied.length, priorityTarget: frenzyPriority, battlefieldStress: Math.max(0, Math.min(1, hazardPressure)), reducedMotion, reducedFlash }), frenzyLayer = eliteAffixLayerFor(enemy, 'frenzied');
+                    if (frenzy.alpha > 0 && frenzyDensity.visible && frenzyLayer.visible) {
+                        const hpRatio = enemy.hp / Math.max(1, enemy.maxHp), pulse = Math.sin((1 - hpRatio) * Math.PI * 4) * frenzy.pulse * frenzyDensity.pulseScale * frenzyLayer.motionScale, eliteCueLane = eliteAffixCueLaneFor(enemy);
                         ctx.save();
-                        ctx.globalAlpha = frenzy.alpha * frenzyDensity.alphaScale;
+                        ctx.translate(eliteCueLane.offsetX, eliteCueLane.offsetY);
+                        ctx.globalAlpha = frenzy.alpha * frenzyDensity.alphaScale * frenzyLayer.alphaScale * eliteCueLane.alphaScale;
                         ctx.strokeStyle = '#ff7a68';
                         ctx.lineWidth = frenzy.lineWidth;
                         ctx.beginPath();
@@ -1514,11 +1576,19 @@ export class EnemyManager {
                     ctx.fillText(text, 0, layout.localCenterY);
                 }
                 if (enemy.maxManaShield > 0 && enemy.manaShield > 0) {
-                    ctx.strokeStyle = 'rgba(139,186,255,.82)';
-                    ctx.lineWidth = 3;
-                    ctx.beginPath();
-                    ctx.arc(0, 0, enemy.radius + 15, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * enemy.manaShield / enemy.maxManaShield);
-                    ctx.stroke();
+                    const manaShieldLayer = eliteAffixLayerFor(enemy, 'manaShield');
+                    if (manaShieldLayer.visible) {
+                        const eliteCueLane = eliteAffixCueLaneFor(enemy);
+                        ctx.save();
+                        ctx.translate(eliteCueLane.offsetX, eliteCueLane.offsetY);
+                        ctx.globalAlpha = manaShieldLayer.alphaScale * eliteCueLane.alphaScale;
+                        ctx.strokeStyle = 'rgba(139,186,255,.82)';
+                        ctx.lineWidth = 3;
+                        ctx.beginPath();
+                        ctx.arc(0, 0, enemy.radius + 15, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * enemy.manaShield / enemy.maxManaShield);
+                        ctx.stroke();
+                        ctx.restore();
+                    }
                 }
             }
             if (enemy.type !== 'grunt' && enemy.type !== 'hound') {
@@ -1543,24 +1613,29 @@ export class EnemyManager {
         }
         if (eliteAffixLifecycleVfxAtlasReady && eliteAffixLifecycleVfxAtlasImage) {
             for (const cue of this.eliteAffixResponseVfx) {
+                const sourceEnemy = this.enemies.find((candidate) => candidate.id === cue.enemyId);
+                const responseLayer = sourceEnemy ? eliteAffixLayerFor(sourceEnemy, cue.affixId) : eliteAffixCueLayerPresentation(undefined, cue.affixId, { activeEliteCount: activeAffixElites.length, indexFromPriority: activeAffixElites.length, priorityTarget: false, activeAttack: false, higherPriorityCue: hazardPressure >= .72, battlefieldStress: eliteAffixBattlefieldStress, reducedMotion, reducedFlash });
+                const responseLane = sourceEnemy ? eliteAffixCueLaneFor(sourceEnemy) : { lane: 0, offsetX: 0, offsetY: 0, motionScale: 0, alphaScale: 1 };
+                const responseCuePos = { x: cue.pos.x + responseLane.offsetX, y: cue.pos.y + responseLane.offsetY };
+                if (!responseLayer.visible)
+                    continue;
                 const sprite = eliteAffixLifecycleVfxSprite(cue.affixId, 'response');
                 const t = Math.max(0, Math.min(1, cue.ttl / cue.maxTtl));
                 const size = 92 + (1 - t) * 22;
                 ctx.save();
-                ctx.globalAlpha = Math.min(reducedFlash ? 0.48 : 0.88, t);
-                ctx.drawImage(eliteAffixLifecycleVfxAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, cue.pos.x - size / 2, cue.pos.y - size / 2, size, size);
+                ctx.globalAlpha = Math.min(reducedFlash ? 0.48 : 0.88, t) * responseLayer.responseAlphaScale;
+                ctx.drawImage(eliteAffixLifecycleVfxAtlasImage, sprite.sx, sprite.sy, sprite.sw, sprite.sh, responseCuePos.x - size / 2, responseCuePos.y - size / 2, size, size);
                 ctx.restore();
                 if (cue.affixId === 'swift' && cue.targetPos && cue.targetKind) {
-                    const sourceEnemy = this.enemies.find((candidate) => candidate.id === cue.enemyId);
-                    const ownership = swiftStrikeOwnershipPresentation({ actualStrike: true, targetKind: cue.targetKind, distanceToTarget: distance(cue.pos, cue.targetPos), recentlyHit: (sourceEnemy?.hitFlash ?? 0) > 0, battlefieldStress: Math.max(0, Math.min(1, hazardPressure)), reducedMotion, reducedFlash });
+                    const ownership = swiftStrikeOwnershipPresentation({ actualStrike: true, targetKind: cue.targetKind, distanceToTarget: distance(responseCuePos, cue.targetPos), recentlyHit: (sourceEnemy?.hitFlash ?? 0) > 0, battlefieldStress: Math.max(0, Math.min(1, hazardPressure)), reducedMotion, reducedFlash });
                     if (ownership.visible) {
-                        const dx = cue.targetPos.x - cue.pos.x, dy = cue.targetPos.y - cue.pos.y, mag = Math.hypot(dx, dy) || 1, nx = dx / mag, ny = dy / mag, travel = Math.min(72, Math.max(30, mag * .55)), endX = cue.pos.x + nx * travel, endY = cue.pos.y + ny * travel, perpX = -ny, perpY = nx, wing = 6 * ownership.chevronScale;
+                        const dx = cue.targetPos.x - responseCuePos.x, dy = cue.targetPos.y - responseCuePos.y, mag = Math.hypot(dx, dy) || 1, nx = dx / mag, ny = dy / mag, travel = Math.min(72, Math.max(30, mag * .55)), endX = responseCuePos.x + nx * travel, endY = responseCuePos.y + ny * travel, perpX = -ny, perpY = nx, wing = 6 * ownership.chevronScale;
                         ctx.save();
-                        ctx.globalAlpha = ownership.connectorAlpha * t;
+                        ctx.globalAlpha = ownership.connectorAlpha * t * responseLayer.responseAlphaScale;
                         ctx.strokeStyle = '#9edfff';
                         ctx.lineWidth = 2 * ownership.priorityScale;
                         ctx.beginPath();
-                        ctx.moveTo(cue.pos.x + nx * 10, cue.pos.y + ny * 10);
+                        ctx.moveTo(responseCuePos.x + nx * 10, responseCuePos.y + ny * 10);
                         ctx.lineTo(endX, endY);
                         ctx.stroke();
                         ctx.beginPath();
@@ -1597,7 +1672,7 @@ export class EnemyManager {
         this.spawn(type, danger, target);
     }
     spawn(type, danger, target, explicitPos) {
-        const baseStats = enemyStats(type, danger);
+        const baseStats = enemyStats(type, danger, this.equipmentElapsed);
         const eliteHealthMultiplier = type === 'elite' ? this.endlessEliteHealthMultiplier : 1;
         const stats = { ...baseStats, hp: Math.round(baseStats.hp * this.endlessHealthMultiplier * eliteHealthMultiplier), damage: baseStats.damage * this.endlessDamageMultiplier };
         const eliteAffixes = type === 'elite' ? selectEliteAffixes(danger) : [];
@@ -1854,7 +1929,7 @@ export class EnemyManager {
                 type = i % 2 === 0 ? 'assassin' : 'nullifier';
             else
                 type = i % 3 === 2 ? 'brute' : 'hound';
-            const baseStats = enemyStats(type, Math.max(1, danger - 1));
+            const baseStats = enemyStats(type, Math.max(1, danger - 1), this.equipmentElapsed);
             const stats = { ...baseStats, hp: Math.round(baseStats.hp * this.endlessHealthMultiplier), damage: baseStats.damage * this.endlessDamageMultiplier };
             const angle = (Math.PI * 2 * i) / Math.max(1, count) + (boss.bossCycle ?? 0) * 0.35;
             const distanceFromBoss = boss.radius + stats.radius + 34;
@@ -1935,10 +2010,20 @@ export class EnemyManager {
         if (this.regularEnemyActionVfx.length > 28)
             this.regularEnemyActionVfx.splice(0, this.regularEnemyActionVfx.length - 28);
     }
-    queueEliteAffixResponseVfx(enemy, affixId, targetPos) {
+    signalEliteAffixCueEvent(enemy, affixId, kind) {
+        if (!enemy.eliteAffixes?.includes(affixId))
+            return;
+        enemy.eliteAffixCueOwnership = advanceEliteAffixCueOwnership(enemy.eliteAffixCueOwnership, { affixes: enemy.eliteAffixes, dt: 0, event: { affixId, kind }, swiftPhase: enemy.swiftCadencePresentation?.phase, frenziedPhase: enemy.frenziedPresentation?.phase, manaShieldActive: (enemy.manaShield ?? 0) > 0, regeneratingActive: (enemy.regenPerSecondRatio ?? 0) > 0 && enemy.hp < enemy.maxHp, commanderActive: (enemy.commandAuraMultiplier ?? 1) > 1, armoredActive: enemy.eliteAffixes.includes('armored') });
+    }
+    queueEliteAffixResponseVfx(enemy, affixId, eventKind = 'response', targetPos) {
+        const important = eventKind !== 'response';
+        if (important)
+            this.signalEliteAffixCueEvent(enemy, affixId, eventKind);
         const existing = this.eliteAffixResponseVfx.find((cue) => cue.enemyId === enemy.id && cue.affixId === affixId && cue.ttl > 0.12);
         if (existing)
             return;
+        if (!important)
+            this.signalEliteAffixCueEvent(enemy, affixId, eventKind);
         const maxTtl = 0.42;
         this.eliteAffixResponseVfx.push({ pos: { ...enemy.pos }, enemyId: enemy.id, affixId, ...(targetPos ? { targetPos: { ...targetPos }, targetKind: enemy.target } : {}), ttl: maxTtl, maxTtl });
         if (this.eliteAffixResponseVfx.length > 32)

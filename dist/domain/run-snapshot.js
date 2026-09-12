@@ -2,6 +2,8 @@ import { FUSION_IDS } from '../game/spell-fusions.js';
 import { restoreExtension, serializeExtension } from '../game/endless/snapshot.js';
 import { decodeBuildCapsule } from './build-capsule.js';
 import { MAX_RUN_DURATION_SECONDS } from './run-duration.js';
+import { sanitizeEquipmentInventory } from './equipment-inventory.js';
+import { equipmentRecipes } from '../game/equipment-recipes.js';
 const KEY = 'arcane-last-stand.run-snapshot';
 const BACKUP_KEY = 'arcane-last-stand.run-snapshot.backup';
 const HERO_IDS = new Set(['arkan', 'seria', 'kain', 'edric']);
@@ -10,6 +12,7 @@ const RELIC_IDS = new Set(['abyss-eye', 'chrono-shard', 'guardian-heart', 'ember
 const FATE_IDS = new Set(['frenzy', 'golden', 'guardian']);
 const MAP_IDS = new Set(['ruinedGate', 'frozenFen', 'crystalQuarry']);
 const SPELL_IDS = ['fireBolt', 'chainLightning', 'frostNova', 'flameField', 'meteorStorm', 'blackHole'];
+const HIDDEN_RECIPE_IDS = new Set(equipmentRecipes().filter((recipe) => recipe.hidden).map((recipe) => recipe.id));
 function num(value, min, max) {
     const n = typeof value === 'number' ? value : Number(value);
     if (!Number.isFinite(n))
@@ -22,10 +25,10 @@ function sanitizeItem(raw) {
     if (raw === null || raw === undefined)
         return null;
     const o = record(raw);
-    const kind = o.kind === 'weapon' || o.kind === 'armor' ? o.kind : null;
+    const kind = o.kind === 'weapon' || o.kind === 'armor' || o.kind === 'accessory' ? o.kind : null;
     if (!kind || typeof o.id !== 'string' || typeof o.name !== 'string')
         return null;
-    return { id: o.id.slice(0, 64), kind, name: o.name.slice(0, 64), rank: int(o.rank, 1, 5), power: num(o.power, 0, 1000), legendary: o.legendary === true };
+    return { id: o.id.slice(0, 64), kind, name: o.name.slice(0, 64), rank: int(o.rank, 1, 10000), power: num(o.power, 0, 1000), legendary: o.legendary === true };
 }
 export function sanitizeRunSnapshot(raw) {
     const o = record(raw);
@@ -61,7 +64,12 @@ export function sanitizeRunSnapshot(raw) {
         coreHp: num(o.coreHp, 0, 1e6),
         spellLevels,
         equipment: {
+            ...(equipment.accessory !== undefined ? { accessory: sanitizeItem(equipment.accessory)?.kind === 'accessory' ? sanitizeItem(equipment.accessory) : null } : {}),
             coins: int(equipment.coins, 0, 1e9), weapon: sanitizeItem(equipment.weapon), armor: sanitizeItem(equipment.armor), healingPotions: int(equipment.healingPotions, 0, 99),
+            inventory: sanitizeEquipmentInventory(equipment.inventory),
+            discoveredRecipes: Array.isArray(equipment.discoveredRecipes)
+                ? [...new Set(equipment.discoveredRecipes.filter((id) => typeof id === 'string' && HIDDEN_RECIPE_IDS.has(id)))].slice(0, HIDDEN_RECIPE_IDS.size)
+                : [],
         },
         relic,
         fusions: [...new Set(fusions)].slice(0, 2),

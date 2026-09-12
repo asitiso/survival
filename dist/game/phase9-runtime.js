@@ -3,7 +3,16 @@ export function applyMissionRewardToState(state, reward) {
         coins: state.equipmentState.coins,
         weapon: state.equipmentState.weapon ? { ...state.equipmentState.weapon } : null,
         armor: state.equipmentState.armor ? { ...state.equipmentState.armor } : null,
+        ...(state.equipmentState.accessory !== undefined
+            ? {
+                accessory: state.equipmentState.accessory
+                    ? { ...state.equipmentState.accessory }
+                    : null,
+            }
+            : {}),
         healingPotions: state.equipmentState.healingPotions,
+        inventory: state.equipmentState.inventory.map((stack) => ({ ...stack })),
+        discoveredRecipes: [...state.equipmentState.discoveredRecipes],
     };
     let shopTokens = state.shopTokens;
     let goldEarned = state.goldEarned;

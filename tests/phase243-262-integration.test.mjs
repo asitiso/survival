@@ -27,7 +27,7 @@ test('foldable thumb ownership is input-only and normal hit testing stays unchan
   assert.ok(input.includes('foldableThumbIntent'));
   assert.ok(input.includes("thumbIntent === 'right'"));
   assert.ok(input.includes("thumbIntent === 'left'"));
-  assert.ok(input.includes(': hitTestActionButton(p)'));
+  assert.ok(input.includes(': hitTestActionButton(p, ACTION_BUTTONS, actionTouchScale)'));
 });
 
 test('default raster CI gate passes current five committed viewports',()=>{

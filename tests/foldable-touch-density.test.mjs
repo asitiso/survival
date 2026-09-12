@@ -42,5 +42,6 @@ test('per-action scales keep nearest normalized button resolution deterministic'
 test('input derives adaptive touch density from the same landscape safe area profile',()=>{
   const input=fs.readFileSync(new URL('../src/core/input.ts',import.meta.url),'utf8');
   assert.ok(input.includes('foldableTouchScaleMap'));
-  assert.ok(input.includes('hitTestActionButton(p, ACTION_BUTTONS, ACTION_TOUCH_SCALE, touchProfile)'));
+  assert.ok(input.includes('hitTestActionButton(p, ACTION_BUTTONS, actionTouchScale, touchProfile)'));
+  assert.ok(input.includes('foldableTouchScaleMap(safeArea, ACTION_BUTTONS, actionTouchScale)'));
 });

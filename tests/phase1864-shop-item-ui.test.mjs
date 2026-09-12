@@ -15,6 +15,6 @@ test('phase 1864 shop cards render static item icon while keeping text identity'
 
 test('shop icon CSS keeps layout compact and hides failed atlas without blocking card',()=>{
   assert.match(styles,/\.shop-item-icon/);
-  assert.match(styles,/background-image:url\('\.\.\/assets\/ui\/shop-items\.png'\)/);
+  assert.match(styles,/background-image:url\('\.\.\/assets\/ui\/shop-items-enhanced\.png'\)/);
   assert.match(styles,/\.shop-item-icon\.shop-item-icon-fallback/);
 });

@@ -31,5 +31,5 @@ test('input gates foldable actions to right thumb and joystick starts to left th
   assert.ok(source.includes('foldableThumbIntent'));
   assert.ok(source.includes("thumbIntent === 'right'"));
   assert.ok(source.includes("thumbIntent === 'left'"));
-  assert.ok(source.includes(': hitTestActionButton(p)'));
+  assert.ok(source.includes(': hitTestActionButton(p, ACTION_BUTTONS, actionTouchScale)'));
 });

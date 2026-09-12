@@ -11,6 +11,8 @@ import type { MapEvolutionStage } from '../game/map-evolution.js';
 import { restoreExtension, serializeExtension } from '../game/endless/snapshot.js';
 import { decodeBuildCapsule } from './build-capsule.js';
 import { MAX_RUN_DURATION_SECONDS } from './run-duration.js';
+import { sanitizeEquipmentInventory } from './equipment-inventory.js';
+import { equipmentRecipes } from '../game/equipment-recipes.js';
 
 export interface SnapshotStorage {
   getItem(key: string): string | null;
@@ -46,6 +48,7 @@ const RELIC_IDS = new Set<RelicId>(['abyss-eye','chrono-shard','guardian-heart',
 const FATE_IDS = new Set<FatePathId>(['frenzy','golden','guardian']);
 const MAP_IDS = new Set<MapId>(['ruinedGate','frozenFen','crystalQuarry']);
 const SPELL_IDS: SpellId[] = ['fireBolt','chainLightning','frostNova','flameField','meteorStorm','blackHole'];
+const HIDDEN_RECIPE_IDS = new Set(equipmentRecipes().filter((recipe) => recipe.hidden).map((recipe) => recipe.id));
 
 function num(value: unknown, min: number, max: number): number {
   const n = typeof value === 'number' ? value : Number(value);
@@ -58,9 +61,9 @@ function record(value: unknown): Record<string, unknown> { return typeof value =
 function sanitizeItem(raw: unknown): EquippedItem | null {
   if (raw === null || raw === undefined) return null;
   const o = record(raw);
-  const kind = o.kind === 'weapon' || o.kind === 'armor' ? o.kind : null;
+  const kind = o.kind === 'weapon' || o.kind === 'armor' || o.kind === 'accessory' ? o.kind : null;
   if (!kind || typeof o.id !== 'string' || typeof o.name !== 'string') return null;
-  return { id: o.id.slice(0, 64), kind, name: o.name.slice(0, 64), rank: int(o.rank, 1, 5), power: num(o.power, 0, 1000), legendary: o.legendary === true };
+  return { id: o.id.slice(0, 64), kind, name: o.name.slice(0, 64), rank: int(o.rank, 1, 10000), power: num(o.power, 0, 1000), legendary: o.legendary === true };
 }
 
 export function sanitizeRunSnapshot(raw: unknown): RunSnapshot | null {
@@ -89,7 +92,12 @@ export function sanitizeRunSnapshot(raw: unknown): RunSnapshot | null {
     coreHp: num(o.coreHp, 0, 1e6),
     spellLevels,
     equipment: {
+      ...(equipment.accessory !== undefined ? { accessory: sanitizeItem(equipment.accessory)?.kind === 'accessory' ? sanitizeItem(equipment.accessory) : null } : {}),
       coins: int(equipment.coins, 0, 1e9), weapon: sanitizeItem(equipment.weapon), armor: sanitizeItem(equipment.armor), healingPotions: int(equipment.healingPotions, 0, 99),
+      inventory: sanitizeEquipmentInventory(equipment.inventory),
+      discoveredRecipes: Array.isArray(equipment.discoveredRecipes)
+        ? [...new Set(equipment.discoveredRecipes.filter((id): id is string => typeof id === 'string' && HIDDEN_RECIPE_IDS.has(id)))].slice(0, HIDDEN_RECIPE_IDS.size)
+        : [],
     },
     relic,
     fusions: [...new Set(fusions)].slice(0, 2),

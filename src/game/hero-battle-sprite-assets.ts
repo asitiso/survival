@@ -1,4 +1,5 @@
 import type { HeroId } from './hero-profiles.js';
+import { mobileLandscapeActorScale } from './mobile-landscape-presentation.js';
 
 export const HERO_BATTLE_SPRITE_ATLAS = {
   src: './assets/heroes/hero-battle-sprites.png',
@@ -48,7 +49,7 @@ export function heroBattleSpritePresentation(heroId: HeroId, radius: number, atl
     visible: atlasReady,
     animated: false,
     motionAmplitude: 0,
-    drawSize: Math.round(safeRadius * SIZE_SCALE[heroId]),
+    drawSize: Math.round(safeRadius * SIZE_SCALE[heroId] * mobileLandscapeActorScale()),
     fallbackBodyVisible: true,
   };
 }

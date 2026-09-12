@@ -22,7 +22,7 @@ test('phase 1881 lobby mastery recent run and resume reuse hero portraits with t
 
 test('phase 1882 meta upgrade cards reuse existing growth and shop icon atlases',async()=>{
   const mod=await import('../dist/game/lobby-result-identity-assets.js');
-  const expected={vitality:'./assets/ui/growth-choice-icons.png',power:'./assets/ui/growth-choice-icons.png',bankroll:'./assets/ui/shop-items.png',magnet:'./assets/ui/growth-choice-icons.png'};
+  const expected={vitality:'./assets/ui/growth-choice-icons.png',power:'./assets/ui/growth-choice-icons.png',bankroll:'./assets/ui/shop-items-enhanced.png',magnet:'./assets/ui/growth-choice-icons.png'};
   for(const [id,atlas] of Object.entries(expected))assert.equal(mod.metaUpgradeIdentity(id).atlasSrc,atlas);
   assert.match(lobbySource,/metaUpgradeIdentity/);
   assert.match(lobbySource,/lobby-upgrade-icon/);

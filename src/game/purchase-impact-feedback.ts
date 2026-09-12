@@ -3,7 +3,7 @@ import type { ShopDisplayOffer } from './shop-data.js';
 import { shopPurchaseProjectionFromStates } from './shop-purchase-projection.js';
 export type PurchaseImpactKind='new'|'upgrade'|'legendary'|'replace'|'potion';
 export interface PurchaseImpactFeedback{kind:PurchaseImpactKind;message:string;}
-function equipped(state:EquipmentState,offer:ShopDisplayOffer){return offer.kind==='weapon'?state.weapon:offer.kind==='armor'?state.armor:null;}
+function equipped(state:EquipmentState,offer:ShopDisplayOffer){return offer.kind==='potion'?null:state[offer.kind];}
 export function purchaseImpactFeedback(before:EquipmentState,after:EquipmentState,offer:ShopDisplayOffer):PurchaseImpactFeedback{
   const projection=shopPurchaseProjectionFromStates(before,after,offer);
   if(offer.kind==='potion')return{kind:'potion',message:projection.summary};

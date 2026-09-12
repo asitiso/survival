@@ -38,8 +38,8 @@ export function auditShopItemAssets(): ShopItemAssetAudit {
   add(samples, 'unique-cells', 9, atlas.uniqueCellCount);
   add(samples, 'atlas-columns', 3, SHOP_ITEM_ATLAS.columns);
   add(samples, 'atlas-rows', 3, SHOP_ITEM_ATLAS.rows);
-  add(samples, 'atlas-width', 384, SHOP_ITEM_ATLAS.width);
-  add(samples, 'atlas-height', 384, SHOP_ITEM_ATLAS.height);
+  add(samples, 'atlas-width', 1254, SHOP_ITEM_ATLAS.width);
+  add(samples, 'atlas-height', 1254, SHOP_ITEM_ATLAS.height);
   add(samples, 'no-missing-items', 0, atlas.missing.length);
   add(samples, 'no-out-of-bounds-items', 0, atlas.outOfBounds.length);
 
@@ -63,7 +63,7 @@ export function auditShopItemAssets(): ShopItemAssetAudit {
   add(samples, 'text-fallback-preserved', true, textFallbackPreserved);
   add(samples, 'offer-logic-mutation', false, false);
   add(samples, 'snapshot-schema-mutation', false, false);
-  add(samples, 'atlas-src-stable', './assets/ui/shop-items.png', SHOP_ITEM_ATLAS.src);
+  add(samples, 'atlas-src-stable', './assets/ui/shop-items-enhanced.png', SHOP_ITEM_ATLAS.src);
   add(samples, 'desktop-icon-size-compact', true, desktopCompact);
   add(samples, 'mobile-icon-size-compact', true, mobileCompact);
 

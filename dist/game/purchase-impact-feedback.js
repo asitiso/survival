@@ -1,5 +1,5 @@
 import { shopPurchaseProjectionFromStates } from './shop-purchase-projection.js';
-function equipped(state, offer) { return offer.kind === 'weapon' ? state.weapon : offer.kind === 'armor' ? state.armor : null; }
+function equipped(state, offer) { return offer.kind === 'potion' ? null : state[offer.kind]; }
 export function purchaseImpactFeedback(before, after, offer) {
     const projection = shopPurchaseProjectionFromStates(before, after, offer);
     if (offer.kind === 'potion')

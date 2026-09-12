@@ -1,3 +1,4 @@
+import { attackIntentKey, replaceRenderedAttackIntents } from './attack-outcome-linkage.js';
 const IDENTITY = {
     grunt: { motif: 'dust', color: '#b9c8d6', weight: .80 }, hound: { motif: 'slash', color: '#ee8678', weight: .72 }, brute: { motif: 'fracture', color: '#d29668', weight: 1.18 }, archer: { motif: 'needle', color: '#d89bea', weight: .82 },
     bomber: { motif: 'blast', color: '#ff9b55', weight: 1.05 }, shaman: { motif: 'rune', color: '#83eab2', weight: .92 }, shieldbearer: { motif: 'shield', color: '#9eb4d2', weight: 1.08 }, assassin: { motif: 'shadow', color: '#dc9aff', weight: .84 },
@@ -27,18 +28,29 @@ export function enemyDeathCue(type) {
     const rays = id.motif === 'slash' || id.motif === 'needle' ? 6 : id.motif === 'blast' || id.motif === 'quake' ? 8 : id.motif === 'rune' || id.motif === 'null' ? 5 : 3;
     return { radius, particles, duration: type === 'siegeGolem' ? .42 : type === 'brute' ? .34 : .28, color: id.color, motif: id.motif, rayCount: rays, glowAlpha: Math.min(.22, .08 + id.weight * .08) };
 }
+function telegraphAttackIntent(enemy, source) {
+    if (enemy.target !== 'hero' && enemy.target !== 'core')
+        return undefined;
+    const identity = { enemyId: enemy.id, enemyType: enemy.type, target: enemy.target, source };
+    return { key: attackIntentKey(identity), ...identity, ...(enemy.pos ? { origin: { x: enemy.pos.x, y: enemy.pos.y } } : {}) };
+}
 export function enemyThreatTelegraph(enemy) {
-    if (enemy.type === 'boss')
-        return { enemyId: enemy.id, type: enemy.type, radius: enemy.radius + 54, priority: 100, color: '#ff5768', style: 'boss-ring' };
+    if (enemy.type === 'boss') {
+        const attackIntent = telegraphAttackIntent(enemy, 'contact');
+        return { enemyId: enemy.id, type: enemy.type, radius: enemy.radius + 54, priority: 100, color: '#ff5768', style: 'boss-ring', ...(attackIntent ? { attackIntent } : {}) };
+    }
     if (enemy.type === 'bomber') {
         if ((enemy.specialTimer ?? 0.8) > 1.2)
             return null;
-        return { enemyId: enemy.id, type: enemy.type, radius: Math.max(88, enemy.radius * 5.4), priority: 85, color: '#ff7a43', style: 'danger-ring' };
+        const attackIntent = telegraphAttackIntent(enemy, 'explosion');
+        return { enemyId: enemy.id, type: enemy.type, radius: Math.max(88, enemy.radius * 5.4), priority: 85, color: '#ff7a43', style: 'danger-ring', ...(attackIntent ? { attackIntent } : {}) };
     }
     if (enemy.type === 'shaman')
         return { enemyId: enemy.id, type: enemy.type, radius: enemy.radius + 58, priority: 25, color: '#70e7a1', style: 'support-ring' };
     return null;
 }
 export function sortTelegraphsByPriority(telegraphs) {
-    return telegraphs.filter((cue) => cue !== null).sort((a, b) => b.priority - a.priority || a.enemyId - b.enemyId);
+    const sorted = telegraphs.filter((cue) => cue !== null).sort((a, b) => b.priority - a.priority || a.enemyId - b.enemyId);
+    replaceRenderedAttackIntents(sorted.flatMap((cue) => cue.attackIntent ? [cue.attackIntent] : []));
+    return sorted;
 }

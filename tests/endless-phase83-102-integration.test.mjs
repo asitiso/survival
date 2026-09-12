@@ -45,7 +45,7 @@ test('mythic identity and final form attack layers are wired into combat rather 
 });
 
 test('mobile polish is input-accurate and sheds decorative load before combat logic',()=>{
-  assert.match(input,/hitTestActionButton\(p\)/); assert.match(input,/applyJoystickDeadzone/);
+  assert.match(input,/hitTestActionButton\(p, ACTION_BUTTONS, actionTouchScale\)/); assert.match(input,/applyJoystickDeadzone/);
   const minimal=mobileFrameGovernorPolicy('minimal');
   assert.equal(minimal.particleCap,64); assert.equal(minimal.trailCap,28); assert.equal(minimal.telegraphCap,24);
   assert.match(game,/comfort\.vfxDensity/); assert.match(game,/governor\.telegraphCap/);

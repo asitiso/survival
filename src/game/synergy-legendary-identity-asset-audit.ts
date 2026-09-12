@@ -11,7 +11,7 @@ export interface SynergyLegendaryIdentityAssetAudit{
 }
 const close=(a:number,b:number)=>Math.abs(a-b)<1e-9;
 const item=(id:string,kind:'weapon'|'armor'):EquippedItem=>({id,kind,name:id,rank:5,power:.1,legendary:true});
-const equip=(weapon:EquippedItem|null=null,armor:EquippedItem|null=null):EquipmentState=>({coins:0,weapon,armor,healingPotions:1});
+const equip=(weapon:EquippedItem|null=null,armor:EquippedItem|null=null):EquipmentState=>({coins:0,weapon,armor,healingPotions:1,inventory:[],discoveredRecipes:[]});
 function synergyContractOk():boolean{
   const cases=[
     [{heroId:'arkan',traitId:null,relicId:'abyss-eye',equipment:equip(item('arcane-staff','weapon'))},'forbidden-arcana'],

@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   defaultMetaProfile,
+  discoverEquipmentRecipe,
+  sanitizeMetaProfile,
   loadMetaProfile,
   saveMetaProfile,
   metaUpgradeCost,
@@ -37,6 +39,20 @@ test('meta profile sanitizes malformed persisted values and respects upgrade cap
   const profile = loadMetaProfile(storage);
   assert.equal(profile.shards, 0);
   assert.deepEqual(profile.upgrades, { vitality: 5, power: 0, bankroll: 2, magnet: 4 });
+});
+
+test('meta profile permanently sanitizes known hidden recipe ids', () => {
+  const profile = sanitizeMetaProfile({
+    ...defaultMetaProfile(),
+    discoveredEquipmentRecipes: ['celestial-fusion-staff', 'bad-id', 'celestial-fusion-staff'],
+  });
+  assert.deepEqual(profile.discoveredEquipmentRecipes, ['celestial-fusion-staff']);
+});
+
+test('recipe discovery is idempotent and ignores unknown recipe ids', () => {
+  const discovered = discoverEquipmentRecipe(defaultMetaProfile(), 'world-tree-armor');
+  assert.deepEqual(discoverEquipmentRecipe(discovered, 'world-tree-armor').discoveredEquipmentRecipes, ['world-tree-armor']);
+  assert.deepEqual(discoverEquipmentRecipe(discovered, 'bad-id').discoveredEquipmentRecipes, ['world-tree-armor']);
 });
 
 test('meta upgrade costs rise by target level and capped tracks cannot be purchased again', () => {

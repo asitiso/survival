@@ -35,5 +35,5 @@ test('phase 2412 image VFX cleanup survives atlas load failure and hazard stamps
   const cleanupIndex = gameSource.indexOf('this.enemyDeathImageBursts = this.enemyDeathImageBursts.filter');
   const atlasGuardIndex = gameSource.indexOf('if (!this.enemyCombatVfxAtlasReady || !this.enemyCombatVfxAtlasImage) return;');
   assert.ok(cleanupIndex >= 0 && atlasGuardIndex >= 0 && cleanupIndex < atlasGuardIndex);
-  assert.match(gameSource, /ctx\.restore\(\);\n\s+if \(this\.bossSpecialCombatVfxAtlasReady && this\.bossSpecialCombatVfxAtlasImage\)/);
+  assert.match(gameSource, /ctx\.restore\(\);\r?\n\s+if \(this\.bossSpecialCombatVfxAtlasReady && this\.bossSpecialCombatVfxAtlasImage\)/);
 });

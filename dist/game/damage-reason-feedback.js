@@ -1,9 +1,17 @@
+import { consumeRenderedAttackOutcome } from './attack-outcome-linkage.js';
 const LABELS = {
     contact: '근접 공격', projectile: '투사체 피격', explosion: '폭발 피격', arena: '위험지대', strain: '과부하 피해',
 };
 const DENSITY_GUARD_SECONDS = .22;
 const SEVERITY_RANK = { normal: 0, heavy: 1, critical: 2 };
 function dwellSeconds(severity) { return severity === 'critical' ? 1.15 : severity === 'heavy' ? .95 : .72; }
+function linkedDamageLabel(intent, baseLabel) {
+    if (intent.enemyType === 'boss')
+        return `보스 · ${baseLabel}`;
+    if (intent.enemyType === 'bomber')
+        return `폭탄병 · ${baseLabel}`;
+    return baseLabel;
+}
 export function damageReasonCue(source, amount, maxHp) {
     const ratio = Math.max(0, amount) / Math.max(1, maxHp);
     const severity = ratio >= .32 ? 'critical' : ratio >= .12 ? 'heavy' : 'normal';
@@ -21,6 +29,8 @@ export function recordDamageReason(previous, source, amount, maxHp, nowSeconds) 
     }
     const total = merge && previous ? previous.amount + Math.max(0, amount) : Math.max(0, amount);
     const mergedCue = damageReasonCue(source, total, maxHp);
-    return { ...mergedCue, amount: total, expiresAt: nowSeconds + dwellSeconds(mergedCue.severity) };
+    const attackIntent = consumeRenderedAttackOutcome('hero', source);
+    const label = attackIntent ? linkedDamageLabel(attackIntent, mergedCue.label) : mergedCue.label;
+    return { ...mergedCue, label, amount: total, expiresAt: nowSeconds + dwellSeconds(mergedCue.severity), ...(attackIntent ? { attackIntent } : {}) };
 }
 export function advanceDamageReason(state, nowSeconds) { return state && state.expiresAt > nowSeconds ? state : null; }

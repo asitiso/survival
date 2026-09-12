@@ -40,3 +40,12 @@ export function mobileLandscapePresentationProfile(
 export function mobileLandscapeActorScale(): number {
   return mobileLandscapePresentationProfile().actorScale;
 }
+
+export function mobileLandscapeControlScale(): number {
+  return mobileLandscapePresentationProfile().controlScale;
+}
+
+export function mobileLandscapeTouchScale(baseTouchScale: number): number {
+  const safeBase = Number.isFinite(baseTouchScale) ? Math.max(0.5, baseTouchScale) : 1;
+  return safeBase / mobileLandscapeControlScale();
+}

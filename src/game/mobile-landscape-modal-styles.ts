@@ -4,7 +4,7 @@ export const MOBILE_LANDSCAPE_MODAL_CSS = `
 @media (orientation: landscape) and (min-height: 431px) and (max-height: 600px) and (max-width: 1024px) {
   .results-overlay .results-panel {
     width: min(68%, 820px);
-    max-height: calc(100dvh - 16px);
+    max-height: calc(100% - 16px);
     padding: 10px 16px;
   }
 
@@ -12,19 +12,19 @@ export const MOBILE_LANDSCAPE_MODAL_CSS = `
   .trait-select-overlay .trait-panel,
   .fate-select-overlay .trait-panel {
     width: min(74%, 920px);
-    max-height: calc(100dvh - 16px);
+    max-height: calc(100% - 16px);
   }
 
   .lobby-overlay .lobby-panel {
     width: min(84%, 1080px);
-    max-height: calc(100dvh - 16px);
+    max-height: calc(100% - 16px);
   }
 }
 
 @media (orientation: landscape) and (max-height: 430px) and (max-width: 1024px) {
   .results-overlay .results-panel {
     width: min(66%, 760px);
-    max-height: calc(100dvh - 8px);
+    max-height: calc(100% - 8px);
     padding: 8px 14px;
   }
 
@@ -61,12 +61,12 @@ export const MOBILE_LANDSCAPE_MODAL_CSS = `
   .trait-select-overlay .trait-panel,
   .fate-select-overlay .trait-panel {
     width: min(72%, 900px);
-    max-height: calc(100dvh - 8px);
+    max-height: calc(100% - 8px);
   }
 
   .lobby-overlay .lobby-panel {
     width: min(82%, 1040px);
-    max-height: calc(100dvh - 8px);
+    max-height: calc(100% - 8px);
   }
 }
 `;

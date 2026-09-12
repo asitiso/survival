@@ -6,6 +6,7 @@ import { landscapeSafeAreaProfile } from '../game/landscape-safe-area.js';
 import { foldableTouchScaleMap } from '../game/foldable-touch-density.js';
 import { foldableThumbIntent } from '../game/foldable-thumb-zones.js';
 import { resolveFoldableDeadSpace } from '../game/foldable-dead-space.js';
+import { mobileLandscapeTouchScale } from '../game/mobile-landscape-presentation.js';
 import { softFollowJoystickBase, thumbComfortProfile } from './thumb-fatigue.js';
 import { logicalPointerPosition } from './input-lifecycle.js';
 import { ActionHoldLeashTracker, actionHoldReleaseRadius } from './action-hold-leash.js';
@@ -119,16 +120,17 @@ export class InputState {
     }
     const rect = this.canvas.getBoundingClientRect();
     const safeArea = landscapeSafeAreaProfile(rect.width || LOGICAL_WIDTH, rect.height || LOGICAL_HEIGHT);
-    const touchProfile = foldableTouchScaleMap(safeArea, ACTION_BUTTONS, ACTION_TOUCH_SCALE);
+    const actionTouchScale = mobileLandscapeTouchScale(ACTION_TOUCH_SCALE);
+    const touchProfile = foldableTouchScaleMap(safeArea, ACTION_BUTTONS, actionTouchScale);
     const deadSpace = safeArea.aspectClass === 'foldable' ? resolveFoldableDeadSpace(p, safeArea, ACTION_BUTTONS) : null;
     const thumbIntent = deadSpace?.intent ?? foldableThumbIntent(p, safeArea);
     const deadSpaceButton = deadSpace?.actionId ? ACTION_BUTTONS.find((entry)=>entry.id===deadSpace.actionId) ?? null : null;
     const button = safeArea.aspectClass === 'foldable'
-      ? deadSpaceButton ?? (thumbIntent === 'right' ? hitTestActionButton(p, ACTION_BUTTONS, ACTION_TOUCH_SCALE, touchProfile) : null)
-      : hitTestActionButton(p);
+      ? deadSpaceButton ?? (thumbIntent === 'right' ? hitTestActionButton(p, ACTION_BUTTONS, actionTouchScale, touchProfile) : null)
+      : hitTestActionButton(p, ACTION_BUTTONS, actionTouchScale);
     if (button?.id === 'auto' && !this.autoModeVisible) return;
     if (button) {
-      const actualTouchScale = touchProfile[button.id] ?? ACTION_TOUCH_SCALE;
+      const actualTouchScale = touchProfile[button.id] ?? actionTouchScale;
       if (button.id === 'shop' || button.id === 'auto') {
         const armed = this.strategicReleases.arm(
           event.pointerId,

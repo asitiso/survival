@@ -77,7 +77,8 @@ body { overscroll-behavior:none; touch-action:none; }
 .result-grid .result-shards b { color:#d9c4ff; }
 
 /* Phase 6: lightweight between-run progression */
-.lobby-panel { width:min(1180px,92%); padding:26px 30px 28px; text-align:left; }
+.lobby-panel { width:min(1180px,92%); max-height:calc(100% - 16px); padding:26px 30px 28px; text-align:left; display:flex; flex-direction:column; overflow:hidden; }
+.lobby-scroll-body { min-height:0; flex:1 1 auto; overflow-y:auto; overscroll-behavior:contain; touch-action:pan-y; }
 .lobby-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:26px; }
 .lobby-heading h1 { margin:4px 0 4px; font-size:clamp(30px,3.2vw,48px); }
 .shard-wallet { min-width:210px; padding:14px 18px; border-radius:18px; background:#101a2a; border:1px solid rgba(195,151,255,.30); text-align:right; }
@@ -92,7 +93,7 @@ body { overscroll-behavior:none; touch-action:none; }
 .lobby-upgrade-pips { color:var(--accent); letter-spacing:.13em; font-size:13px; }
 .lobby-upgrade-desc { min-height:42px; color:#b8c7d5; line-height:1.45; font-size:14px; }
 .lobby-upgrade-price { margin-top:5px; color:#e9c5ff; font-size:17px; }
-.lobby-footer { margin-top:18px; display:flex; align-items:center; justify-content:space-between; gap:18px; color:#8fa4b7; font-size:13px; font-weight:700; }
+.lobby-footer { flex-shrink:0; margin-top:18px; display:flex; align-items:center; justify-content:space-between; gap:18px; color:#8fa4b7; font-size:13px; font-weight:700; }
 .lobby-start { min-width:250px; min-height:58px; font-size:20px; }
 .trait-panel { width:min(1040px,88%); }
 .trait-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }

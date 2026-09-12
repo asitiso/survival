@@ -141,6 +141,8 @@ export class LobbyOverlay {
         <div class="shard-wallet"><span>보유 마력석</span><strong>◆ ${profile.shards.toLocaleString()}</strong></div>
       </div>`;
 
+    const scrollBody = document.createElement('div');
+    scrollBody.className = 'lobby-scroll-body';
     const grid = document.createElement('div');
     grid.className = 'lobby-grid';
     for (const card of lobbyUpgradeCards(profile)) {
@@ -165,7 +167,7 @@ export class LobbyOverlay {
       });
       grid.append(button);
     }
-    panel.append(grid);
+    scrollBody.append(grid);
 
     if (this.masteryProfile) {
       const masteryWrap = document.createElement('div');
@@ -181,7 +183,7 @@ export class LobbyOverlay {
         row.append(hero);
       }
       masteryWrap.append(row);
-      panel.append(masteryWrap);
+      scrollBody.append(masteryWrap);
     }
 
     if (this.threatProfile) {
@@ -206,7 +208,7 @@ export class LobbyOverlay {
         row.append(button);
       }
       threatWrap.append(row);
-      panel.append(threatWrap);
+      scrollBody.append(threatWrap);
     }
 
     if (this.recentRuns.length > 0) {
@@ -221,7 +223,7 @@ export class LobbyOverlay {
       const recentFinalForm=newest.finalForm ?? recentBuild?.finalForm ?? null;
       const recentMapIcon=newest.mapId?`<i class="battlefield-identity-icon lobby-battlefield-icon" style="${battlefieldEnvironmentIconStyle(newest.mapId,mapEvolutionStage(newest.seconds))}" aria-hidden="true"></i>`:'';
       history.innerHTML = `${recentMapIcon}${recentFinalForm?`<i class="final-form-identity-icon lobby-final-form-icon" style="${finalFormIdentityIconStyle(recentFinalForm)}" aria-hidden="true"></i>`:''}<span class="lobby-recent-portrait" style="${identityIconStyle(recentPortrait)}" aria-hidden="true"></span><span>최근 기록</span><b>${hero} · T${newest.threat} · ${mins}분 · ${newest.runCode}</b>${recentBuildIcons.length?`<span class="lobby-build-identities">${recentBuildIcons.map((id)=>`<i class="build-identity-icon" style="${buildIdentityIconStyle(id)}" aria-hidden="true"></i>`).join('')}</span>`:''}<small>${newest.buildCapsule ? `BUILD ${newest.buildCapsule}` : `최근 ${this.recentRuns.length}런 저장`}</small>`;
-      panel.append(history);
+      scrollBody.append(history);
     }
 
     if (this.resumeSnapshot && this.handlers?.onResume) {
@@ -237,7 +239,7 @@ export class LobbyOverlay {
       const resumeMapIcon=`<i class="battlefield-identity-icon lobby-battlefield-icon" style="${battlefieldEnvironmentIconStyle(this.resumeSnapshot.map.id,this.resumeSnapshot.map.evolutionStage)}" aria-hidden="true"></i>`;
       resume.innerHTML = `${resumeMapIcon}${resumeFinalForm?`<i class="final-form-identity-icon lobby-final-form-icon" style="${finalFormIdentityIconStyle(resumeFinalForm.id)}" aria-hidden="true"></i>`:''}<span class="lobby-resume-portrait" style="${identityIconStyle(resumePortrait)}" aria-hidden="true"></span><span>이어하기 · ${hero} · ${mins}:${secs}</span>${resumeBuildIds.length?`<span class="lobby-build-identities">${resumeBuildIds.map((id)=>`<i class="build-identity-icon" style="${buildIdentityIconStyle(id)}" aria-hidden="true"></i>`).join('')}</span>`:''}`;
       resume.addEventListener('click', () => this.handlers?.onResume?.());
-      panel.append(resume);
+      scrollBody.append(resume);
     }
 
     const footer = document.createElement('div');
@@ -248,7 +250,7 @@ export class LobbyOverlay {
     start.textContent = '전투 준비';
     start.addEventListener('click', () => this.handlers?.onContinue());
     footer.append(start);
-    panel.append(footer);
+    panel.append(scrollBody, footer);
     this.root.append(panel);
   }
 }

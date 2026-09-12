@@ -28,7 +28,7 @@ if (presentationControls?.parentElement) {
   const settingsPanel = document.createElement('div');
   settingsPanel.className = 'presentation-settings-panel';
   settingsPanel.style.position = 'absolute';
-  settingsPanel.style.zIndex = '9';
+  settingsPanel.style.zIndex = '14';
   settingsPanel.style.display = 'flex';
   settingsPanel.style.flexDirection = 'row-reverse';
   settingsPanel.style.alignItems = 'flex-start';
@@ -76,9 +76,27 @@ if (presentationControls?.parentElement) {
 
   syncPresentationSettingsLayout = () => {
     const compact = window.innerWidth <= 1000;
-    settingsPanel.style.top = compact ? '84px' : '88px';
-    settingsPanel.style.right = compact ? '14px' : '22px';
-    if (userExpandedOverride === null) expanded = !isPhoneLandscapeSettings();
+    const phoneLandscape = isPhoneLandscapeSettings();
+    settingsPanel.style.position = phoneLandscape ? 'fixed' : 'absolute';
+    settingsPanel.style.top = phoneLandscape ? 'max(8px, env(safe-area-inset-top))' : compact ? '84px' : '88px';
+    settingsPanel.style.right = phoneLandscape ? 'max(8px, env(safe-area-inset-right))' : compact ? '14px' : '22px';
+    settingsPanel.style.flexDirection = phoneLandscape ? 'column' : 'row-reverse';
+    settingsPanel.style.alignItems = phoneLandscape ? 'flex-end' : 'flex-start';
+    settingsPanel.style.gap = phoneLandscape ? '8px' : '6px';
+    settingsPanel.style.maxWidth = phoneLandscape ? 'calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right))' : 'calc(100% - 28px)';
+    settingsBody.style.maxHeight = phoneLandscape ? 'calc(100dvh - 128px)' : '';
+    settingsBody.style.overflowY = phoneLandscape ? 'auto' : '';
+    settingsBody.style.overscrollBehavior = phoneLandscape ? 'contain' : '';
+    presentationControls.style.display = phoneLandscape ? 'grid' : 'flex';
+    presentationControls.style.gridTemplateColumns = phoneLandscape ? 'repeat(3,minmax(0,1fr))' : '';
+    presentationControls.style.maxWidth = phoneLandscape ? 'min(420px, calc(100vw - 96px))' : 'min(620px, calc(100vw - 96px))';
+    presentationControls.style.gap = phoneLandscape ? '6px' : '';
+    for (const button of presentationControls.querySelectorAll<HTMLButtonElement>('button')) {
+      button.style.minHeight = phoneLandscape ? '44px' : '';
+      button.style.padding = phoneLandscape ? '0 10px' : '';
+      button.style.fontSize = phoneLandscape ? '11px' : '';
+    }
+    if (userExpandedOverride === null) expanded = !phoneLandscape;
     syncExpandedState();
   };
 

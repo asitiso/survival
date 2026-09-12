@@ -22,6 +22,10 @@ test('crafted equipment has a dedicated atlas instead of the generic fallback', 
   assert.match(assets, /equipment-forge-items\.png/);
 });
 
+test('forge atlas is resolved from the app root so the shop route cannot lose item art', () => {
+  assert.match(assets, /src:\s*'\/assets\/ui\/equipment-forge-items\.png'/);
+});
+
 test('accessories keep their two-column atlas scale inside the forge', () => {
   assert.match(assets, /backgroundSize: '200% 200%'/);
   assert.match(styles, /--forge-item-size/);

@@ -40,7 +40,7 @@ test('phase 2299 activation toast uses the same projection and clears stale effe
   assert.match(game,/overdrive\.activations > previousOverdriveActivations[\s\S]{0,600}showBuildOverdriveActivationToast/);
   assert.match(game,/showBuildOverdriveActivationToast[\s\S]{0,500}projectBuildOverdriveEffects/);
   assert.match(game,/eventToastBuildOverdriveProjection\s*=\s*null/);
-  const body=game.match(/private showEventToast\([\s\S]*?\n  }\n\n  private showHeroMeterEventToast/)?.[0]??'';
+  const body=game.match(/private showEventToast\([\s\S]*?\r?\n  }\r?\n\r?\n  private showHeroMeterEventToast/)?.[0]??'';
   assert.match(body,/this\.eventToastBuildOverdriveProjection\s*=\s*null/);
 });
 

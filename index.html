@@ -19,6 +19,169 @@
         touch-action: pan-y;
       }
 
+      .lobby-overlay,
+      .levelup-overlay,
+      .trait-select-overlay,
+      .fate-select-overlay {
+        position: fixed;
+        inset: max(0px, env(safe-area-inset-top)) max(0px, env(safe-area-inset-right)) max(0px, env(safe-area-inset-bottom)) max(0px, env(safe-area-inset-left));
+      }
+
+      .modal-panel:not(.shop-panel) {
+        padding: 14px 18px 16px;
+        border-radius: 20px;
+      }
+
+      .modal-panel:not(.shop-panel) h1,
+      .modal-panel:not(.shop-panel) h2 {
+        margin-top: 2px;
+        margin-bottom: 2px;
+      }
+
+      .modal-panel:not(.shop-panel) .modal-subtitle {
+        margin-bottom: 8px;
+        line-height: 1.3;
+      }
+
+      .levelup-panel,
+      .trait-panel {
+        height: calc(100vh - 24px);
+        height: calc(100dvh - 24px);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .levelup-panel .upgrade-cards,
+      .trait-panel .trait-grid {
+        flex: 1 1 70%;
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        touch-action: pan-y;
+        align-items: stretch;
+      }
+
+      .levelup-panel .upgrade-card,
+      .trait-panel .trait-card {
+        min-height: 132px;
+        padding: 10px 12px;
+        gap: 7px;
+      }
+
+      .levelup-panel .upgrade-icon,
+      .trait-panel .trait-mark {
+        width: 40px;
+        height: 40px;
+      }
+
+      .levelup-panel .upgrade-card strong,
+      .trait-panel .trait-card strong {
+        font-size: 18px;
+      }
+
+      .levelup-panel .upgrade-card > strong + span,
+      .trait-panel .trait-card > span:not(.trait-mark):not(.fate-tradeoff-identities) {
+        font-size: 12px;
+        line-height: 1.3;
+      }
+
+      .lobby-overlay .lobby-panel {
+        width: min(1180px, 96%);
+      }
+
+      .lobby-overlay .lobby-heading {
+        align-items: center;
+        gap: 10px;
+      }
+
+      .lobby-overlay .lobby-heading > div:first-child {
+        min-width: 0;
+      }
+
+      .lobby-overlay .lobby-heading h1 {
+        margin: 0;
+        font-size: 26px;
+        line-height: 1.1;
+      }
+
+      .lobby-overlay .lobby-heading .modal-subtitle {
+        margin: 2px 0 0;
+        font-size: 12px;
+        line-height: 1.25;
+      }
+
+      .lobby-overlay .shard-wallet {
+        display: inline-flex;
+        min-width: 0;
+        padding: 5px 10px;
+        flex-direction: row;
+        align-items: baseline;
+        gap: 7px;
+        border-radius: 999px;
+        white-space: nowrap;
+      }
+
+      .lobby-overlay .shard-wallet span {
+        font-size: 10px;
+      }
+
+      .lobby-overlay .shard-wallet strong {
+        margin-top: 0;
+        font-size: 17px;
+      }
+
+      .lobby-overlay .lobby-grid {
+        margin-top: 6px;
+        gap: 8px;
+      }
+
+      .lobby-overlay .lobby-upgrade-card {
+        min-height: 132px;
+        padding: 9px 11px;
+        gap: 4px;
+        display: grid;
+        grid-template-columns: 34px minmax(0,1fr) auto;
+        grid-template-rows: repeat(3,auto) auto;
+        align-content: center;
+        align-items: center;
+        text-align: left;
+      }
+
+      .lobby-overlay .lobby-upgrade-icon {
+        width: 34px;
+        height: 34px;
+        flex-basis: 34px;
+        grid-column: 1;
+        grid-row: 1 / span 3;
+      }
+
+      .lobby-overlay .lobby-upgrade-name,
+      .lobby-overlay .lobby-upgrade-card strong,
+      .lobby-overlay .lobby-upgrade-pips {
+        grid-column: 2;
+      }
+
+      .lobby-overlay .lobby-upgrade-card strong {
+        font-size: 18px;
+      }
+
+      .lobby-overlay .lobby-upgrade-desc {
+        grid-column: 1 / -1;
+        grid-row: 4;
+        min-height: 0;
+        font-size: 11px;
+        line-height: 1.25;
+      }
+
+      .lobby-overlay .lobby-upgrade-price {
+        grid-column: 3;
+        grid-row: 1 / span 3;
+        align-self: center;
+        margin: 0;
+        font-size: 14px;
+      }
+
       .shop-overlay {
         position: fixed;
         inset: max(0px, env(safe-area-inset-top)) max(0px, env(safe-area-inset-right)) max(0px, env(safe-area-inset-bottom)) max(0px, env(safe-area-inset-left));
@@ -287,6 +450,63 @@
     }
 
     @media (orientation: landscape) and (max-height: 430px) and (max-width: 1024px) {
+      .modal-panel:not(.shop-panel) {
+        padding: 8px 10px 10px;
+        border-radius: 16px;
+      }
+
+      .modal-panel:not(.shop-panel) .eyebrow {
+        font-size: 11px;
+        letter-spacing: .16em;
+      }
+
+      .modal-panel:not(.shop-panel) h1,
+      .modal-panel:not(.shop-panel) h2 {
+        margin: 0;
+        font-size: 20px;
+        line-height: 1.15;
+      }
+
+      .modal-panel:not(.shop-panel) .modal-subtitle {
+        margin-bottom: 4px;
+        font-size: 11px;
+        line-height: 1.2;
+      }
+
+      .levelup-panel,
+      .trait-panel {
+        height: calc(100vh - 16px);
+        height: calc(100dvh - 16px);
+      }
+
+      .levelup-panel .upgrade-card,
+      .trait-panel .trait-card,
+      .lobby-overlay .lobby-upgrade-card {
+        min-height: 116px;
+        padding: 7px 9px;
+        gap: 3px;
+      }
+
+      .levelup-panel .upgrade-icon,
+      .trait-panel .trait-mark {
+        width: 34px;
+        height: 34px;
+      }
+
+      .lobby-overlay .lobby-heading h1 {
+        font-size: 20px;
+      }
+
+      .lobby-overlay .lobby-heading .modal-subtitle {
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+
+      .lobby-overlay .shard-wallet span {
+        display: none;
+      }
+
       .shop-overlay .shop-grid {
         gap: 4px;
       }

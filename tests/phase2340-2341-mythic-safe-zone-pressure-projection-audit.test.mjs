@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 const auditUrl=new URL('../dist/game/endless/mythic-safe-zone-pressure-projection-identity-audit.js',import.meta.url);
 const pressureSource=new URL('../src/game/endless/mythic-safe-zone-pressure.ts',import.meta.url);
 const snapshotSource=new URL('../src/game/endless/snapshot.ts',import.meta.url);
-const sha=p=>crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
+const sha=p=>crypto.createHash('sha256').update(fs.readFileSync(p,'utf8').replace(/\r\n/g,'\n')).digest('hex');
 
 test('phase 2340-2341 deterministic SAFE pressure projection audit contains exactly ninety-six samples',async()=>{
   assert.equal(fs.existsSync(auditUrl),true,'SAFE pressure projection audit module must exist');

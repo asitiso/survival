@@ -41,3 +41,29 @@ test('very short phone landscape shop prioritizes item choices over card chrome'
   assert.match(style, /\.shop-overlay \.shop-item-icon\s*\{[\s\S]*width:\s*30px;[\s\S]*height:\s*30px;/);
   assert.match(style, /\.shop-overlay \.shop-desc\s*\{[\s\S]*-webkit-line-clamp:\s*1;/);
 });
+
+test('short landscape keeps ordinary dialogs readable while compacting only their spacing', () => {
+  assert.match(style, /\.modal-panel:not\(\.shop-panel\)\s*\{[\s\S]*padding:\s*14px 18px 16px;[\s\S]*border-radius:\s*20px;/);
+  assert.match(style, /\.modal-panel:not\(\.shop-panel\) \.modal-subtitle\s*\{[\s\S]*margin-bottom:\s*8px;/);
+  assert.doesNotMatch(style, /\.modal-panel:not\(\.shop-panel\)[^{]*\{[^}]*transform:\s*scale/);
+});
+
+test('short landscape decision dialogs reserve most height for internally scrollable choices', () => {
+  assert.match(style, /\.lobby-overlay,[\s\S]*\.levelup-overlay,[\s\S]*\.trait-select-overlay,[\s\S]*\.fate-select-overlay\s*\{[\s\S]*position:\s*fixed;[\s\S]*inset:\s*max\(0px, env\(safe-area-inset-top\)\)/);
+  assert.match(style, /\.levelup-panel,[\s\S]*\.trait-panel\s*\{[\s\S]*height:\s*calc\(100dvh - 24px\);[\s\S]*overflow:\s*hidden;/);
+  assert.match(style, /\.levelup-panel \.upgrade-cards,[\s\S]*\.trait-panel \.trait-grid\s*\{[\s\S]*flex:\s*1 1 70%;[\s\S]*overflow-y:\s*auto;/);
+  assert.match(style, /\.levelup-panel \.upgrade-card,[\s\S]*\.trait-panel \.trait-card\s*\{[\s\S]*min-height:\s*132px;/);
+  assert.match(style, /\.levelup-panel \.upgrade-card > strong \+ span,[\s\S]*\.trait-panel \.trait-card > span:not\(\.trait-mark\):not\(\.fate-tradeoff-identities\)\s*\{[\s\S]*font-size:\s*12px;[\s\S]*line-height:\s*1\.3;/);
+});
+
+test('arcane sanctum uses a compact shard chip and shorter upgrade cards in short landscape', () => {
+  assert.match(style, /\.lobby-overlay \.shard-wallet\s*\{[\s\S]*display:\s*inline-flex;[\s\S]*min-width:\s*0;[\s\S]*padding:\s*5px 10px;/);
+  assert.match(style, /\.lobby-overlay \.lobby-grid\s*\{[\s\S]*margin-top:\s*6px;/);
+  assert.match(style, /\.lobby-overlay \.lobby-upgrade-card\s*\{[\s\S]*min-height:\s*132px;[\s\S]*padding:\s*9px 11px;[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*34px minmax\(0,1fr\) auto;/);
+  assert.match(style, /\.lobby-overlay \.lobby-upgrade-price\s*\{[\s\S]*grid-column:\s*3;[\s\S]*grid-row:\s*1 \/ span 3;/);
+});
+
+test('ultra-short landscape further compresses headers without shrinking touch targets', () => {
+  assert.match(style, /@media\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*430px\)\s*and\s*\(max-width:\s*1024px\)[\s\S]*\.levelup-panel,[\s\S]*\.trait-panel\s*\{[\s\S]*height:\s*calc\(100dvh - 16px\);/);
+  assert.match(style, /\.levelup-panel \.upgrade-card,[\s\S]*\.trait-panel \.trait-card,[\s\S]*\.lobby-overlay \.lobby-upgrade-card\s*\{[\s\S]*min-height:\s*116px;/);
+});

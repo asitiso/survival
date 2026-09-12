@@ -6,7 +6,7 @@ import { heroSpellIdentity, heroSpellName } from './hero-spells.js';
 import { relicCandidates, relicDefinition, type RelicId } from './relics.js';
 import { fusionCandidates, fusionDefinition, fusionHeroName, type FusionId } from './spell-fusions.js';
 
-export type UpgradeId = SpellId | 'maxHp' | 'moveSpeed' | 'spellPower' | 'cooldown' | 'pickupRadius';
+export type UpgradeId = SpellId | 'maxHp' | 'moveSpeed' | 'spellPower' | 'cooldown' | 'pickupRadius' | 'armor' | 'critChance';
 
 export interface UpgradeChoice {
   id: UpgradeId;
@@ -61,6 +61,8 @@ export function applyUpgrade(id: UpgradeId, hero: Hero, spells: SpellSystem): vo
     case 'moveSpeed': hero.speed *= 1.075; break;
     case 'spellPower': hero.spellPower *= 1.096; break;
     case 'cooldown': hero.cooldownMultiplier = Math.max(0.55, hero.cooldownMultiplier * 0.958); break;
+    case 'armor': hero.armor = Math.min(6, hero.armor + 1); break;
+    case 'critChance': hero.critChance = Math.min(0.20, hero.critChance + 0.03); break;
     case 'pickupRadius': hero.pickupRadius += 28; break;
   }
 }
@@ -82,6 +84,8 @@ export function buildUpgradeChoices(hero: Hero, spells: SpellSystem, rng: () => 
     { id: 'moveSpeed', title: '질풍 걸음', description: `이동속도 +7.5%`, accent: '#6fe7bd' },
     { id: 'pickupRadius', title: '마력 자석', description: `경험치·금화 흡수거리 +28`, accent: '#f3d66d' },
   );
+  if (hero.level >= 10 && hero.armor < 6) pool.push({ id: 'armor', title: '수호 갑주', description: `방어력 +1 · 받는 피해 감소`, accent: '#aab8c7' });
+  if (hero.level >= 15 && hero.critChance < 0.20) pool.push({ id: 'critChance', title: '치명 집중', description: `마법 치명타 확률 +3%`, accent: '#ffd166' });
 
   const result: UpgradeChoice[] = [];
   while (result.length < 3 && pool.length > 0) {

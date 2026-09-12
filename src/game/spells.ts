@@ -1,6 +1,7 @@
 import { distance, normalize, type Vec2 } from '../core/math.js';
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH, type ActionId } from './config.js';
 import type { GuardianCore, Hero } from './entities.js';
+import { magicCriticalDamage } from './magic-critical.js';
 import { heroSpellIdentity } from './hero-spells.js';
 import { spellEvolution } from './spell-evolutions.js';
 import type { Enemy, EnemyManager } from './enemies.js';
@@ -767,7 +768,7 @@ export class SpellSystem {
       const hitSource={...(points[points.length-1] ?? world.hero.pos)};
       points.push({ ...current.pos });
       const impactPos=this.targetAimPoint(world,current)??current.pos,impactResponse=projectileImpactResponseAt(world,impactPos,current);
-      const chainKilled=world.enemies.damage(current, tuning.damage * world.hero.spellPower * world.hero.equipmentSpellPower * identity.damageMultiplier * evolution.damageMultiplier * fusion.damageMultiplier * Math.pow(0.86, i), hitSource);
+      const chainKilled=world.enemies.damage(current, magicCriticalDamage(tuning.damage * world.hero.spellPower * world.hero.equipmentSpellPower * identity.damageMultiplier * evolution.damageMultiplier * fusion.damageMultiplier * Math.pow(0.86, i), world.hero), hitSource);
       if (identity.chainSlowFactor < 1) world.enemies.applySlow(current, Math.max(0.24, identity.chainSlowFactor * evolution.slowFactorMultiplier), identity.chainSlowDuration * evolution.slowDurationMultiplier * fusion.slowDurationMultiplier, 'impact');
       if(i>0){const secondary=secondaryImpactCanonicalPresentation('chain',impactPos,world.reducedFlash??false),lineage=projectileImpactLineageTransferPresentation({sourceLineageKey:visualImpactLineageId,impactIndex:i,secondaryKind:'chain',continues:Boolean(current)},world.reducedMotion??false);this.projectileImpactVisuals.push({pos:secondary.pos,entryOffset:secondary.entryOffset,alphaScale:secondary.alphaScale,secondaryKind:'chain',impactLineageKey:lineage.lineageKey,impactDirection:{x:impactPos.x-hitSource.x,y:impactPos.y-hitSource.y},impactResponseOwner:impactResponse.owner,impactResponseStrength:impactResponse.strength,enemyReactionOwner:chainKilled?'death':'hit',heroId:world.hero.profileId,ttl:.14,maxTtl:.14,size:54*secondary.sizeScale});if(this.projectileImpactVisuals.length>32)this.projectileImpactVisuals.splice(0,this.projectileImpactVisuals.length-32);}
       world.terrain?.hitByMagic(current.pos, 1);
@@ -795,7 +796,7 @@ export class SpellSystem {
     for (const enemy of world.enemies.enemies) {
       if (!enemy.alive || distance(world.hero.pos, enemy.pos) > radius + enemy.radius) continue;
       const seria = world.hero.profileId === 'seria';
-      world.enemies.damage(enemy, tuning.damage * world.hero.spellPower * world.hero.equipmentSpellPower * identity.novaDamageMultiplier * evolution.damageMultiplier * fusion.damageMultiplier * (seria ? 1.06 : 1), world.hero.pos, 'freeze');
+      world.enemies.damage(enemy, magicCriticalDamage(tuning.damage * world.hero.spellPower * world.hero.equipmentSpellPower * identity.novaDamageMultiplier * evolution.damageMultiplier * fusion.damageMultiplier * (seria ? 1.06 : 1), world.hero), world.hero.pos, 'freeze');
       world.enemies.applySlow(enemy, Math.max(0.20, (seria ? 0.42 : 0.53) * evolution.slowFactorMultiplier), tuning.duration * evolution.durationMultiplier * evolution.slowDurationMultiplier * fusion.slowDurationMultiplier * (seria ? 1.25 : 1), 'frost');
       if (identity.knockback > 0) world.enemies.pushAway(enemy, world.hero.pos, identity.knockback * evolution.knockbackMultiplier);
     }
@@ -883,7 +884,7 @@ export class SpellSystem {
         if (distance(p.pos, enemy.pos) > p.radius + enemy.radius) continue;
         const priorImpactCount=p.hitIds.size,continues=p.pierceLeft>0,impactResponse=projectileImpactResponseAt(world,p.pos,enemy);
         p.hitIds.add(enemy.id);
-        const killedByImpact=world.enemies.damage(enemy, p.damage, p.pos);
+        const killedByImpact=world.enemies.damage(enemy, magicCriticalDamage(p.damage, world.hero), p.pos);
         const impactHandoff=projectileMultiHitImpactHandoff({launchOffset:p.visualLaunchOffset,launchTtl:p.visualLaunchTtl,launchMaxTtl:p.visualLaunchMaxTtl,priorImpactCount,continues},world.reducedMotion??false);
         const entryOffset=impactHandoff.entryOffset,lineage=projectileImpactLineageTransferPresentation({sourceLineageKey:p.visualImpactLineageId??`projectile-unbound`,impactIndex:priorImpactCount,continues},world.reducedMotion??false);
         this.projectileImpactVisuals.push({ pos:{...p.pos}, entryOffset, impactLineageKey:lineage.lineageKey, impactDirection:{x:p.vel.x,y:p.vel.y}, impactResponseOwner:impactResponse.owner, impactResponseStrength:impactResponse.strength, enemyReactionOwner:killedByImpact?'death':'hit', heroId:p.heroId, ttl:0.18, maxTtl:0.18, size:Math.max(48,p.radius*5.2) });
@@ -893,7 +894,7 @@ export class SpellSystem {
         if (p.splashRadius > 0 && p.splashDamage > 0) {
           for (const nearby of world.enemies.enemies) {
             if (!nearby.alive || nearby.id === enemy.id) continue;
-            if (distance(enemy.pos, nearby.pos) <= p.splashRadius + nearby.radius) { const splashResponse=projectileImpactResponseAt(world,nearby.pos,nearby); const splashKilled=world.enemies.damage(nearby, p.splashDamage, enemy.pos, 'explosion'); const secondary=secondaryImpactCanonicalPresentation('splash',nearby.pos,world.reducedFlash??false),secondaryLineage=projectileImpactLineageTransferPresentation({sourceLineageKey:p.visualImpactLineageId??lineage.lineageKey,impactIndex:priorImpactCount,secondaryKind:'splash',continues},world.reducedMotion??false); this.projectileImpactVisuals.push({pos:secondary.pos,entryOffset:secondary.entryOffset,alphaScale:secondary.alphaScale,secondaryKind:'splash',impactLineageKey:secondaryLineage.lineageKey,impactDirection:{x:nearby.pos.x-enemy.pos.x,y:nearby.pos.y-enemy.pos.y},impactResponseOwner:splashResponse.owner,impactResponseStrength:splashResponse.strength,enemyReactionOwner:splashKilled?'death':'hit',heroId:p.heroId,ttl:.14,maxTtl:.14,size:Math.max(38,p.radius*4.2)*secondary.sizeScale}); if(this.projectileImpactVisuals.length>32)this.projectileImpactVisuals.splice(0,this.projectileImpactVisuals.length-32); }
+            if (distance(enemy.pos, nearby.pos) <= p.splashRadius + nearby.radius) { const splashResponse=projectileImpactResponseAt(world,nearby.pos,nearby); const splashKilled=world.enemies.damage(nearby, magicCriticalDamage(p.splashDamage, world.hero), enemy.pos, 'explosion'); const secondary=secondaryImpactCanonicalPresentation('splash',nearby.pos,world.reducedFlash??false),secondaryLineage=projectileImpactLineageTransferPresentation({sourceLineageKey:p.visualImpactLineageId??lineage.lineageKey,impactIndex:priorImpactCount,secondaryKind:'splash',continues},world.reducedMotion??false); this.projectileImpactVisuals.push({pos:secondary.pos,entryOffset:secondary.entryOffset,alphaScale:secondary.alphaScale,secondaryKind:'splash',impactLineageKey:secondaryLineage.lineageKey,impactDirection:{x:nearby.pos.x-enemy.pos.x,y:nearby.pos.y-enemy.pos.y},impactResponseOwner:splashResponse.owner,impactResponseStrength:splashResponse.strength,enemyReactionOwner:splashKilled?'death':'hit',heroId:p.heroId,ttl:.14,maxTtl:.14,size:Math.max(38,p.radius*4.2)*secondary.sizeScale}); if(this.projectileImpactVisuals.length>32)this.projectileImpactVisuals.splice(0,this.projectileImpactVisuals.length-32); }
           }
         }
         world.terrain?.hitByMagic(p.pos, 1);
@@ -913,7 +914,7 @@ export class SpellSystem {
       this.hitMagicTarget(world,field.pos,field.damage * 0.55,field.pos);
       for (const enemy of world.enemies.enemies) {
         if (enemy.alive && distance(field.pos, enemy.pos) <= field.radius + enemy.radius) {
-          world.enemies.damage(enemy, field.damage, field.pos);
+          world.enemies.damage(enemy, magicCriticalDamage(field.damage, world.hero), field.pos);
           if (field.slowFactor < 1) world.enemies.applySlow(enemy, field.slowFactor, field.slowDuration, 'generic');
         }
       }
@@ -935,7 +936,7 @@ export class SpellSystem {
           this.queueUltimatePostImpactResidue(meteor.heroId,'meteorStorm',meteor.pos,meteor.radius,.48);
           for (const enemy of world.enemies.enemies) {
             if (enemy.alive && distance(meteor.pos, enemy.pos) <= meteor.radius + enemy.radius) {
-              world.enemies.damage(enemy, meteor.damage, meteor.pos, 'ultimate');
+              world.enemies.damage(enemy, magicCriticalDamage(meteor.damage, world.hero), meteor.pos, 'ultimate');
               if (meteor.slowFactor < 1) world.enemies.applySlow(enemy, meteor.slowFactor, meteor.slowDuration, 'impact');
             }
           }
@@ -958,7 +959,7 @@ export class SpellSystem {
         enemy.pos.x += dir.x * pull;
         enemy.pos.y += dir.y * pull;
         if (hole.tickTimer <= 0) {
-          world.enemies.damage(enemy, hole.damage, hole.pos, 'ultimate');
+          world.enemies.damage(enemy, magicCriticalDamage(hole.damage, world.hero), hole.pos, 'ultimate');
           if (hole.slowFactor < 1) world.enemies.applySlow(enemy, hole.slowFactor, hole.slowDuration, 'gravity');
         }
       }

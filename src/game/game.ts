@@ -13,6 +13,7 @@ import { ManualTargetMemory } from './manual-target-stability.js';
 import { PickupManager } from './pickups.js';
 import { TerrainSystem } from './terrain.js';
 import { applyUpgrade, buildBossRewardChoices, buildUpgradeChoices } from './upgrades.js';
+import { armorDamageTakenMultiplier } from './defense.js';
 import { guideBossRewardChoices } from './boss-reward-guidance.js';
 import { projectBossRewardImpact } from './boss-reward-impact-projection.js';
 import { bossRewardImpactRoleIdentityStyle } from './boss-reward-impact-role-identity-assets.js';
@@ -2737,7 +2738,7 @@ export class Game {
       },
       onHeroDamage: (amount, source = 'contact') => {
         const auraMultiplier = edricAura ? combatBuild.edricHeroAuraMultiplier : 1;
-        const applied = amount * this.hero.equipmentDamageTakenMultiplier * this.runHeroDamageTakenMultiplier * auraMultiplier;
+        const applied = amount * armorDamageTakenMultiplier(this.hero.armor) * this.hero.equipmentDamageTakenMultiplier * this.runHeroDamageTakenMultiplier * auraMultiplier;
         const beforeHpRatio=this.hero.hp/Math.max(1,this.hero.maxHp);
         this.hero.hp = Math.max(0, this.hero.hp - applied);
         const afterHpRatio=this.hero.hp/Math.max(1,this.hero.maxHp);
@@ -2864,7 +2865,7 @@ export class Game {
           const blastDistance = Math.hypot(this.hero.pos.x - death.x, this.hero.pos.y - death.y);
           if (blastDistance <= mutatorRuntime.volatileDeath.radius + this.hero.radius) {
             const falloff = Math.max(.35, 1 - blastDistance / Math.max(1, mutatorRuntime.volatileDeath.radius));
-            const applied = mutatorRuntime.volatileDeath.damage * falloff * this.hero.equipmentDamageTakenMultiplier * this.runHeroDamageTakenMultiplier;
+            const applied = mutatorRuntime.volatileDeath.damage * falloff * armorDamageTakenMultiplier(this.hero.armor) * this.hero.equipmentDamageTakenMultiplier * this.runHeroDamageTakenMultiplier;
             this.hero.hp = Math.max(0, this.hero.hp - applied);
             if(applied>0)this.queueHeroResponseVfx('hit',.92);
             this.feedback.addImpact({ x: death.x, y: death.y }, 'eliteKill');
@@ -5949,7 +5950,7 @@ export class Game {
     const hazardDamage = this.bossArena.damageAt(this.hero.pos, this.hero.radius) * dt * safeZoneDamage;
     if (hazardDamage > 0) {
       if (this.arenaDodgeChain.count > 0) this.arenaDodgeChain = breakArenaDodgeChain(this.arenaDodgeChain);
-      const applied = hazardDamage * this.hero.equipmentDamageTakenMultiplier * this.runHeroDamageTakenMultiplier;
+      const applied = hazardDamage * armorDamageTakenMultiplier(this.hero.armor) * this.hero.equipmentDamageTakenMultiplier * this.runHeroDamageTakenMultiplier;
       this.hero.hp = Math.max(0, this.hero.hp - applied);
       if(applied>0)this.queueHeroResponseVfx('hit',.84);
       this.damageReasonState = recordDamageReason(this.damageReasonState, 'arena', applied, this.hero.maxHp, this.elapsed);
@@ -7668,7 +7669,7 @@ export class Game {
     if (this.gameOver || this.elapsed < 5 || this.selectedTrait === null) return;
     const snapshot: RunSnapshot = {
       version: 1, savedAt: Date.now(), heroId: this.hero.profileId, traitId: this.selectedTrait, threatLevel: this.runThreatLevel, elapsed: this.elapsed,
-      hero: { level: this.hero.level, xp: this.hero.xp, xpNext: this.hero.xpNext, hp: this.hero.hp, maxHp: this.hero.maxHp, coins: this.hero.coins, kills: this.hero.kills },
+      hero: { level: this.hero.level, xp: this.hero.xp, xpNext: this.hero.xpNext, hp: this.hero.hp, maxHp: this.hero.maxHp, coins: this.hero.coins, kills: this.hero.kills, armor: this.hero.armor, critChance: this.hero.critChance },
       coreHp: this.core.hp, spellLevels: { ...this.spells.levels }, equipment: structuredClone(this.equipmentState), relic: this.activeRelic,
       fusions: [...this.fusionRuntime.equipped], fateChoices: [...this.fateRuntime.choices], map: { id: this.terrain.currentLayout.id, evolutionStage: this.terrain.evolutionStage },
       progression: { bossesKilled: this.bossesKilled, goldEarned: this.goldEarned, shopTokens: this.shopTokens },
@@ -7683,7 +7684,7 @@ export class Game {
     this.resetRun(snapshot.heroId, snapshot.traitId);
     this.runThreatLevel = snapshot.threatLevel;
     this.elapsed = snapshot.elapsed;
-    this.hero.level = snapshot.hero.level; this.hero.xp = snapshot.hero.xp; this.hero.xpNext = snapshot.hero.xpNext; this.hero.hp = snapshot.hero.hp; this.hero.maxHp = snapshot.hero.maxHp; this.hero.coins = snapshot.hero.coins; this.hero.kills = snapshot.hero.kills;
+    this.hero.level = snapshot.hero.level; this.hero.xp = snapshot.hero.xp; this.hero.xpNext = snapshot.hero.xpNext; this.hero.hp = snapshot.hero.hp; this.hero.maxHp = snapshot.hero.maxHp; this.hero.coins = snapshot.hero.coins; this.hero.kills = snapshot.hero.kills; this.hero.armor = snapshot.hero.armor ?? 0; this.hero.critChance = snapshot.hero.critChance ?? .05;
     this.core.hp = Math.min(this.core.maxHp, snapshot.coreHp);
     for (const id of Object.keys(snapshot.spellLevels) as SpellId[]) this.spells.levels[id] = snapshot.spellLevels[id];
     this.equipmentState = refreshEquipmentPowers(structuredClone(snapshot.equipment)); this.activeRelic = snapshot.relic; this.fusionRuntime.restore(snapshot.fusions); this.fateRuntime.restore(snapshot.fateChoices);

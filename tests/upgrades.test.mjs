@@ -4,12 +4,47 @@ import { createHero } from '../dist/game/entities.js';
 import { SpellSystem } from '../dist/game/spells.js';
 import { applyUpgrade, buildBossRewardChoices, buildUpgradeChoices } from '../dist/game/upgrades.js';
 import { relicCandidates } from '../dist/game/relics.js';
+import { armorDamageTakenMultiplier } from '../dist/game/defense.js';
+import { magicCriticalDamage } from '../dist/game/magic-critical.js';
 
 test('spell power upgrade immediately improves hero magic multiplier', () => {
   const hero = createHero();
   const spells = new SpellSystem();
   applyUpgrade('spellPower', hero, spells);
   assert.ok(hero.spellPower > 1);
+});
+
+test('armor upgrade is capped and uses diminishing damage reduction', () => {
+  const hero = createHero();
+  const spells = new SpellSystem();
+  for (let i = 0; i < 8; i++) applyUpgrade('armor', hero, spells);
+  assert.equal(hero.armor, 6);
+  assert.equal(armorDamageTakenMultiplier(hero.armor), 20 / 26);
+});
+
+test('armor appears from level 10 and critical chance appears from level 15', () => {
+  const spells = new SpellSystem();
+  const levelTenHero = createHero();
+  levelTenHero.level = 10;
+  assert.ok(buildUpgradeChoices(levelTenHero, spells, () => 0.999).some((choice) => choice.id === 'armor'));
+
+  const levelFifteenHero = createHero();
+  levelFifteenHero.level = 15;
+  assert.ok(buildUpgradeChoices(levelFifteenHero, spells, () => 0.999).some((choice) => choice.id === 'critChance'));
+});
+
+test('critical chance upgrade caps at 20 percent', () => {
+  const hero = createHero();
+  const spells = new SpellSystem();
+  for (let i = 0; i < 8; i++) applyUpgrade('critChance', hero, spells);
+  assert.equal(hero.critChance, 0.20);
+});
+
+test('magic critical damage only multiplies a successful critical hit', () => {
+  const hero = createHero();
+  hero.critChance = 0.20;
+  assert.equal(magicCriticalDamage(100, hero, () => 0.19), 150);
+  assert.equal(magicCriticalDamage(100, hero, () => 0.20), 100);
 });
 
 test('spell upgrade increases the chosen spell level', () => {

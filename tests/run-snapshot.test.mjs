@@ -87,6 +87,15 @@ test('old snapshot gains empty inventory and discovery arrays', () => {
   assert.deepEqual(restored.equipment.discoveredRecipes, []);
 });
 
+test('snapshot preserves bounded armor and critical chance upgrades', () => {
+  const snapshot = validSnapshot();
+  snapshot.hero.armor = 6;
+  snapshot.hero.critChance = .20;
+  const restored = sanitizeRunSnapshot(snapshot);
+  assert.equal(restored.hero.armor, 6);
+  assert.equal(restored.hero.critChance, .20);
+});
+
 test('snapshot merges valid stacks, drops unknown items, clamps counts, and keeps six stack keys', () => {
   const snapshot = validSnapshot();
   snapshot.equipment.inventory = [

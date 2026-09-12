@@ -23,3 +23,15 @@ test('hero and enemy sprite presentation use actor-only mobile scale', () => {
   assert.match(enemy, /mobileLandscapeActorScale/);
   assert.match(enemy, /SIZE_SCALE\[spriteType\]\s*\*\s*mobileLandscapeActorScale\(\)/);
 });
+
+test('phone landscape action buttons grow visually while preserving the established hit envelope', () => {
+  const helper = read('src/game/mobile-landscape-presentation.ts');
+  const config = read('src/game/config.ts');
+  const input = read('src/core/input.ts');
+  assert.match(helper, /mobileLandscapeControlScale/);
+  assert.match(helper, /mobileLandscapeTouchScale/);
+  assert.match(config, /get radius\(\)[\s\S]*mobileLandscapeControlScale\(\)/);
+  assert.match(input, /const actionTouchScale\s*=\s*mobileLandscapeTouchScale\(ACTION_TOUCH_SCALE\)/);
+  assert.match(input, /hitTestActionButton\(p, ACTION_BUTTONS, actionTouchScale/);
+  assert.match(input, /touchProfile\[button\.id\]\s*\?\?\s*actionTouchScale/);
+});

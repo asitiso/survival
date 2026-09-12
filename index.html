@@ -11,7 +11,6 @@
   <style data-mobile-landscape-modal>
     @media (orientation: landscape) and (max-height: 600px) and (max-width: 1024px) {
       .modal-overlay {
-        --mobile-modal-scale: 0.8;
         place-items: start center;
         overflow-y: auto;
         padding: 12px 2vw;
@@ -20,15 +19,268 @@
         touch-action: pan-y;
       }
 
-      .modal-panel {
-        zoom: var(--mobile-modal-scale);
+      .shop-overlay {
+        place-items: stretch center;
+        overflow: hidden;
+        padding: 6px 1.5vw;
+      }
+
+      .shop-overlay .shop-panel {
+        width: 100%;
+        max-width: 1240px;
+        height: calc(100vh - 12px);
+        height: calc(100dvh - 12px);
+        max-height: none;
+        padding: 8px 12px 6px;
+      }
+
+      .shop-overlay .shop-header {
+        gap: 10px;
+      }
+
+      .shop-overlay .shop-header .eyebrow {
+        display: none;
+      }
+
+      .shop-overlay .shop-header h2 {
+        margin: 0;
+        font-size: 22px;
+      }
+
+      .shop-overlay .shop-wallet {
+        min-width: 0;
+        padding: 5px 10px;
+        flex-direction: row;
+        align-items: baseline;
+        gap: 8px;
+      }
+
+      .shop-overlay .shop-wallet span {
+        font-size: 11px;
+      }
+
+      .shop-overlay .shop-wallet strong {
+        font-size: 19px;
+      }
+
+      .shop-overlay .shop-tabs {
+        padding: 4px 0;
+      }
+
+      .shop-overlay .shop-tabs button {
+        min-height: 44px;
+        padding: 6px 18px;
+      }
+
+      .shop-overlay .shop-content {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 0 4px 4px;
+        overscroll-behavior: contain;
+      }
+
+      .shop-overlay .shop-readiness {
+        padding: 6px 8px;
+        font-size: 12px;
+        line-height: 1.35;
+      }
+
+      .shop-overlay .shop-readiness-recommendation {
+        margin: 4px 0 6px;
+        font-size: 11px;
+        line-height: 1.3;
+      }
+
+      .shop-overlay .equipped-row {
+        margin: 4px 0 6px;
+      }
+
+      .shop-overlay .equipped-row span {
+        padding: 5px 7px;
+        font-size: 11px;
+      }
+
+      .shop-overlay .shop-stage-hint {
+        margin: 4px 0;
+        font-size: 11px;
+      }
+
+      .shop-overlay .shop-set-summary {
+        padding: 5px 8px;
+        margin-bottom: 5px;
+        font-size: 10px;
+        line-height: 1.25;
+      }
+
+      .shop-overlay .shop-accessory-picker {
+        margin: 4px 0 6px;
+      }
+
+      .shop-overlay .shop-grid {
+        gap: 6px;
+      }
+
+      .shop-overlay .shop-card {
+        min-height: 100px;
+        padding: 7px 9px;
+        gap: 3px;
+        display: grid;
+        grid-template-columns: minmax(0,1fr) auto;
+        align-content: center;
+      }
+
+      .shop-overlay .shop-card > :not(.shop-price) {
+        grid-column: 1;
+        min-width: 0;
+      }
+
+      .shop-overlay .shop-price {
+        grid-column: 2;
+        grid-row: 1 / span 10;
+        align-self: center;
+        margin: 0 0 0 10px;
+        font-size: 16px;
+        white-space: nowrap;
+      }
+
+      .shop-overlay .shop-item-heading {
+        min-height: 36px;
+        gap: 7px;
+      }
+
+      .shop-overlay .shop-item-icon {
+        flex-basis: 34px;
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+      }
+
+      .shop-overlay .shop-kind {
+        font-size: 10px;
+      }
+
+      .shop-overlay .shop-card strong {
+        font-size: 16px;
+      }
+
+      .shop-overlay .shop-desc {
+        min-height: 0;
+        font-size: 11px;
+        line-height: 1.25;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .shop-overlay .shop-rank-row {
+        min-height: 18px;
+      }
+
+      .shop-overlay .shop-rank,
+      .shop-overlay .shop-purchase-delta,
+      .shop-overlay .shop-reason,
+      .shop-overlay .shop-disabled-reason {
+        font-size: 10px;
+        line-height: 1.2;
+      }
+
+      .shop-overlay .shop-purchase-delta {
+        min-height: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .shop-overlay .shop-equipped-grid {
+        grid-template-columns: repeat(3,minmax(0,1fr));
+        gap: 6px;
+      }
+
+      .shop-overlay .shop-inventory-grid {
+        grid-template-columns: repeat(6,minmax(0,1fr));
+        gap: 6px;
+      }
+
+      .shop-overlay .shop-equipped-slot,
+      .shop-overlay .shop-inventory-slot {
+        min-height: 64px;
+        padding: 6px;
+        font-size: 11px;
+      }
+
+      .shop-overlay .shop-equipped-slot strong,
+      .shop-overlay .shop-inventory-slot strong {
+        font-size: 11px;
+      }
+
+      .shop-overlay .shop-equipped-slot small,
+      .shop-overlay .shop-inventory-slot small {
+        margin-top: 2px;
+        font-size: 10px;
+      }
+
+      .shop-overlay .shop-content > h3 {
+        margin: 8px 0 5px;
+      }
+
+      .shop-overlay .shop-item-actions,
+      .shop-overlay .shop-recipe-card {
+        margin: 6px 0;
+        padding: 8px;
+        font-size: 11px;
+        line-height: 1.35;
+      }
+
+      .shop-overlay .shop-footer {
+        margin-top: 4px;
+        padding-top: 3px;
+        gap: 6px;
+      }
+
+      .shop-overlay .shop-footer button {
+        min-height: 44px;
+        padding: 6px 12px;
+        font-size: 13px;
       }
     }
 
     @media (orientation: landscape) and (max-height: 500px) and (max-width: 1024px) {
       .modal-overlay {
-        --mobile-modal-scale: 0.74;
         padding: 8px 1.5vw;
+      }
+
+      .shop-overlay {
+        padding: 4px 1vw;
+      }
+
+      .shop-overlay .shop-panel {
+        height: calc(100vh - 8px);
+        height: calc(100dvh - 8px);
+        padding: 4px 10px;
+      }
+
+      .shop-overlay .shop-header h2 {
+        font-size: 19px;
+      }
+
+      .shop-overlay .shop-wallet span {
+        display: none;
+      }
+
+      .shop-overlay .shop-tabs {
+        padding: 2px 0;
+      }
+
+      .shop-overlay .shop-tabs button {
+        min-height: 44px;
+        padding: 4px 16px;
+      }
+
+      .shop-overlay .shop-card {
+        min-height: 96px;
+        padding: 6px 8px;
       }
     }
   </style>

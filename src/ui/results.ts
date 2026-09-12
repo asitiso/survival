@@ -57,8 +57,11 @@ export class ResultsOverlay {
     this.root.hidden = false;
     this.root.innerHTML = `
       <section class="modal-panel results-panel">
-        <div class="eyebrow">RUN COMPLETE</div>
-        <h2>수호선 붕괴</h2>
+        <div class="results-header">
+          <div class="eyebrow">RUN COMPLETE</div>
+          <h2>수호선 붕괴</h2>
+        </div>
+        <div class="results-scroll-body">
         ${result.heroId ? `<div class="result-hero-identity"><span style="${identityIconStyle(resultHeroIdentity(result.heroId))}" aria-hidden="true"></span></div>` : ''}
         ${result.newRecord ? '<div class="result-record">NEW RECORD</div>' : ''}
         <div class="result-main">${result.survival}</div>
@@ -84,6 +87,7 @@ export class ResultsOverlay {
         ${result.tacticalRecap?.length ? `<div class="result-recap">${result.tacticalRecap.map((line) => `<div>${line}</div>`).join('')}</div>` : ''}
         ${result.comparisonLines?.length ? `<div class="result-comparison">${result.comparisonLines.map((line) => `<div>${line}</div>`).join('')}</div>` : ''}
         ${result.buildSummary?.length ? `<div class="result-build-summary"><b>FINAL BUILD</b>${result.buildSummary.map((line) => `<span>${line}</span>`).join('')}</div>` : ''}
+        </div>
         <div class="results-actions">
           <button class="primary-btn result-retry">같은 조건으로 재도전</button>
           <button class="secondary-btn result-lobby">로비로 돌아가기</button>

@@ -63,7 +63,10 @@ body { overscroll-behavior:none; touch-action:none; }
 .hero-passive { margin-top:4px; color:#f4d276; font-weight:900; }
 .hero-desc { min-height:58px; color:#aec0d0; font-size:14px; line-height:1.45; }
 .hero-stats { margin-top:auto; color:#758da1; font-size:12px; }
-.results-panel { width:min(720px,82%); }
+.results-panel { width:min(720px,82%); max-height:calc(100% - 16px); display:flex; flex-direction:column; overflow:hidden; }
+.results-header { flex-shrink:0; }
+.results-scroll-body { min-height:0; overflow-y:auto; overscroll-behavior:contain; touch-action:pan-y; }
+.results-actions { flex-shrink:0; }
 .result-main { margin:18px auto 22px; font-size:64px; font-weight:950; letter-spacing:.04em; color:#f1d375; text-shadow:0 0 30px rgba(241,211,117,.22); }
 .result-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:24px; }
 .result-grid span { padding:15px; border-radius:14px; background:rgba(255,255,255,.04); color:#8ea4b8; }

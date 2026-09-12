@@ -21,6 +21,75 @@ app.append(shell);
 
 const game = new Game(canvas);
 
+const presentationControls = shell.querySelector<HTMLDivElement>('.presentation-controls');
+let syncPresentationSettingsLayout = (): void => {};
+if (presentationControls?.parentElement) {
+  const settingsPanel = document.createElement('div');
+  settingsPanel.className = 'presentation-settings-panel';
+  settingsPanel.style.position = 'absolute';
+  settingsPanel.style.zIndex = '9';
+  settingsPanel.style.display = 'flex';
+  settingsPanel.style.flexDirection = 'row-reverse';
+  settingsPanel.style.alignItems = 'flex-start';
+  settingsPanel.style.gap = '6px';
+  settingsPanel.style.maxWidth = 'calc(100% - 28px)';
+
+  const settingsToggle = document.createElement('button');
+  settingsToggle.type = 'button';
+  settingsToggle.className = 'presentation-settings-toggle';
+  settingsToggle.style.minHeight = '44px';
+  settingsToggle.style.padding = '0 12px';
+  settingsToggle.style.borderRadius = '11px';
+  settingsToggle.style.border = '1px solid rgba(160,214,255,.22)';
+  settingsToggle.style.background = 'rgba(9,20,32,.90)';
+  settingsToggle.style.color = '#d9edf9';
+  settingsToggle.style.font = '800 11px system-ui';
+  settingsToggle.style.whiteSpace = 'nowrap';
+
+  const settingsBody = document.createElement('div');
+  settingsBody.id = 'presentation-settings-body';
+  settingsBody.className = 'presentation-settings-body';
+
+  presentationControls.style.position = 'static';
+  presentationControls.style.top = 'auto';
+  presentationControls.style.right = 'auto';
+  presentationControls.style.flexWrap = 'wrap';
+  presentationControls.style.justifyContent = 'flex-end';
+  presentationControls.style.maxWidth = 'min(620px, calc(100vw - 96px))';
+
+  settingsBody.append(presentationControls);
+  settingsPanel.append(settingsToggle, settingsBody);
+  presentationControls.parentElement?.append(settingsPanel);
+
+  const isPhoneLandscapeSettings = (): boolean => window.matchMedia('(orientation: landscape) and (max-height: 520px) and (max-width: 1024px)').matches;
+  let expanded = !isPhoneLandscapeSettings();
+  let userExpandedOverride: boolean | null = null;
+
+  const syncExpandedState = (): void => {
+    settingsBody.hidden = !expanded;
+    settingsToggle.textContent = expanded ? '⚙ 설정 ▲' : '⚙ 설정 ▼';
+    settingsToggle.setAttribute('aria-label', expanded ? '설정 닫기' : '설정 열기');
+    settingsToggle.setAttribute('aria-expanded', String(expanded));
+    settingsToggle.setAttribute('aria-controls', settingsBody.id);
+  };
+
+  syncPresentationSettingsLayout = () => {
+    const compact = window.innerWidth <= 1000;
+    settingsPanel.style.top = compact ? '84px' : '88px';
+    settingsPanel.style.right = compact ? '14px' : '22px';
+    if (userExpandedOverride === null) expanded = !isPhoneLandscapeSettings();
+    syncExpandedState();
+  };
+
+  settingsToggle.addEventListener('click', () => {
+    expanded = !expanded;
+    userExpandedOverride = expanded;
+    syncExpandedState();
+  });
+
+  syncPresentationSettingsLayout();
+}
+
 const hudCanvas = document.createElement('canvas');
 hudCanvas.className = 'mobile-landscape-hud-layer';
 hudCanvas.setAttribute('aria-hidden', 'true');
@@ -90,8 +159,8 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pagehide', () => { game.checkpointForLifecycle(); });
 window.addEventListener('beforeunload', () => { game.checkpointForLifecycle(); });
 window.addEventListener('pageshow', () => { game.resetTransientDecisionInput(); game.setVisibilityPaused(document.hidden); });
-window.addEventListener('resize', () => { syncHudViewport(); game.resetTransientDecisionInput(); });
-window.addEventListener('orientationchange', () => { syncHudViewport(); game.resetTransientDecisionInput(); });
+window.addEventListener('resize', () => { syncHudViewport(); syncPresentationSettingsLayout(); game.resetTransientDecisionInput(); });
+window.addEventListener('orientationchange', () => { syncHudViewport(); syncPresentationSettingsLayout(); game.resetTransientDecisionInput(); });
 
 game.start();
 const visualProbe = new URLSearchParams(window.location.search).get('visualProbe');

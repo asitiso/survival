@@ -48,3 +48,24 @@ test('phone landscape HUD expands into safe side gutters without changing the ba
   assert.match(main, /canvas\.width\s*=\s*LOGICAL_WIDTH/);
   assert.match(main, /canvas\.height\s*=\s*LOGICAL_HEIGHT/);
 });
+
+test('short phone landscape pushes spell controls outward but clamps enlarged edge buttons inside the battlefield', () => {
+  const helper = read('src/game/mobile-landscape-presentation.ts');
+  const config = read('src/game/config.ts');
+  assert.match(helper, /MOBILE_ACTION_X_OFFSET\s*=\s*72/);
+  assert.match(helper, /MOBILE_ACTION_EDGE_MARGIN\s*=\s*16/);
+  assert.match(helper, /export function mobileLandscapeActionX/);
+  assert.match(helper, /logicalWidth\s*-\s*scaledRadius\s*-\s*MOBILE_ACTION_EDGE_MARGIN/);
+  assert.match(config, /get x\(\)[\s\S]*mobileLandscapeActionX\(/);
+});
+
+test('short phone landscape keeps the dynamic joystick under the thumb while moving its center-side clamp outward', () => {
+  const helper = read('src/game/mobile-landscape-presentation.ts');
+  const input = read('src/core/input.ts');
+  assert.match(helper, /MOBILE_JOYSTICK_MAX_X_OFFSET\s*=\s*60/);
+  assert.match(helper, /export function mobileLandscapeJoystickMaxX/);
+  assert.match(input, /mobileLandscapeJoystickMaxX\(safeArea\.joystickMaxX,\s*rect\.width,\s*rect\.height\)/);
+  assert.match(input, /joystickSafeArea/);
+  assert.match(input, /shouldStartLandscapeJoystick\(joystickPoint, joystickSafeArea\)/);
+  assert.match(input, /safeJoystickOrigin\(p, joystickSafeArea\)/);
+});

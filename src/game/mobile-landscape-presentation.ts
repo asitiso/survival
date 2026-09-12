@@ -26,6 +26,13 @@ export interface MobileLandscapeHudLayout {
   offsetX: number;
 }
 
+export interface MobileLandscapeHudViewport {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
 function browserViewport(): readonly [width: number, height: number] {
   try {
     if (typeof window === 'undefined') return [0, 0];
@@ -70,6 +77,26 @@ export function mobileLandscapeHudLayout(
   const scale = Math.max(1, Math.min(profile.hudScale, logicalWidth / 1600));
   const offsetX = Math.max(0, (logicalWidth - HUD_BASE_WIDTH * scale) / 2);
   return { active: true, scale, logicalWidth, logicalHeight: HUD_BASE_HEIGHT, offsetX };
+}
+
+export function mobileLandscapeHudLogicalPoint(
+  clientX: number,
+  clientY: number,
+  viewport: MobileLandscapeHudViewport,
+): { x: number; y: number } | null {
+  const width = Number.isFinite(viewport.width) ? Math.max(0, viewport.width) : 0;
+  const height = Number.isFinite(viewport.height) ? Math.max(0, viewport.height) : 0;
+  if (width <= 0 || height <= 0) return null;
+  const layout = mobileLandscapeHudLayout(width, height);
+  if (!layout.active || layout.scale <= 1.001) return null;
+  const left = Number.isFinite(viewport.left) ? viewport.left : 0;
+  const top = Number.isFinite(viewport.top) ? viewport.top : 0;
+  const hudX = (clientX - left) * (layout.logicalWidth / width);
+  const hudY = (clientY - top) * (layout.logicalHeight / height);
+  return {
+    x: (hudX - layout.offsetX) / layout.scale,
+    y: hudY / layout.scale,
+  };
 }
 
 export function mobileLandscapeActionX(

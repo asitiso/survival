@@ -34,3 +34,15 @@ test('settings wrapper keeps the original parent before moving the controls', ()
   assert.match(main, /settingsParent\.append\(settingsPanel\)/);
   assert.doesNotMatch(main, /presentationControls\.parentElement\?\.append\(settingsPanel\)/);
 });
+
+test('phone landscape settings use the side gutter and keep every setting button touchable', () => {
+  assert.match(main, /const phoneLandscape\s*=\s*isPhoneLandscapeSettings\(\)/);
+  assert.match(main, /settingsPanel\.style\.position\s*=\s*phoneLandscape\s*\?\s*'fixed'\s*:\s*'absolute'/);
+  assert.match(main, /settingsPanel\.style\.flexDirection\s*=\s*phoneLandscape\s*\?\s*'column'\s*:\s*'row-reverse'/);
+  assert.match(main, /presentationControls\.style\.display\s*=\s*phoneLandscape\s*\?\s*'grid'\s*:\s*'flex'/);
+  assert.match(main, /presentationControls\.style\.gridTemplateColumns\s*=\s*phoneLandscape\s*\?\s*'repeat\(3,minmax\(0,1fr\)\)'\s*:\s*''/);
+  assert.match(main, /settingsBody\.style\.maxHeight\s*=\s*phoneLandscape\s*\?\s*'calc\(100dvh - 128px\)'\s*:\s*''/);
+  assert.match(main, /presentationControls\.querySelectorAll<HTMLButtonElement>\('button'\)/);
+  assert.match(main, /button\.style\.minHeight\s*=\s*phoneLandscape\s*\?\s*'44px'\s*:\s*''/);
+  assert.match(main, /button\.style\.fontSize\s*=\s*phoneLandscape\s*\?\s*'11px'\s*:\s*''/);
+});

@@ -34,6 +34,6 @@ test('run milestone recap persists in endless snapshot and is handled without a 
 });
 
 test('landscape joystick uses HUD-safe start and clamped origin',()=>{
-  assert.match(input,/shouldStartLandscapeJoystick\(joystickPoint, safeArea\)/);
-  assert.match(input,/safeJoystickOrigin\(p, safeArea\)/);
+  assert.match(input,/shouldStartLandscapeJoystick\(joystickPoint, joystickSafeArea\)/);
+  assert.match(input,/safeJoystickOrigin\(p, joystickSafeArea\)/);
 });

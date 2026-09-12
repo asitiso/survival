@@ -1,4 +1,5 @@
 import type { EnemyType } from './enemies.js';
+import { mobileLandscapeActorScale } from './mobile-landscape-presentation.js';
 
 export type EnemySpriteType = Exclude<EnemyType, 'boss'>;
 
@@ -58,7 +59,7 @@ export function enemySpritePresentation(type: EnemyType, radius: number, atlasRe
     visible,
     animated: false,
     motionAmplitude: 0,
-    drawSize: spriteType ? Math.round(safeRadius * SIZE_SCALE[spriteType]) : 0,
+    drawSize: spriteType ? Math.round(safeRadius * SIZE_SCALE[spriteType] * mobileLandscapeActorScale()) : 0,
     fallbackBodyVisible: true,
     bodyAlpha: visible ? (elite ? 0.12 : 0.16) : 1,
     groundShadowScale: visible ? (elite ? 1.14 : 1.06) : 1,

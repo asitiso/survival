@@ -28,3 +28,9 @@ test('settings toggle remains comfortably tappable and does not recreate setting
   assert.match(main, /settingsBody\.append\(presentationControls\)/);
   assert.doesNotMatch(main, /presentationSettings\.quality\s*=/);
 });
+
+test('settings wrapper keeps the original parent before moving the controls', () => {
+  assert.match(main, /const settingsParent\s*=\s*presentationControls\.parentElement/);
+  assert.match(main, /settingsParent\.append\(settingsPanel\)/);
+  assert.doesNotMatch(main, /presentationControls\.parentElement\?\.append\(settingsPanel\)/);
+});

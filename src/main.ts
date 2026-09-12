@@ -24,6 +24,7 @@ const game = new Game(canvas);
 const presentationControls = shell.querySelector<HTMLDivElement>('.presentation-controls');
 let syncPresentationSettingsLayout = (): void => {};
 if (presentationControls?.parentElement) {
+  const settingsParent = presentationControls.parentElement;
   const settingsPanel = document.createElement('div');
   settingsPanel.className = 'presentation-settings-panel';
   settingsPanel.style.position = 'absolute';
@@ -57,9 +58,9 @@ if (presentationControls?.parentElement) {
   presentationControls.style.justifyContent = 'flex-end';
   presentationControls.style.maxWidth = 'min(620px, calc(100vw - 96px))';
 
-  settingsBody.append(presentationControls);
+  settingsParent.append(settingsPanel);
   settingsPanel.append(settingsToggle, settingsBody);
-  presentationControls.parentElement?.append(settingsPanel);
+  settingsBody.append(presentationControls);
 
   const isPhoneLandscapeSettings = (): boolean => window.matchMedia('(orientation: landscape) and (max-height: 520px) and (max-width: 1024px)').matches;
   let expanded = !isPhoneLandscapeSettings();

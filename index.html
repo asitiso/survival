@@ -20,6 +20,8 @@
       }
 
       .shop-overlay {
+        position: fixed;
+        inset: max(0px, env(safe-area-inset-top)) max(0px, env(safe-area-inset-right)) max(0px, env(safe-area-inset-bottom)) max(0px, env(safe-area-inset-left));
         place-items: stretch center;
         overflow: hidden;
         padding: 6px 1.5vw;
@@ -281,6 +283,52 @@
       .shop-overlay .shop-card {
         min-height: 96px;
         padding: 6px 8px;
+      }
+    }
+
+    @media (orientation: landscape) and (max-height: 430px) and (max-width: 1024px) {
+      .shop-overlay .shop-grid {
+        gap: 4px;
+      }
+
+      .shop-overlay .shop-card {
+        min-height: 88px;
+        padding: 5px 7px;
+        gap: 2px;
+      }
+
+      .shop-overlay .shop-item-heading {
+        min-height: 32px;
+        gap: 6px;
+      }
+
+      .shop-overlay .shop-item-icon {
+        flex-basis: 30px;
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+      }
+
+      .shop-overlay .shop-card strong {
+        font-size: 14px;
+      }
+
+      .shop-overlay .shop-desc {
+        font-size: 10px;
+        -webkit-line-clamp: 1;
+      }
+
+      .shop-overlay .shop-rank-row {
+        min-height: 16px;
+      }
+
+      .shop-overlay .shop-purchase-delta {
+        font-size: 9px;
+      }
+
+      .shop-overlay .shop-price {
+        margin-left: 8px;
+        font-size: 15px;
       }
     }
   </style>

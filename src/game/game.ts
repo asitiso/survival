@@ -63,6 +63,7 @@ import { spellVfxDescriptor } from './spell-vfx.js';
 import { enemyDeathCue, enemyStatusCue, enemyThreatTelegraph, sortTelegraphsByPriority } from './enemy-presentation.js';
 import { BossPresentationTracker, bossPatternTelegraph, bossLifecycleCinematicProfile, type BossPhaseCue } from './boss-presentation.js';
 import { edgeThreatVfxProfile, edgeThreatIndicator, deathAfterglowProfile, ultimateAftermathProfile, bossSettleProfile, createVfxQualityTransition, advanceVfxQualityTransition, type VfxQualityTransitionState } from './visual-rhythm.js';
+import { advanceMobileFollowCamera, cameraTransform, cameraWorldToScreen, createMobileFollowCamera } from './mobile-follow-camera.js';
 import { spellResidueProfile, bossHealthPressureProfile, mapAmbientDepthProfile, visualPriorityPolicy, spellEchoContinuityProfile, bossPressureTransitionProfile, mapCombatReactionProfile, visualReadabilityBudget, spellEchoCadenceProfile, bossPressureEnvelope, mapAmbientFlowProfile, visualFocusBudget } from './visual-presence.js';
 import { criticalCuePolicy, nextPresentationQuality } from './presentation-integration.js';
 import { cosmeticMotionScale, cosmeticMotionVelocity, loadPresentationSettings, savePresentationSettings, type PresentationSettings } from './presentation-settings.js';
@@ -624,6 +625,12 @@ export class Game {
   private mapVfxSequence = 0;
   private battlefieldEnvironmentReactionVfx: Array<{mapId: import('./map-layouts.js').MapId; kind: BattlefieldEnvironmentReactionKind; x:number; y:number; size:number; ttl:number; maxTtl:number}> = [];
   private lastRenderClock = 0;
+  private mobileFollowCamera = createMobileFollowCamera({
+    width: 0,
+    height: 0,
+    arena: { left: ARENA_MARGIN, top: ARENA_MARGIN + 38, right: LOGICAL_WIDTH - ARENA_MARGIN, bottom: LOGICAL_HEIGHT - ARENA_MARGIN },
+    hero: this.hero.pos,
+  });
   private smoothedFps = 60;
   private vfxQualityTransition: VfxQualityTransitionState = createVfxQualityTransition('high');
   private thermalRecoveryState: ThermalRecoveryState = createThermalRecoveryState();
@@ -3501,7 +3508,7 @@ export class Game {
 
   private render(): void {
     const ctx = this.ctx;
-    this.updatePresentationQuality();
+    const renderDt = this.updatePresentationQuality();
     ctx.clearRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
     const combatAttention=this.currentCombatAttentionPolicy();
     const worldVfxPriority=worldVfxPriorityPolicy(combatAttention.primary,this.presentation.quality);
@@ -3514,9 +3521,18 @@ export class Game {
     const shake = this.feedback.cameraOffset;
     const cameraPressureScale = this.presentationSettings.reducedShake ? 0.4 : 1;
     const cameraScale = 1 + this.feedback.cameraScaleOffset * cameraPressureScale;
+    const viewport = this.canvas.getBoundingClientRect();
+    this.mobileFollowCamera = advanceMobileFollowCamera(this.mobileFollowCamera, {
+      width: viewport.width,
+      height: viewport.height,
+      arena: { left: ARENA_MARGIN, top: ARENA_MARGIN + 38, right: LOGICAL_WIDTH - ARENA_MARGIN, bottom: LOGICAL_HEIGHT - ARENA_MARGIN },
+      hero: this.hero.pos,
+      deltaSeconds: renderDt,
+    });
+    const worldCamera = cameraTransform(this.mobileFollowCamera, cameraScale);
     ctx.save();
     ctx.translate(shake.x * shakeScale, shake.y * shakeScale);
-    ctx.translate(LOGICAL_WIDTH / 2, LOGICAL_HEIGHT / 2); ctx.scale(cameraScale, cameraScale); ctx.translate(-LOGICAL_WIDTH / 2, -LOGICAL_HEIGHT / 2);
+    ctx.translate(LOGICAL_WIDTH / 2, LOGICAL_HEIGHT / 2); ctx.scale(worldCamera.scale, worldCamera.scale); ctx.translate(-worldCamera.center.x, -worldCamera.center.y);
     this.drawArena(ctx);
     this.drawBattlefieldAtmosphereVfx(ctx);
     this.drawBattlefieldDepthOverlays(ctx);
@@ -3600,7 +3616,7 @@ export class Game {
     if (this.eventToastTimer > 0 && this.eventToast) this.drawEventToast(ctx);
   }
 
-  private updatePresentationQuality(): void {
+  private updatePresentationQuality(): number {
     const now = typeof performance !== 'undefined' ? performance.now() : 0;
     let qualityDt = 1 / 60;
     if (this.lastRenderClock > 0 && now > this.lastRenderClock) {
@@ -3634,6 +3650,7 @@ export class Game {
       Math.max(20, Math.round(governor.trailCap * comfort.vfxDensity * thermal.trailCapMultiplier)),
       governor.telegraphCap,
     );
+    return qualityDt;
   }
 
 
@@ -6073,7 +6090,7 @@ export class Game {
     for(const cue of cues){
       const projectile=projectiles[cue.index]; if(!projectile)continue;
       const profile=edgeThreatVfxProfile(cue.level,cue.target);
-      const indicator=edgeThreatIndicator(projectile.visualPos??projectile.pos,LOGICAL_WIDTH,LOGICAL_HEIGHT);
+      const indicator=edgeThreatIndicator(cameraWorldToScreen(projectile.visualPos??projectile.pos,this.mobileFollowCamera),LOGICAL_WIDTH,LOGICAL_HEIGHT);
       ctx.globalAlpha=this.presentationSettings.reducedFlash?profile.alpha*.62:profile.alpha; ctx.fillStyle=profile.color;
       const length=48+profile.segmentCount*18,thickness=profile.thickness;
       for(let i=0;i<profile.segmentCount;i++){

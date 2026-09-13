@@ -5,8 +5,6 @@ const PHONE_LANDSCAPE_MAX_HEIGHT = 520;
 const HUD_BASE_WIDTH = 1600;
 const HUD_BASE_HEIGHT = 900;
 
-export const MOBILE_ACTION_X_OFFSET = 72;
-export const MOBILE_ACTION_EDGE_MARGIN = 16;
 export const MOBILE_JOYSTICK_MAX_X_OFFSET = 60;
 
 installMobileLandscapeModalStyles();
@@ -32,6 +30,24 @@ export interface MobileLandscapeHudViewport {
   width: number;
   height: number;
 }
+
+export interface MobileLandscapeActionLayout {
+  x: number;
+  y: number;
+  radius: number;
+}
+
+const PHONE_ACTION_LAYOUT: Readonly<Record<string, MobileLandscapeActionLayout>> = {
+  spell1: { x: 1180, y: 610, radius: 70 },
+  spell2: { x: 1350, y: 610, radius: 70 },
+  spell3: { x: 1180, y: 770, radius: 70 },
+  spell4: { x: 1350, y: 770, radius: 70 },
+  ultimate1: { x: 1510, y: 570, radius: 74 },
+  ultimate2: { x: 1510, y: 810, radius: 74 },
+  potion: { x: 1025, y: 610, radius: 52 },
+  shop: { x: 1025, y: 480, radius: 46 },
+  auto: { x: 1025, y: 770, radius: 48 },
+};
 
 function browserViewport(): readonly [width: number, height: number] {
   try {
@@ -99,21 +115,12 @@ export function mobileLandscapeHudLogicalPoint(
   };
 }
 
-export function mobileLandscapeActionX(
-  baseX: number,
-  baseRadius: number,
-  logicalWidth = HUD_BASE_WIDTH,
-  viewportWidth?: number,
-  viewportHeight?: number,
-): number {
-  const [browserWidth, browserHeight] = browserViewport();
-  const width = viewportWidth === undefined ? browserWidth : viewportWidth;
-  const height = viewportHeight === undefined ? browserHeight : viewportHeight;
-  const profile = mobileLandscapePresentationProfile(width, height);
-  if (!profile.active) return baseX;
-  const scaledRadius = baseRadius * profile.controlScale;
-  const maxCenterX = logicalWidth - scaledRadius - MOBILE_ACTION_EDGE_MARGIN;
-  return Math.min(baseX + MOBILE_ACTION_X_OFFSET, maxCenterX);
+export function mobileLandscapeActionLayout(
+  id: string,
+  base: MobileLandscapeActionLayout,
+): MobileLandscapeActionLayout {
+  if (!mobileLandscapePresentationProfile().active) return base;
+  return PHONE_ACTION_LAYOUT[id] ?? base;
 }
 
 export function mobileLandscapeJoystickMaxX(

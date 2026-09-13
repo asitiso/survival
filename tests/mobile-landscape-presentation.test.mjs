@@ -24,13 +24,16 @@ test('hero and enemy sprite presentation use actor-only mobile scale', () => {
   assert.match(enemy, /SIZE_SCALE\[spriteType\]\s*\*\s*mobileLandscapeActorScale\(\)/);
 });
 
-test('phone landscape action buttons grow visually while preserving the established hit envelope', () => {
+test('phone landscape action buttons use the collision-safe layout while preserving the touch envelope', () => {
   const helper = read('src/game/mobile-landscape-presentation.ts');
   const config = read('src/game/config.ts');
   const input = read('src/core/input.ts');
-  assert.match(helper, /mobileLandscapeControlScale/);
+  assert.match(helper, /PHONE_ACTION_LAYOUT/);
+  assert.match(helper, /mobileLandscapeActionLayout/);
   assert.match(helper, /mobileLandscapeTouchScale/);
-  assert.match(config, /get radius\(\)[\s\S]*mobileLandscapeControlScale\(\)/);
+  assert.match(config, /get x\(\)[\s\S]*mobileLandscapeActionLayout/);
+  assert.match(config, /get y\(\)[\s\S]*mobileLandscapeActionLayout/);
+  assert.match(config, /get radius\(\)[\s\S]*mobileLandscapeActionLayout/);
   assert.match(input, /const actionTouchScale\s*=\s*mobileLandscapeTouchScale\(ACTION_TOUCH_SCALE\)/);
   assert.match(input, /hitTestActionButton\(p, ACTION_BUTTONS, actionTouchScale/);
   assert.match(input, /touchProfile\[button\.id\]\s*\?\?\s*actionTouchScale/);
@@ -49,14 +52,13 @@ test('phone landscape HUD expands into safe side gutters without changing the ba
   assert.match(main, /canvas\.height\s*=\s*LOGICAL_HEIGHT/);
 });
 
-test('short phone landscape pushes spell controls outward but clamps enlarged edge buttons inside the battlefield', () => {
+test('short phone landscape delegates every action coordinate to the mobile collision-safe layout', () => {
   const helper = read('src/game/mobile-landscape-presentation.ts');
   const config = read('src/game/config.ts');
-  assert.match(helper, /MOBILE_ACTION_X_OFFSET\s*=\s*72/);
-  assert.match(helper, /MOBILE_ACTION_EDGE_MARGIN\s*=\s*16/);
-  assert.match(helper, /export function mobileLandscapeActionX/);
-  assert.match(helper, /logicalWidth\s*-\s*scaledRadius\s*-\s*MOBILE_ACTION_EDGE_MARGIN/);
-  assert.match(config, /get x\(\)[\s\S]*mobileLandscapeActionX\(/);
+  assert.match(helper, /spell1:\s*\{ x: 1180, y: 610, radius: 70 \}/);
+  assert.match(helper, /ultimate2:\s*\{ x: 1510, y: 810, radius: 74 \}/);
+  assert.match(config, /mobileLandscapeActionLayout\(layout\.id, layout\)\.x/);
+  assert.match(config, /mobileLandscapeActionLayout\(layout\.id, layout\)\.y/);
 });
 
 test('short phone landscape keeps the dynamic joystick under the thumb while moving its center-side clamp outward', () => {

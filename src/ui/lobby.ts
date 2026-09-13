@@ -16,6 +16,7 @@ import { restoreExtension } from '../game/endless/snapshot.js';
 import { battlefieldEnvironmentIconStyle } from '../game/battlefield-environment-assets.js';
 import { mapEvolutionStage } from '../game/map-evolution.js';
 import type { AuthState } from '../cloud/game-auth.js';
+import { leaderboardComparison, type LeaderboardEntry } from '../domain/leaderboard.js';
 
 export interface LobbyUpgradeCard {
   id: MetaUpgradeId;
@@ -99,6 +100,8 @@ export class LobbyOverlay {
   private resumeSnapshot: RunSnapshot | null = null;
   private recentRuns: readonly RunHistoryEntry[] = [];
   private authState: AuthState | undefined;
+  private leaderboard: readonly LeaderboardEntry[] = [];
+  private myLeaderboardBest: LeaderboardEntry | null = null;
   isOpen = false;
 
   constructor(parent: HTMLElement) {
@@ -108,13 +111,15 @@ export class LobbyOverlay {
     parent.append(this.root);
   }
 
-  open(profile: MetaProfile, handlers: LobbyHandlers, threatProfile?: ThreatProfile, masteryProfile?: MasteryProfile, resumeSnapshot?: RunSnapshot | null, recentRuns: readonly RunHistoryEntry[] = [], authState?: AuthState): void {
+  open(profile: MetaProfile, handlers: LobbyHandlers, threatProfile?: ThreatProfile, masteryProfile?: MasteryProfile, resumeSnapshot?: RunSnapshot | null, recentRuns: readonly RunHistoryEntry[] = [], authState?: AuthState, leaderboard: readonly LeaderboardEntry[] = [], myLeaderboardBest: LeaderboardEntry | null = null): void {
     this.handlers = handlers;
     this.threatProfile = threatProfile ?? null;
     this.masteryProfile = masteryProfile ?? null;
     this.resumeSnapshot = resumeSnapshot ?? null;
     this.recentRuns = recentRuns.slice(0, 5);
     this.authState = authState;
+    this.leaderboard = leaderboard;
+    this.myLeaderboardBest = myLeaderboardBest;
     this.isOpen = true;
     this.root.hidden = false;
     this.render(profile);
@@ -133,6 +138,8 @@ export class LobbyOverlay {
     this.resumeSnapshot = null;
     this.recentRuns = [];
     this.authState = undefined;
+    this.leaderboard = [];
+    this.myLeaderboardBest = null;
     this.root.hidden = true;
     this.root.replaceChildren();
   }
@@ -243,6 +250,38 @@ export class LobbyOverlay {
       const recentMapIcon=newest.mapId?`<i class="battlefield-identity-icon lobby-battlefield-icon" style="${battlefieldEnvironmentIconStyle(newest.mapId,mapEvolutionStage(newest.seconds))}" aria-hidden="true"></i>`:'';
       history.innerHTML = `${recentMapIcon}${recentFinalForm?`<i class="final-form-identity-icon lobby-final-form-icon" style="${finalFormIdentityIconStyle(recentFinalForm)}" aria-hidden="true"></i>`:''}<span class="lobby-recent-portrait" style="${identityIconStyle(recentPortrait)}" aria-hidden="true"></span><span>최근 기록</span><b>${hero} · T${newest.threat} · ${mins}분 · ${newest.runCode}</b>${recentBuildIcons.length?`<span class="lobby-build-identities">${recentBuildIcons.map((id)=>`<i class="build-identity-icon" style="${buildIdentityIconStyle(id)}" aria-hidden="true"></i>`).join('')}</span>`:''}<small>${newest.buildCapsule ? `BUILD ${newest.buildCapsule}` : `최근 ${this.recentRuns.length}런 저장`}</small>`;
       scrollBody.append(history);
+    }
+
+    if (this.authState?.status === 'authenticated') {
+      const board = document.createElement('section');
+      board.className = 'lobby-recent-runs';
+      const title = document.createElement('span');
+      title.textContent = `T${this.threatProfile?.selected ?? 0} 상위 기록`;
+      board.append(title);
+      if (this.leaderboard.length === 0) {
+        const empty = document.createElement('small');
+        empty.textContent = '아직 표시할 클라우드 기록이 없습니다';
+        board.append(empty);
+      } else {
+        const list = document.createElement('div');
+        for (const entry of this.leaderboard.slice(0, 5)) {
+          const row = document.createElement('div');
+          const minutes = Math.floor(entry.survivedSeconds / 60);
+          const seconds = Math.floor(entry.survivedSeconds % 60).toString().padStart(2, '0');
+          row.textContent = `${this.leaderboard.indexOf(entry) + 1}위 · ${entry.displayName} · ${minutes}:${seconds} · LV.${entry.level}`;
+          list.append(row);
+        }
+        board.append(list);
+      }
+      const comparison = leaderboardComparison(this.leaderboard, this.myLeaderboardBest);
+      if (comparison) {
+        const mine = document.createElement('small');
+        mine.textContent = comparison.nextRankGapSeconds === null
+          ? `내 최고 기록 · 현재 1위`
+          : `내 최고 기록 · ${comparison.rank}위 · 바로 위까지 ${comparison.nextRankGapSeconds}초`;
+        board.append(mine);
+      }
+      scrollBody.append(board);
     }
 
     if (this.resumeSnapshot && this.handlers?.onResume) {

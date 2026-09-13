@@ -106,6 +106,8 @@ export function buildBossRewardChoices(
   bossArchetype: BossArchetype | null = null,
   activeFusions: readonly FusionId[] = [],
   masteryLevel = 1,
+  spellPowerUpgradeCount = 0,
+  cooldownUpgradeCount = 0,
 ): BossRewardChoice[] {
   const upgrades: UpgradeRewardChoice[] = [];
   for (const spell of ['meteorStorm', 'blackHole'] as const) {
@@ -121,8 +123,8 @@ export function buildBossRewardChoices(
   }
 
   const fallback: UpgradeRewardChoice[] = [
-    { kind: 'upgrade', id: 'spellPower', title: '대마력 증폭', description: '모든 마법 피해 +9.6%', accent: '#e49cff' },
-    { kind: 'upgrade', id: 'cooldown', title: '시간 압축', description: '모든 마법 재사용시간 -4.2%', accent: '#6dcfff' },
+    { kind: 'upgrade', id: 'spellPower', title: '대마력 증폭', description: `모든 마법 피해 +${spellPowerUpgradeCount < 6 ? '9.6' : '3.0'}%`, accent: '#e49cff' },
+    { kind: 'upgrade', id: 'cooldown', title: '시간 압축', description: `모든 마법 재사용시간 -${cooldownUpgradeCount < 6 ? '4.2' : '1.5'}%`, accent: '#6dcfff' },
     { kind: 'upgrade', id: 'maxHp', title: '불굴의 생명력', description: '최대 HP +42 · 즉시 42 회복', accent: '#ff7587' },
   ];
 

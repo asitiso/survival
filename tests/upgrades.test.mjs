@@ -40,6 +40,19 @@ test('critical chance upgrade caps at 20 percent', () => {
   assert.equal(hero.critChance, 0.20);
 });
 
+test('late-level offers retain capped defensive and critical choices without a critical damage card', () => {
+  const hero = createHero();
+  const spells = new SpellSystem();
+  hero.level = 30;
+  hero.armor = 5;
+  for (const id of ['fireBolt', 'chainLightning', 'frostNova', 'flameField']) {
+    for (let i = 0; i < 9; i++) spells.levelUp(id);
+  }
+  const choices = buildUpgradeChoices(hero, spells, () => 0.999);
+  assert.deepEqual(choices.map((choice) => choice.id), ['critChance', 'armor', 'pickupRadius']);
+  assert.equal(choices.some((choice) => choice.id === 'critDamage'), false);
+});
+
 test('magic critical damage only multiplies a successful critical hit', () => {
   const hero = createHero();
   hero.critChance = 0.20;
@@ -87,6 +100,18 @@ test('maxed ultimates disappear from later boss rewards', async () => {
   assert.equal(choices.filter((choice) => choice.kind === 'relic').length, 1);
   assert.equal(choices.filter((choice) => choice.kind === 'upgrade').length, 2);
   assert.equal(choices.length, 3);
+});
+
+test('late boss growth cards disclose their reduced post-cap gains', async () => {
+  const { buildBossRewardChoices } = await import('../dist/game/upgrades.js');
+  const spells = new SpellSystem();
+  for (let i = 0; i < 20; i++) {
+    spells.levelUp('meteorStorm');
+    spells.levelUp('blackHole');
+  }
+  const choices = buildBossRewardChoices(spells, () => 0, 'arkan', null, null, [], 1, 6, 6);
+  assert.match(choices.find((choice) => choice.id === 'spellPower')?.description ?? '', /3\.0%/);
+  assert.match(choices.find((choice) => choice.id === 'cooldown')?.description ?? '', /1\.5%/);
 });
 
 test('level up cards use the selected hero signature spell names', () => {

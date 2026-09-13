@@ -1,4 +1,4 @@
-const CACHE_NAME = "arcane-last-stand-v1";
+const CACHE_NAME = "arcane-last-stand-v2";
 const APP_SHELL = [
   "./",
   "./index.html",

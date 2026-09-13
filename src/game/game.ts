@@ -27,6 +27,7 @@ import { ResultsOverlay } from '../ui/results.js';
 import { LobbyOverlay } from '../ui/lobby.js';
 import { GameAuth, type AuthState } from '../cloud/game-auth.js';
 import { CloudRunHistory } from '../cloud/run-history.js';
+import type { LeaderboardEntry } from '../domain/leaderboard.js';
 import { TraitSelectOverlay } from '../ui/trait-select.js';
 import { refreshEquipmentPowers, priceShopOffers, ensureEquippedOffers, generateShopOffers, equipmentDefinition, type ShopDisplayOffer } from './shop-data.js';
 import { quickShopRecommendation, safeQuickPurchase, shopGuidanceForOffers, shopTopRecommendations } from './shop-guidance.js';
@@ -961,6 +962,8 @@ export class Game {
   private readonly gameAuth = new GameAuth();
   private readonly cloudRunHistory = new CloudRunHistory();
   private authState: AuthState = { status: 'guest', userId: null };
+  private leaderboard: readonly LeaderboardEntry[] = [];
+  private myLeaderboardBest: LeaderboardEntry | null = null;
 
   private readonly ctx: CanvasRenderingContext2D;
   private readonly loop: FixedGameLoop;
@@ -2217,7 +2220,7 @@ export class Game {
     this.openLobby();
   }
 
-  private openLobby(): void {
+  private openLobby(refreshCloud = true): void {
     this.paused = true;
     this.heroSelectOverlay.hide();
     this.traitSelectOverlay.hide();
@@ -2233,6 +2236,7 @@ export class Game {
       onThreatChange: (level) => {
         this.threatProfile = selectThreatLevel(this.threatProfile, level);
         this.saveStoredThreatProfile();
+        void this.refreshCloudLeaderboard();
         return this.threatProfile;
       },
       onContinue: () => {
@@ -2248,7 +2252,25 @@ export class Game {
       },
       onSignInWithGoogle: () => { if (typeof window !== 'undefined') void this.gameAuth.signInWithGoogle(window.location.origin); },
       onSignOut: () => { void this.gameAuth.signOut(); },
-    }, this.threatProfile, this.masteryProfile, this.resumeSnapshot, this.loadStoredRunHistory(), this.authState);
+    }, this.threatProfile, this.masteryProfile, this.resumeSnapshot, this.loadStoredRunHistory(), this.authState, this.leaderboard, this.myLeaderboardBest);
+    if (refreshCloud) void this.refreshCloudLeaderboard();
+  }
+
+  private async refreshCloudLeaderboard(): Promise<void> {
+    const threatLevel = this.threatProfile.selected;
+    if (this.authState.status !== 'authenticated') {
+      this.leaderboard = [];
+      this.myLeaderboardBest = null;
+      return;
+    }
+    const [leaderboard, myBest] = await Promise.all([
+      this.cloudRunHistory.loadLeaderboard(threatLevel),
+      this.cloudRunHistory.loadMine(this.authState.userId, threatLevel),
+    ]);
+    if (!this.lobbyOverlay.isOpen || threatLevel !== this.threatProfile.selected) return;
+    this.leaderboard = leaderboard;
+    this.myLeaderboardBest = myBest;
+    this.openLobby(false);
   }
 
   private openHeroSelect(): void {
@@ -7517,7 +7539,7 @@ export class Game {
   private openNextBossReward(generation: number): void {
     if (this.queuedBossRewards <= 0 || this.gameOver) return;
     const guidedChoices = guideBossRewardChoices(
-      buildBossRewardChoices(this.spells, Math.random, this.hero.profileId, this.activeRelic, this.pendingBossArchetype, this.fusionRuntime.equipped, this.masteryProfile.heroes[this.hero.profileId].level),
+      buildBossRewardChoices(this.spells, Math.random, this.hero.profileId, this.activeRelic, this.pendingBossArchetype, this.fusionRuntime.equipped, this.masteryProfile.heroes[this.hero.profileId].level, this.hero.spellPowerUpgradeCount, this.hero.cooldownUpgradeCount),
       { activeRelic:this.activeRelic, activeFusionCount:this.fusionRuntime.equipped.length },
     );
     const repeatChoices = reduceRepeatBossRewardDecision(guidedChoices,{elapsedSeconds:this.elapsed,activeRelic:this.activeRelic,activeFusionCount:this.fusionRuntime.equipped.length});
@@ -7873,6 +7895,7 @@ export class Game {
       kills: this.hero.kills,
       goldEarned: this.goldEarned,
       bossesKilled: this.bossesKilled,
+      threatLevel: this.runThreatLevel,
     }).catch(() => { /* cloud sync is optional */ });
     const baseBuildSummary = compactPhase22BuildLabels({
       masteryLevel: this.masteryProfile.heroes[this.hero.profileId].level,

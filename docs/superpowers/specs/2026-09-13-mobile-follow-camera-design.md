@@ -1,8 +1,8 @@
 # Mobile follow camera design
 
-## Goal
+## Primary goal
 
-Make the phone-landscape battlefield easier to read by zooming the world view and following the hero, without changing combat simulation, HUD controls, or desktop presentation.
+Make the phone-landscape character, enemies, spells, and terrain materially larger and easier to read by zooming the world view and following the hero. This is the success criterion. Do not change combat simulation, HUD controls, or desktop presentation.
 
 ## Scope
 
@@ -10,6 +10,7 @@ Make the phone-landscape battlefield easier to read by zooming the world view an
 - Keep the logical world at 1600 by 900 and retain every combat coordinate, collision, spawn, AI, range, and damage formula.
 - Keep desktop, tablet, foldable, and portrait layouts on the existing centered camera.
 - Keep HUD, joystick, and action buttons outside the world camera transform.
+- Treat the minimap as a secondary orientation aid; it must never reduce the camera zoom or crowd the primary combat view.
 
 ## Camera module
 
@@ -35,6 +36,15 @@ Add a small `mobile-follow-camera` module that owns camera-only math.
 - `ctx.restore()` occurs before HUD and control rendering, so existing mobile HUD and input coordinates remain unchanged.
 - Edge threat indicators receive camera-transformed projectile positions, ensuring their direction is based on the visible mobile view rather than the full 1600 by 900 world.
 
+## Optional mobile minimap
+
+- Phone landscape starts with the minimap collapsed.
+- A small mobile-only map toggle opens and closes a compact, translucent minimap in unused upper-left HUD space.
+- The minimap shows arena bounds, hero, core, bosses and elites, and enemies currently targeting or approaching the core.
+- It omits ordinary enemies, projectiles, and visual effects to preserve readability and rendering budget.
+- Its open state lasts only for the current run; no settings or persistence schema is added.
+- The minimap never changes camera ownership, zoom, input mapping, or desktop/tablet/portrait HUD.
+
 ## Error handling and fallback
 
 - Invalid or missing timing and position inputs are sanitized to finite values.
@@ -46,6 +56,7 @@ Add a small `mobile-follow-camera` module that owns camera-only math.
 - Unit tests for mobile activation, 1.70 zoom, dead-zone stability, soft follow, and all four arena-edge clamps.
 - Unit tests that confirm the desktop camera remains centered with 1.00 zoom.
 - Edge-indicator projection tests for visible and off-screen projectile directions.
+- Minimap tests for collapsed-by-default behavior, mobile-only visibility, toggle state, and its bounded marker set.
 - Existing mobile input, render contract, and full regression suites must remain green.
 
 ## Non-goals
@@ -54,3 +65,4 @@ Add a small `mobile-follow-camera` module that owns camera-only math.
 - No screen tap-to-world targeting changes.
 - No camera handoff to the core, boss, or projectiles.
 - No HUD or action-control redesign in this change.
+- No minimap requirement can trade away the 1.70 mobile world zoom or primary combat readability.

@@ -1,6 +1,7 @@
 import { FixedGameLoop } from '../core/loop.js';
 import { clamp, distance, normalize, type Vec2 } from '../core/math.js';
 import { InputState } from '../core/input.js';
+import { logicalPointerPosition } from '../core/input-lifecycle.js';
 import { ACTION_BUTTONS, ARENA_MARGIN, LOGICAL_HEIGHT, LOGICAL_WIDTH, type ActionId } from './config.js';
 import { createGuardianCore, createHero, type GuardianCore, type Hero } from './entities.js';
 import { dangerTierForSeconds, xpNeededForLevel } from '../domain/progression.js';
@@ -64,6 +65,7 @@ import { enemyDeathCue, enemyStatusCue, enemyThreatTelegraph, sortTelegraphsByPr
 import { BossPresentationTracker, bossPatternTelegraph, bossLifecycleCinematicProfile, type BossPhaseCue } from './boss-presentation.js';
 import { edgeThreatVfxProfile, edgeThreatIndicator, deathAfterglowProfile, ultimateAftermathProfile, bossSettleProfile, createVfxQualityTransition, advanceVfxQualityTransition, type VfxQualityTransitionState } from './visual-rhythm.js';
 import { advanceMobileFollowCamera, cameraTransform, cameraWorldToScreen, createMobileFollowCamera } from './mobile-follow-camera.js';
+import { mobileMinimapLayout, mobileMinimapToggleHit, projectMobileMinimapPoint } from './mobile-minimap.js';
 import { spellResidueProfile, bossHealthPressureProfile, mapAmbientDepthProfile, visualPriorityPolicy, spellEchoContinuityProfile, bossPressureTransitionProfile, mapCombatReactionProfile, visualReadabilityBudget, spellEchoCadenceProfile, bossPressureEnvelope, mapAmbientFlowProfile, visualFocusBudget } from './visual-presence.js';
 import { criticalCuePolicy, nextPresentationQuality } from './presentation-integration.js';
 import { cosmeticMotionScale, cosmeticMotionVelocity, loadPresentationSettings, savePresentationSettings, type PresentationSettings } from './presentation-settings.js';
@@ -631,6 +633,7 @@ export class Game {
     arena: { left: ARENA_MARGIN, top: ARENA_MARGIN + 38, right: LOGICAL_WIDTH - ARENA_MARGIN, bottom: LOGICAL_HEIGHT - ARENA_MARGIN },
     hero: this.hero.pos,
   });
+  private mobileMinimapExpanded = false;
   private smoothedFps = 60;
   private vfxQualityTransition: VfxQualityTransitionState = createVfxQualityTransition('high');
   private thermalRecoveryState: ThermalRecoveryState = createThermalRecoveryState();
@@ -1104,6 +1107,7 @@ export class Game {
     this.resumeSnapshot = this.loadStoredRunSnapshot();
     this.audio.settings = this.audioSettings;
     this.input = new InputState(canvas);
+    canvas.addEventListener('pointerup', this.onMobileMinimapPointerUp, { passive: false });
     this.enemies.feedback = this.feedback;
     const uiParent = canvas.parentElement ?? document.body;
     this.levelUpOverlay = new LevelUpOverlay(uiParent);
@@ -1122,6 +1126,15 @@ export class Game {
 
   start(): void { this.loop.start(); }
   stop(): void { this.loop.stop(); }
+
+  private readonly onMobileMinimapPointerUp = (event: PointerEvent): void => {
+    const viewport = this.canvas.getBoundingClientRect();
+    const layout = mobileMinimapLayout(viewport.width, viewport.height, this.mobileMinimapExpanded);
+    const point = logicalPointerPosition(event.clientX, event.clientY, viewport);
+    if (!mobileMinimapToggleHit(point, layout)) return;
+    event.preventDefault();
+    this.mobileMinimapExpanded = !this.mobileMinimapExpanded;
+  };
 
   private async initializeCloudAuth(): Promise<void> {
     this.gameAuth.subscribe((state) => {
@@ -3604,6 +3617,7 @@ export class Game {
     this.drawDangerVignette(ctx);
     this.drawEdgeThreatVfx(ctx);
     this.drawHud(ctx);
+    this.drawMobileMinimap(ctx);
     this.drawFinalFormTransformationCue(ctx);
     this.drawArcaneComboHud(ctx);
     this.drawControls(ctx);
@@ -5527,6 +5541,42 @@ export class Game {
     if(!this.bossResponseAckIdentityAtlasReady||!this.bossResponseAckIdentityAtlasImage)return;
     const icon=bossResponseAckIdentityIcon(boss.bossArchetype??'inferno'),size=radius>60?24:20,dx=x+radius*.48-size/2,dy=y-radius*.48-size/2;
     ctx.save();ctx.globalAlpha=.96;ctx.fillStyle='rgba(5,9,16,.9)';ctx.fillRect(dx-2,dy-2,size+4,size+4);ctx.drawImage(this.bossResponseAckIdentityAtlasImage,icon.sx,icon.sy,icon.sw,icon.sh,dx,dy,size,size);ctx.restore();
+  }
+
+  private drawMobileMinimap(ctx: CanvasRenderingContext2D): void {
+    const viewport = this.canvas.getBoundingClientRect();
+    const layout = mobileMinimapLayout(viewport.width, viewport.height, this.mobileMinimapExpanded);
+    if (!layout.active) return;
+
+    ctx.save();
+    if (layout.panel) {
+      const { panel } = layout;
+      ctx.fillStyle = 'rgba(5,12,23,.90)';
+      ctx.strokeStyle = 'rgba(152,211,255,.75)';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.roundRect(panel.x, panel.y, panel.width, panel.height, 12); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#d9efff'; ctx.font = '800 13px system-ui'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText('MAP', panel.x + 14, panel.y + 20);
+      const map = panel.map;
+      ctx.fillStyle = 'rgba(19,43,59,.90)'; ctx.fillRect(map.x, map.y, map.width, map.height);
+      ctx.strokeStyle = 'rgba(138,199,237,.42)'; ctx.lineWidth = 1; ctx.strokeRect(map.x, map.y, map.width, map.height);
+      const arena = { left: ARENA_MARGIN, top: ARENA_MARGIN + 38, right: LOGICAL_WIDTH - ARENA_MARGIN, bottom: LOGICAL_HEIGHT - ARENA_MARGIN };
+      const marker = (point: Vec2, radius: number, color: string): void => {
+        const projected = projectMobileMinimapPoint(point, arena, layout);
+        ctx.fillStyle = color; ctx.beginPath(); ctx.arc(projected.x, projected.y, radius, 0, Math.PI * 2); ctx.fill();
+      };
+      marker(this.core.pos, 5, '#75dfff');
+      marker(this.hero.pos, 4.5, '#ffe67a');
+      const importantEnemies = this.enemies.enemies.filter((enemy) => enemy.alive && (enemy.type === 'boss' || enemy.type === 'elite' || (enemy.target === 'core' && enemy.type !== 'grunt')));
+      for (const enemy of importantEnemies) marker(enemy.pos, enemy.type === 'boss' ? 6 : enemy.type === 'elite' ? 4 : 3, enemy.type === 'boss' ? '#ff6877' : enemy.type === 'elite' ? '#d99cff' : '#ffb66f');
+    }
+
+    ctx.fillStyle = layout.expanded ? 'rgba(33,92,122,.98)' : 'rgba(21,55,78,.94)';
+    ctx.strokeStyle = '#aee7ff'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(layout.toggle.x, layout.toggle.y, layout.toggle.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#effaff'; ctx.font = '800 10px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(layout.expanded ? '\u00d7' : 'MAP', layout.toggle.x, layout.toggle.y + (layout.expanded ? -1 : 1));
+    ctx.restore();
   }
 
   private drawControls(ctx: CanvasRenderingContext2D): void {

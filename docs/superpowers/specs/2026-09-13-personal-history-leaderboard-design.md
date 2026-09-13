@@ -19,9 +19,9 @@
 
 기존 `run_records`에 `threat_level`과 `ended_at`을 활용해 개인 기록을 보관한다. `profiles`에는 로그인 후 설정 가능한 표시명을 둔다.
 
-공개 읽기 전용 테이블 `leaderboard_entries`를 둔다. 키는 `(threat_level, user_id)`이며 한 사용자의 같은 T단계 최고 기록만 가진다. `user_id`는 클라이언트에 노출하지 않고 표시명과 순위 비교에 필요한 경기 요약만 반환한다.
+내부 테이블 `leaderboard_entries`를 둔다. 키는 `(threat_level, user_id)`이며 한 사용자의 같은 T단계 최고 기록만 가진다. 공개 클라이언트는 이 테이블을 직접 읽지 않고, UUID를 반환하지 않는 `get_leaderboard(threat_level, limit)` RPC로 표시명과 순위 비교에 필요한 경기 요약만 받는다.
 
-`run_records`는 현재처럼 본인만 SELECT/INSERT 가능하다. `leaderboard_entries`는 익명·로그인 사용자에게 SELECT만 허용하며 INSERT/UPDATE/DELETE 권한은 주지 않는다. 안전한 갱신은 `run_records` INSERT 뒤의 DB 트리거가 수행한다. 트리거는 새 기록이 기존 최고보다 좋을 때만 교체한다.
+`run_records`는 현재처럼 본인만 SELECT/INSERT 가능하다. `leaderboard_entries`는 클라이언트 권한을 전혀 주지 않는다. Data API가 호출할 수 있는 `public` 스키마의 안전한 `SECURITY DEFINER` 함수는 고정된 `search_path`, 기본 PUBLIC EXECUTE 철회, 명시적인 `anon`·`authenticated` EXECUTE 권한을 사용해 UUID 없는 순위 행만 반환한다. 안전한 갱신은 `run_records` INSERT 뒤의 DB 트리거가 수행하며, 새 기록이 기존 최고보다 좋을 때만 교체한다.
 
 ## UI와 흐름
 

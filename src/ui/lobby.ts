@@ -15,6 +15,7 @@ import { deriveHeroFinalForm } from '../game/endless/final-form.js';
 import { restoreExtension } from '../game/endless/snapshot.js';
 import { battlefieldEnvironmentIconStyle } from '../game/battlefield-environment-assets.js';
 import { mapEvolutionStage } from '../game/map-evolution.js';
+import type { AuthState } from '../cloud/game-auth.js';
 
 export interface LobbyUpgradeCard {
   id: MetaUpgradeId;
@@ -32,6 +33,8 @@ export interface LobbyHandlers {
   onContinue: () => void;
   onThreatChange?: (level: ThreatLevel) => ThreatProfile;
   onResume?: () => void;
+  onSignInWithGoogle?: () => void;
+  onSignOut?: () => void;
 }
 
 export interface LobbyThreatChoice { level: ThreatLevel; name: string; selected: boolean; locked: boolean; }
@@ -95,6 +98,7 @@ export class LobbyOverlay {
   private masteryProfile: MasteryProfile | null = null;
   private resumeSnapshot: RunSnapshot | null = null;
   private recentRuns: readonly RunHistoryEntry[] = [];
+  private authState: AuthState | undefined;
   isOpen = false;
 
   constructor(parent: HTMLElement) {
@@ -104,12 +108,13 @@ export class LobbyOverlay {
     parent.append(this.root);
   }
 
-  open(profile: MetaProfile, handlers: LobbyHandlers, threatProfile?: ThreatProfile, masteryProfile?: MasteryProfile, resumeSnapshot?: RunSnapshot | null, recentRuns: readonly RunHistoryEntry[] = []): void {
+  open(profile: MetaProfile, handlers: LobbyHandlers, threatProfile?: ThreatProfile, masteryProfile?: MasteryProfile, resumeSnapshot?: RunSnapshot | null, recentRuns: readonly RunHistoryEntry[] = [], authState?: AuthState): void {
     this.handlers = handlers;
     this.threatProfile = threatProfile ?? null;
     this.masteryProfile = masteryProfile ?? null;
     this.resumeSnapshot = resumeSnapshot ?? null;
     this.recentRuns = recentRuns.slice(0, 5);
+    this.authState = authState;
     this.isOpen = true;
     this.root.hidden = false;
     this.render(profile);
@@ -127,6 +132,7 @@ export class LobbyOverlay {
     this.masteryProfile = null;
     this.resumeSnapshot = null;
     this.recentRuns = [];
+    this.authState = undefined;
     this.root.hidden = true;
     this.root.replaceChildren();
   }
@@ -140,6 +146,19 @@ export class LobbyOverlay {
         <div><div class="eyebrow">ARCANE SANCTUM</div><h1>마력 성소</h1><p class="modal-subtitle">마력석은 작게 강해지고, 다음 판의 선택지를 넓히는 데만 사용합니다</p></div>
         <div class="shard-wallet"><span>보유 마력석</span><strong>◆ ${profile.shards.toLocaleString()}</strong></div>
       </div>`;
+
+    if (this.authState && this.authState.status !== 'unconfigured') {
+      const account = document.createElement('div');
+      account.className = 'lobby-account';
+      const signedIn = this.authState.status === 'authenticated';
+      account.innerHTML = `<span>${signedIn ? '☁ 클라우드 기록 저장 중' : '게스트 플레이 · 기록은 이 기기에 저장됨'}</span>`;
+      const button = document.createElement('button');
+      button.className = 'lobby-account-btn';
+      button.textContent = signedIn ? '로그아웃' : 'Google로 로그인';
+      button.addEventListener('click', () => signedIn ? this.handlers?.onSignOut?.() : this.handlers?.onSignInWithGoogle?.());
+      account.append(button);
+      panel.append(account);
+    }
 
     const scrollBody = document.createElement('div');
     scrollBody.className = 'lobby-scroll-body';

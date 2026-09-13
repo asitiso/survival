@@ -25,6 +25,8 @@ import { ShopOverlay, type ShopTab } from '../ui/shop.js';
 import { HeroSelectOverlay } from '../ui/hero-select.js';
 import { ResultsOverlay } from '../ui/results.js';
 import { LobbyOverlay } from '../ui/lobby.js';
+import { GameAuth, type AuthState } from '../cloud/game-auth.js';
+import { CloudRunHistory } from '../cloud/run-history.js';
 import { TraitSelectOverlay } from '../ui/trait-select.js';
 import { refreshEquipmentPowers, priceShopOffers, ensureEquippedOffers, generateShopOffers, equipmentDefinition, type ShopDisplayOffer } from './shop-data.js';
 import { quickShopRecommendation, safeQuickPurchase, shopGuidanceForOffers, shopTopRecommendations } from './shop-guidance.js';
@@ -956,6 +958,9 @@ export class Game {
   private recentGoldPerMinute = 0;
   private rewardRateWindowStartedAt = 0;
   private rewardRateWindowStartGold = 0;
+  private readonly gameAuth = new GameAuth();
+  private readonly cloudRunHistory = new CloudRunHistory();
+  private authState: AuthState = { status: 'guest', userId: null };
 
   private readonly ctx: CanvasRenderingContext2D;
   private readonly loop: FixedGameLoop;
@@ -1101,11 +1106,20 @@ export class Game {
     this.presentationControls = this.createPresentationControls(uiParent);
     this.loop = new FixedGameLoop((dt) => this.update(dt), () => this.render());
     this.onboarding = new OnboardingController(this.loadStoredOnboardingState());
+    void this.initializeCloudAuth();
     this.restart();
   }
 
   start(): void { this.loop.start(); }
   stop(): void { this.loop.stop(); }
+
+  private async initializeCloudAuth(): Promise<void> {
+    this.gameAuth.subscribe((state) => {
+      this.authState = state;
+      if (this.lobbyOverlay.isOpen) this.openLobby();
+    });
+    this.authState = await this.gameAuth.initialize();
+  }
 
   private initializeActionIconAtlas(): void {
     if (typeof Image === 'undefined') return;
@@ -2232,7 +2246,9 @@ export class Game {
         this.restoreRunSnapshot(snapshot);
         this.paused = false;
       },
-    }, this.threatProfile, this.masteryProfile, this.resumeSnapshot, this.loadStoredRunHistory());
+      onSignInWithGoogle: () => { if (typeof window !== 'undefined') void this.gameAuth.signInWithGoogle(window.location.origin); },
+      onSignOut: () => { void this.gameAuth.signOut(); },
+    }, this.threatProfile, this.masteryProfile, this.resumeSnapshot, this.loadStoredRunHistory(), this.authState);
   }
 
   private openHeroSelect(): void {
@@ -7848,6 +7864,16 @@ export class Game {
       buildCapsule,
       ...(finalForm ? { finalForm: finalForm.id } : {}),
     });
+    const runKey = globalThis.crypto?.randomUUID?.();
+    if (runKey) void this.cloudRunHistory.save(this.authState.userId, {
+      runKey,
+      heroId: this.hero.profileId,
+      survivedSeconds: this.elapsed,
+      level: this.hero.level,
+      kills: this.hero.kills,
+      goldEarned: this.goldEarned,
+      bossesKilled: this.bossesKilled,
+    }).catch(() => { /* cloud sync is optional */ });
     const baseBuildSummary = compactPhase22BuildLabels({
       masteryLevel: this.masteryProfile.heroes[this.hero.profileId].level,
       relicName: this.activeRelic ? relicDisplayName(this.activeRelic) : null,

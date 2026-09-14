@@ -1,4 +1,5 @@
 import { growthChoiceIconStyle } from '../game/growth-choice-icon-assets.js';
+
 export interface ChoiceCard {
   title: string;
   description: string;
@@ -14,6 +15,18 @@ export interface ChoiceCard {
   impactRoleLabel?: string;
   secondaryIdentityStyles?: readonly string[];
   secondaryIdentityLimit?: number;
+}
+
+export interface LevelUpCelebrationPlan {
+  sparkCount: number;
+  ringCount: number;
+  flash: boolean;
+  durationMs: number;
+}
+
+export function levelUpCelebrationPlan(reducedMotion: boolean): LevelUpCelebrationPlan {
+  if (reducedMotion) return { sparkCount: 0, ringCount: 0, flash: false, durationMs: 0 };
+  return { sparkCount: 24, ringCount: 2, flash: true, durationMs: 720 };
 }
 
 export class LevelUpOverlay {
@@ -38,6 +51,93 @@ export class LevelUpOverlay {
     if (!cards) throw new Error('upgrade cards root missing');
     this.cards = cards;
     parent.append(this.root);
+  }
+
+  private playCelebrationEffects(reducedMotion: boolean): void {
+    this.root.querySelectorAll<HTMLElement>('[data-levelup-burst]').forEach((node) => node.remove());
+    const plan = levelUpCelebrationPlan(reducedMotion);
+    if (!plan.flash) return;
+
+    const layer = document.createElement('div');
+    layer.dataset.levelupBurst = 'true';
+    Object.assign(layer.style, {
+      position: 'absolute',
+      inset: '0',
+      overflow: 'hidden',
+      pointerEvents: 'none',
+      zIndex: '0',
+    });
+    this.root.prepend(layer);
+
+    const flash = document.createElement('div');
+    Object.assign(flash.style, {
+      position: 'absolute',
+      inset: '0',
+      background: 'radial-gradient(circle at 50% 42%, rgba(255,238,157,.32) 0%, rgba(151,235,200,.13) 24%, rgba(255,255,255,0) 58%)',
+      opacity: '0',
+    });
+    layer.append(flash);
+    flash.animate([
+      { opacity: 0 },
+      { offset: 0.18, opacity: 1 },
+      { opacity: 0 },
+    ], { duration: Math.round(plan.durationMs * 0.72), easing: 'ease-out', fill: 'forwards' });
+
+    for (let i = 0; i < plan.ringCount; i++) {
+      const ring = document.createElement('i');
+      Object.assign(ring.style, {
+        position: 'absolute',
+        left: '50%',
+        top: '42%',
+        width: '92px',
+        height: '92px',
+        borderRadius: '50%',
+        border: `${3 - i}px solid ${i === 0 ? 'rgba(255,229,154,.90)' : 'rgba(151,235,200,.78)'}`,
+        boxShadow: `0 0 ${18 + i * 8}px ${i === 0 ? 'rgba(255,229,154,.42)' : 'rgba(151,235,200,.30)'}`,
+        opacity: '0',
+      });
+      layer.append(ring);
+      ring.animate([
+        { transform: 'translate(-50%, -50%) scale(.45)', opacity: 0 },
+        { offset: 0.16, opacity: 0.95 - i * 0.14 },
+        { transform: `translate(-50%, -50%) scale(${2.25 + i * 0.7})`, opacity: 0 },
+      ], { duration: plan.durationMs - i * 45, delay: i * 70, easing: 'cubic-bezier(.16,.78,.24,1)', fill: 'forwards' });
+    }
+
+    for (let i = 0; i < plan.sparkCount; i++) {
+      const spark = document.createElement('i');
+      const angle = Math.PI * 2 * i / plan.sparkCount;
+      const travel = 92 + (i % 4) * 24;
+      const dx = Math.cos(angle) * travel;
+      const dy = Math.sin(angle) * travel * 0.72;
+      const size = 3 + (i % 3) * 1.5;
+      Object.assign(spark.style, {
+        position: 'absolute',
+        left: '50%',
+        top: '42%',
+        width: `${size}px`,
+        height: `${size}px`,
+        borderRadius: '50%',
+        background: i % 2 === 0 ? '#ffe59a' : '#97ebc8',
+        boxShadow: `0 0 ${8 + (i % 3) * 3}px currentColor`,
+        opacity: '0',
+      });
+      layer.append(spark);
+      spark.animate([
+        { transform: 'translate(-50%, -50%) translate(0, 0) scale(.35)', opacity: 0 },
+        { offset: 0.14, opacity: 0.95 },
+        { transform: `translate(-50%, -50%) translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) scale(.12)`, opacity: 0 },
+      ], { duration: plan.durationMs - 70 + (i % 3) * 35, delay: (i % 4) * 18, easing: 'cubic-bezier(.16,.70,.28,1)', fill: 'forwards' });
+    }
+
+    const title = this.root.querySelector<HTMLElement>('#growth-choice-title');
+    title?.animate([
+      { transform: 'scale(.88)', opacity: 0.35 },
+      { offset: 0.48, transform: 'scale(1.075)', opacity: 1 },
+      { transform: 'scale(1)', opacity: 1 },
+    ], { duration: Math.round(plan.durationMs * 0.78), easing: 'cubic-bezier(.18,.76,.24,1)' });
+
+    window.setTimeout(() => layer.remove(), plan.durationMs + 120);
   }
 
   open<T extends ChoiceCard>(choices: T[], onPick: (choice: T) => void, copy?: { eyebrow: string; title: string; subtitle: string; celebration?: boolean; bonus?: string; reducedMotion?: boolean }): void {
@@ -66,6 +166,7 @@ export class LevelUpOverlay {
     if (subtitle) subtitle.textContent = copy?.subtitle ?? '원하는 힘을 하나 고르세요 · 선택 즉시 전투 재개';
     this.isOpen = true;
     this.root.hidden = false;
+    if (celebrating) this.playCelebrationEffects(copy?.reducedMotion ?? false);
     this.cards.replaceChildren();
     for (const choice of choices) {
       const button = document.createElement('button');
@@ -91,5 +192,6 @@ export class LevelUpOverlay {
   close(): void {
     this.isOpen = false;
     this.root.hidden = true;
+    this.root.querySelectorAll<HTMLElement>('[data-levelup-burst]').forEach((node) => node.remove());
   }
 }

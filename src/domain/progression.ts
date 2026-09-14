@@ -1,7 +1,7 @@
 export function xpNeededForLevel(level: number): number {
   const l = Math.max(1, level);
-  // Give opening combat more breathing room; taper the increase for long runs.
-  const pacing = 2.1 + 0.5 * Math.max(0, 1 - (l - 1) / 29);
+  // Keep the existing long-run curve, but add a modest 10% delay between level-ups.
+  const pacing = (2.1 + 0.5 * Math.max(0, 1 - (l - 1) / 29)) * 1.1;
   return Math.floor((20 + 9.5 * Math.pow(l, 1.25) + Math.max(0, l - 30) * 2.8) * pacing);
 }
 

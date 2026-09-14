@@ -10,6 +10,7 @@ import { deriveHeroFinalForm } from '../game/endless/final-form.js';
 import { restoreExtension } from '../game/endless/snapshot.js';
 import { battlefieldEnvironmentIconStyle } from '../game/battlefield-environment-assets.js';
 import { mapEvolutionStage } from '../game/map-evolution.js';
+import { leaderboardComparison } from '../domain/leaderboard.js';
 export function lobbyThreatChoices(profile) {
     return [0, 1, 2, 3, 4, 5].map((level) => ({ level, name: `T${level} · ${threatLevelName(level)}`, selected: profile.selected === level, locked: level > profile.unlocked }));
 }
@@ -53,6 +54,9 @@ export class LobbyOverlay {
     masteryProfile = null;
     resumeSnapshot = null;
     recentRuns = [];
+    authState;
+    leaderboard = [];
+    myLeaderboardBest = null;
     isOpen = false;
     constructor(parent) {
         this.root = document.createElement('div');
@@ -60,12 +64,15 @@ export class LobbyOverlay {
         this.root.hidden = true;
         parent.append(this.root);
     }
-    open(profile, handlers, threatProfile, masteryProfile, resumeSnapshot, recentRuns = []) {
+    open(profile, handlers, threatProfile, masteryProfile, resumeSnapshot, recentRuns = [], authState, leaderboard = [], myLeaderboardBest = null) {
         this.handlers = handlers;
         this.threatProfile = threatProfile ?? null;
         this.masteryProfile = masteryProfile ?? null;
         this.resumeSnapshot = resumeSnapshot ?? null;
         this.recentRuns = recentRuns.slice(0, 5);
+        this.authState = authState;
+        this.leaderboard = leaderboard;
+        this.myLeaderboardBest = myLeaderboardBest;
         this.isOpen = true;
         this.root.hidden = false;
         this.render(profile);
@@ -82,6 +89,9 @@ export class LobbyOverlay {
         this.masteryProfile = null;
         this.resumeSnapshot = null;
         this.recentRuns = [];
+        this.authState = undefined;
+        this.leaderboard = [];
+        this.myLeaderboardBest = null;
         this.root.hidden = true;
         this.root.replaceChildren();
     }
@@ -94,6 +104,20 @@ export class LobbyOverlay {
         <div><div class="eyebrow">ARCANE SANCTUM</div><h1>마력 성소</h1><p class="modal-subtitle">마력석은 작게 강해지고, 다음 판의 선택지를 넓히는 데만 사용합니다</p></div>
         <div class="shard-wallet"><span>보유 마력석</span><strong>◆ ${profile.shards.toLocaleString()}</strong></div>
       </div>`;
+        if (this.authState && this.authState.status !== 'unconfigured') {
+            const account = document.createElement('div');
+            account.className = 'lobby-account';
+            const signedIn = this.authState.status === 'authenticated';
+            account.innerHTML = `<span>${signedIn ? '☁ 클라우드 기록 저장 중' : '게스트 플레이 · 기록은 이 기기에 저장됨'}</span>`;
+            const button = document.createElement('button');
+            button.className = 'lobby-account-btn';
+            button.textContent = signedIn ? '로그아웃' : 'Google로 로그인';
+            button.addEventListener('click', () => signedIn ? this.handlers?.onSignOut?.() : this.handlers?.onSignInWithGoogle?.());
+            account.append(button);
+            panel.append(account);
+        }
+        const scrollBody = document.createElement('div');
+        scrollBody.className = 'lobby-scroll-body';
         const grid = document.createElement('div');
         grid.className = 'lobby-grid';
         for (const card of lobbyUpgradeCards(profile)) {
@@ -119,7 +143,7 @@ export class LobbyOverlay {
             });
             grid.append(button);
         }
-        panel.append(grid);
+        scrollBody.append(grid);
         if (this.masteryProfile) {
             const masteryWrap = document.createElement('div');
             masteryWrap.className = 'lobby-mastery-wrap';
@@ -134,7 +158,7 @@ export class LobbyOverlay {
                 row.append(hero);
             }
             masteryWrap.append(row);
-            panel.append(masteryWrap);
+            scrollBody.append(masteryWrap);
         }
         if (this.threatProfile) {
             const threatWrap = document.createElement('div');
@@ -159,7 +183,7 @@ export class LobbyOverlay {
                 row.append(button);
             }
             threatWrap.append(row);
-            panel.append(threatWrap);
+            scrollBody.append(threatWrap);
         }
         if (this.recentRuns.length > 0) {
             const history = document.createElement('div');
@@ -173,7 +197,39 @@ export class LobbyOverlay {
             const recentFinalForm = newest.finalForm ?? recentBuild?.finalForm ?? null;
             const recentMapIcon = newest.mapId ? `<i class="battlefield-identity-icon lobby-battlefield-icon" style="${battlefieldEnvironmentIconStyle(newest.mapId, mapEvolutionStage(newest.seconds))}" aria-hidden="true"></i>` : '';
             history.innerHTML = `${recentMapIcon}${recentFinalForm ? `<i class="final-form-identity-icon lobby-final-form-icon" style="${finalFormIdentityIconStyle(recentFinalForm)}" aria-hidden="true"></i>` : ''}<span class="lobby-recent-portrait" style="${identityIconStyle(recentPortrait)}" aria-hidden="true"></span><span>최근 기록</span><b>${hero} · T${newest.threat} · ${mins}분 · ${newest.runCode}</b>${recentBuildIcons.length ? `<span class="lobby-build-identities">${recentBuildIcons.map((id) => `<i class="build-identity-icon" style="${buildIdentityIconStyle(id)}" aria-hidden="true"></i>`).join('')}</span>` : ''}<small>${newest.buildCapsule ? `BUILD ${newest.buildCapsule}` : `최근 ${this.recentRuns.length}런 저장`}</small>`;
-            panel.append(history);
+            scrollBody.append(history);
+        }
+        if (this.authState?.status === 'authenticated') {
+            const board = document.createElement('section');
+            board.className = 'lobby-recent-runs';
+            const title = document.createElement('span');
+            title.textContent = `T${this.threatProfile?.selected ?? 0} 상위 기록`;
+            board.append(title);
+            if (this.leaderboard.length === 0) {
+                const empty = document.createElement('small');
+                empty.textContent = '아직 표시할 클라우드 기록이 없습니다';
+                board.append(empty);
+            }
+            else {
+                const list = document.createElement('div');
+                for (const entry of this.leaderboard.slice(0, 5)) {
+                    const row = document.createElement('div');
+                    const minutes = Math.floor(entry.survivedSeconds / 60);
+                    const seconds = Math.floor(entry.survivedSeconds % 60).toString().padStart(2, '0');
+                    row.textContent = `${this.leaderboard.indexOf(entry) + 1}위 · ${entry.displayName} · ${minutes}:${seconds} · LV.${entry.level}`;
+                    list.append(row);
+                }
+                board.append(list);
+            }
+            const comparison = leaderboardComparison(this.leaderboard, this.myLeaderboardBest);
+            if (comparison) {
+                const mine = document.createElement('small');
+                mine.textContent = comparison.nextRankGapSeconds === null
+                    ? `내 최고 기록 · 현재 1위`
+                    : `내 최고 기록 · ${comparison.rank}위 · 바로 위까지 ${comparison.nextRankGapSeconds}초`;
+                board.append(mine);
+            }
+            scrollBody.append(board);
         }
         if (this.resumeSnapshot && this.handlers?.onResume) {
             const resume = document.createElement('button');
@@ -188,7 +244,7 @@ export class LobbyOverlay {
             const resumeMapIcon = `<i class="battlefield-identity-icon lobby-battlefield-icon" style="${battlefieldEnvironmentIconStyle(this.resumeSnapshot.map.id, this.resumeSnapshot.map.evolutionStage)}" aria-hidden="true"></i>`;
             resume.innerHTML = `${resumeMapIcon}${resumeFinalForm ? `<i class="final-form-identity-icon lobby-final-form-icon" style="${finalFormIdentityIconStyle(resumeFinalForm.id)}" aria-hidden="true"></i>` : ''}<span class="lobby-resume-portrait" style="${identityIconStyle(resumePortrait)}" aria-hidden="true"></span><span>이어하기 · ${hero} · ${mins}:${secs}</span>${resumeBuildIds.length ? `<span class="lobby-build-identities">${resumeBuildIds.map((id) => `<i class="build-identity-icon" style="${buildIdentityIconStyle(id)}" aria-hidden="true"></i>`).join('')}</span>` : ''}`;
             resume.addEventListener('click', () => this.handlers?.onResume?.());
-            panel.append(resume);
+            scrollBody.append(resume);
         }
         const footer = document.createElement('div');
         footer.className = 'lobby-footer';
@@ -198,7 +254,7 @@ export class LobbyOverlay {
         start.textContent = '전투 준비';
         start.addEventListener('click', () => this.handlers?.onContinue());
         footer.append(start);
-        panel.append(footer);
+        panel.append(scrollBody, footer);
         this.root.append(panel);
     }
 }

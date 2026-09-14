@@ -15,10 +15,10 @@ test('early combat fills the arena quickly without exceeding the mobile cap', ()
   assert.ok(twoMinutes.enemyBudget <= 320);
 });
 
-test('level curve keeps midgame upgrades frequent enough for a spell-spam run', () => {
-  assert.ok(xpNeededForLevel(10) <= 200);
-  assert.ok(xpNeededForLevel(30) <= 750);
-  assert.ok(xpNeededForLevel(60) <= 1700);
+test('level curve spaces out choices without starving midgame and late-run growth', () => {
+  assert.ok(xpNeededForLevel(10) >= 440 && xpNeededForLevel(10) <= 490);
+  assert.ok(xpNeededForLevel(30) >= 1400 && xpNeededForLevel(30) <= 1500);
+  assert.ok(xpNeededForLevel(60) >= 3500 && xpNeededForLevel(60) <= 3650);
 });
 
 test('first shop arrives in the first minute and returns often', () => {

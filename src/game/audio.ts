@@ -15,7 +15,7 @@ const DESCRIPTORS: Record<SoundKind, SoundDescriptor> = {
   ultimate: { frequency: 110, duration: 0.42, cooldown: 0.30, priority: 3, type: 'sawtooth', gain: 0.24 },
   eliteDeath: { frequency: 240, duration: 0.24, cooldown: 0.12, priority: 2, type: 'triangle', gain: 0.18 },
   coin: { frequency: 880, duration: 0.06, cooldown: 0.08, priority: 0, type: 'sine', gain: 0.08 },
-  levelUp: { frequency: 620, duration: 0.28, cooldown: 0.25, priority: 2, type: 'triangle', gain: 0.16 },
+  levelUp: { frequency: 523.25, duration: 0.52, cooldown: 0.5, priority: 2, type: 'triangle', gain: 0.16 },
   legendary: { frequency: 300, duration: 0.36, cooldown: 0.35, priority: 3, type: 'sawtooth', gain: 0.20 },
   bossSpawn: { frequency: 82, duration: 0.55, cooldown: 0.5, priority: 4, type: 'square', gain: 0.22 },
   bossPhase: { frequency: 130, duration: 0.48, cooldown: 0.35, priority: 5, type: 'sawtooth', gain: 0.24 },
@@ -98,8 +98,16 @@ export class ArcaneAudio {
       const gain = ctx.createGain();
       oscillator.type = desc.type;
       oscillator.frequency.setValueAtTime(desc.frequency, ctx.currentTime);
-      oscillator.frequency.exponentialRampToValueAtTime(Math.max(40, desc.frequency * 0.72), ctx.currentTime + desc.duration);
+      if (kind === 'levelUp') {
+        // A short ascending major arpeggio makes growth sound celebratory.
+        oscillator.frequency.setValueAtTime(desc.frequency * 1.25, ctx.currentTime + .09);
+        oscillator.frequency.setValueAtTime(desc.frequency * 1.5, ctx.currentTime + .18);
+        oscillator.frequency.setValueAtTime(desc.frequency * 2, ctx.currentTime + .29);
+      } else {
+        oscillator.frequency.exponentialRampToValueAtTime(Math.max(40, desc.frequency * 0.72), ctx.currentTime + desc.duration);
+      }
       gain.gain.setValueAtTime(desc.gain * this.settings.volume, ctx.currentTime);
+      if (kind === 'levelUp') gain.gain.setValueAtTime(desc.gain * this.settings.volume * .7, ctx.currentTime + .29);
       gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + desc.duration);
       oscillator.connect(gain); gain.connect(ctx.destination);
       oscillator.start(); oscillator.stop(ctx.currentTime + desc.duration);

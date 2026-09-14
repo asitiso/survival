@@ -23,10 +23,18 @@ export function applyUpgrade(id, hero, spells) {
             hero.speed *= 1.075;
             break;
         case 'spellPower':
-            hero.spellPower *= 1.12;
+            hero.spellPower *= hero.spellPowerUpgradeCount < 6 ? 1.096 : 1.03;
+            hero.spellPowerUpgradeCount += 1;
             break;
         case 'cooldown':
-            hero.cooldownMultiplier = Math.max(0.55, hero.cooldownMultiplier * 0.94);
+            hero.cooldownMultiplier = Math.max(0.55, hero.cooldownMultiplier * (hero.cooldownUpgradeCount < 6 ? .958 : .985));
+            hero.cooldownUpgradeCount += 1;
+            break;
+        case 'armor':
+            hero.armor = Math.min(6, hero.armor + 1);
+            break;
+        case 'critChance':
+            hero.critChance = Math.min(0.20, hero.critChance + 0.03);
             break;
         case 'pickupRadius':
             hero.pickupRadius += 28;
@@ -43,7 +51,11 @@ export function buildUpgradeChoices(hero, spells, rng = Math.random) {
             pool.push({ id: spell, title: `${heroSpellName(hero.profileId, spell)} 강화`, description: `Lv.${next} · ${milestone}`, accent: heroSpellIdentity(hero.profileId, spell).primary });
         }
     }
-    pool.push({ id: 'spellPower', title: '마력 증폭', description: `모든 마법 피해 +12%`, accent: '#df9dff' }, { id: 'cooldown', title: '고속 영창', description: `모든 마법 재사용시간 -6%`, accent: '#68c9ff' }, { id: 'maxHp', title: '생명 각인', description: `최대 HP +42 · 즉시 42 회복`, accent: '#ff7185' }, { id: 'moveSpeed', title: '질풍 걸음', description: `이동속도 +7.5%`, accent: '#6fe7bd' }, { id: 'pickupRadius', title: '마력 자석', description: `경험치·금화 흡수거리 +28`, accent: '#f3d66d' });
+    pool.push({ id: 'spellPower', title: '마력 증폭', description: `모든 마법 피해 +${hero.spellPowerUpgradeCount < 6 ? '9.6' : '3.0'}%`, accent: '#df9dff' }, { id: 'cooldown', title: '고속 영창', description: `모든 마법 재사용시간 -${hero.cooldownUpgradeCount < 6 ? '4.2' : '1.5'}%`, accent: '#68c9ff' }, { id: 'maxHp', title: '생명 각인', description: `최대 HP +42 · 즉시 42 회복`, accent: '#ff7185' }, { id: 'moveSpeed', title: '질풍 걸음', description: `이동속도 +7.5%`, accent: '#6fe7bd' }, { id: 'pickupRadius', title: '마력 자석', description: `경험치·금화 흡수거리 +28`, accent: '#f3d66d' });
+    if (hero.level >= 10 && hero.armor < 6)
+        pool.push({ id: 'armor', title: '수호 갑주', description: `방어력 +1 · 받는 피해 감소`, accent: '#aab8c7' });
+    if (hero.level >= 15 && hero.critChance < 0.20)
+        pool.push({ id: 'critChance', title: '치명 집중', description: `마법 치명타 확률 +3%`, accent: '#ffd166' });
     const result = [];
     while (result.length < 3 && pool.length > 0) {
         const raw = rng();
@@ -54,7 +66,7 @@ export function buildUpgradeChoices(hero, spells, rng = Math.random) {
     }
     return result;
 }
-export function buildBossRewardChoices(spells, rng = Math.random, heroId = 'arkan', activeRelic = null, bossArchetype = null, activeFusions = [], masteryLevel = 1) {
+export function buildBossRewardChoices(spells, rng = Math.random, heroId = 'arkan', activeRelic = null, bossArchetype = null, activeFusions = [], masteryLevel = 1, spellPowerUpgradeCount = 0, cooldownUpgradeCount = 0) {
     const upgrades = [];
     for (const spell of ['meteorStorm', 'blackHole']) {
         if (spells.levels[spell] >= 10)
@@ -69,8 +81,8 @@ export function buildBossRewardChoices(spells, rng = Math.random, heroId = 'arka
         });
     }
     const fallback = [
-        { kind: 'upgrade', id: 'spellPower', title: '대마력 증폭', description: '모든 마법 피해 +12%', accent: '#e49cff' },
-        { kind: 'upgrade', id: 'cooldown', title: '시간 압축', description: '모든 마법 재사용시간 -6%', accent: '#6dcfff' },
+        { kind: 'upgrade', id: 'spellPower', title: '대마력 증폭', description: `모든 마법 피해 +${spellPowerUpgradeCount < 6 ? '9.6' : '3.0'}%`, accent: '#e49cff' },
+        { kind: 'upgrade', id: 'cooldown', title: '시간 압축', description: `모든 마법 재사용시간 -${cooldownUpgradeCount < 6 ? '4.2' : '1.5'}%`, accent: '#6dcfff' },
         { kind: 'upgrade', id: 'maxHp', title: '불굴의 생명력', description: '최대 HP +42 · 즉시 42 회복', accent: '#ff7587' },
     ];
     while (upgrades.length < 2 && fallback.length > 0) {

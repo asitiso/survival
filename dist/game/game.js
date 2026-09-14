@@ -1,9 +1,10 @@
 import { FixedGameLoop } from '../core/loop.js';
 import { clamp, distance, normalize } from '../core/math.js';
 import { InputState } from '../core/input.js';
+import { logicalPointerPosition } from '../core/input-lifecycle.js';
 import { ACTION_BUTTONS, ARENA_MARGIN, LOGICAL_HEIGHT, LOGICAL_WIDTH } from './config.js';
 import { createGuardianCore, createHero } from './entities.js';
-import { dangerTierForSeconds, xpNeededForLevel } from '../domain/progression.js';
+import { dangerTierForSeconds, levelUpRecovery, xpNeededForLevel } from '../domain/progression.js';
 import { catastropheAt, catastropheModifiers } from '../domain/catastrophe.js';
 import { EnemyManager } from './enemies.js';
 import { bossPhaseForRatio } from './boss-patterns.js';
@@ -13,6 +14,7 @@ import { ManualTargetMemory } from './manual-target-stability.js';
 import { PickupManager } from './pickups.js';
 import { TerrainSystem } from './terrain.js';
 import { applyUpgrade, buildBossRewardChoices, buildUpgradeChoices } from './upgrades.js';
+import { armorDamageTakenMultiplier } from './defense.js';
 import { guideBossRewardChoices } from './boss-reward-guidance.js';
 import { projectBossRewardImpact } from './boss-reward-impact-projection.js';
 import { bossRewardImpactRoleIdentityStyle } from './boss-reward-impact-role-identity-assets.js';
@@ -24,6 +26,8 @@ import { ShopOverlay } from '../ui/shop.js';
 import { HeroSelectOverlay } from '../ui/hero-select.js';
 import { ResultsOverlay } from '../ui/results.js';
 import { LobbyOverlay } from '../ui/lobby.js';
+import { GameAuth } from '../cloud/game-auth.js';
+import { CloudRunHistory } from '../cloud/run-history.js';
 import { TraitSelectOverlay } from '../ui/trait-select.js';
 import { refreshEquipmentPowers, priceShopOffers, ensureEquippedOffers, generateShopOffers, equipmentDefinition } from './shop-data.js';
 import { quickShopRecommendation, safeQuickPurchase, shopGuidanceForOffers, shopTopRecommendations } from './shop-guidance.js';
@@ -58,6 +62,8 @@ import { spellVfxDescriptor } from './spell-vfx.js';
 import { enemyDeathCue, enemyStatusCue, enemyThreatTelegraph, sortTelegraphsByPriority } from './enemy-presentation.js';
 import { BossPresentationTracker, bossPatternTelegraph, bossLifecycleCinematicProfile } from './boss-presentation.js';
 import { edgeThreatVfxProfile, edgeThreatIndicator, deathAfterglowProfile, ultimateAftermathProfile, bossSettleProfile, createVfxQualityTransition, advanceVfxQualityTransition } from './visual-rhythm.js';
+import { advanceMobileFollowCamera, cameraTransform, cameraWorldToScreen, createMobileFollowCamera } from './mobile-follow-camera.js';
+import { mobileMinimapLayout, mobileMinimapToggleHit, projectMobileMinimapPoint } from './mobile-minimap.js';
 import { spellResidueProfile, bossHealthPressureProfile, mapAmbientDepthProfile, visualPriorityPolicy, spellEchoContinuityProfile, bossPressureTransitionProfile, mapCombatReactionProfile, visualReadabilityBudget, spellEchoCadenceProfile, bossPressureEnvelope, mapAmbientFlowProfile, visualFocusBudget } from './visual-presence.js';
 import { criticalCuePolicy, nextPresentationQuality } from './presentation-integration.js';
 import { cosmeticMotionScale, cosmeticMotionVelocity, loadPresentationSettings, savePresentationSettings } from './presentation-settings.js';
@@ -614,6 +620,13 @@ export class Game {
     mapVfxSequence = 0;
     battlefieldEnvironmentReactionVfx = [];
     lastRenderClock = 0;
+    mobileFollowCamera = createMobileFollowCamera({
+        width: 0,
+        height: 0,
+        arena: { left: ARENA_MARGIN, top: ARENA_MARGIN + 38, right: LOGICAL_WIDTH - ARENA_MARGIN, bottom: LOGICAL_HEIGHT - ARENA_MARGIN },
+        hero: this.hero.pos,
+    });
+    mobileMinimapExpanded = false;
     smoothedFps = 60;
     vfxQualityTransition = createVfxQualityTransition('high');
     thermalRecoveryState = createThermalRecoveryState();
@@ -949,6 +962,11 @@ export class Game {
     recentGoldPerMinute = 0;
     rewardRateWindowStartedAt = 0;
     rewardRateWindowStartGold = 0;
+    gameAuth = new GameAuth();
+    cloudRunHistory = new CloudRunHistory();
+    authState = { status: 'guest', userId: null };
+    leaderboard = [];
+    myLeaderboardBest = null;
     ctx;
     loop;
     constructor(canvas) {
@@ -1082,6 +1100,7 @@ export class Game {
         this.resumeSnapshot = this.loadStoredRunSnapshot();
         this.audio.settings = this.audioSettings;
         this.input = new InputState(canvas);
+        canvas.addEventListener('pointerup', this.onMobileMinimapPointerUp, { passive: false });
         this.enemies.feedback = this.feedback;
         const uiParent = canvas.parentElement ?? document.body;
         this.levelUpOverlay = new LevelUpOverlay(uiParent);
@@ -1094,10 +1113,28 @@ export class Game {
         this.presentationControls = this.createPresentationControls(uiParent);
         this.loop = new FixedGameLoop((dt) => this.update(dt), () => this.render());
         this.onboarding = new OnboardingController(this.loadStoredOnboardingState());
+        void this.initializeCloudAuth();
         this.restart();
     }
     start() { this.loop.start(); }
     stop() { this.loop.stop(); }
+    onMobileMinimapPointerUp = (event) => {
+        const viewport = this.canvas.getBoundingClientRect();
+        const layout = mobileMinimapLayout(viewport.width, viewport.height, this.mobileMinimapExpanded);
+        const point = logicalPointerPosition(event.clientX, event.clientY, viewport);
+        if (!mobileMinimapToggleHit(point, layout))
+            return;
+        event.preventDefault();
+        this.mobileMinimapExpanded = !this.mobileMinimapExpanded;
+    };
+    async initializeCloudAuth() {
+        this.gameAuth.subscribe((state) => {
+            this.authState = state;
+            if (this.lobbyOverlay.isOpen)
+                this.openLobby();
+        });
+        this.authState = await this.gameAuth.initialize();
+    }
     initializeActionIconAtlas() {
         if (typeof Image === 'undefined')
             return;
@@ -2311,7 +2348,7 @@ export class Game {
         this.paused = true;
         this.openLobby();
     }
-    openLobby() {
+    openLobby(refreshCloud = true) {
         this.paused = true;
         this.heroSelectOverlay.hide();
         this.traitSelectOverlay.hide();
@@ -2327,6 +2364,7 @@ export class Game {
             onThreatChange: (level) => {
                 this.threatProfile = selectThreatLevel(this.threatProfile, level);
                 this.saveStoredThreatProfile();
+                void this.refreshCloudLeaderboard();
                 return this.threatProfile;
             },
             onContinue: () => {
@@ -2341,7 +2379,29 @@ export class Game {
                 this.restoreRunSnapshot(snapshot);
                 this.paused = false;
             },
-        }, this.threatProfile, this.masteryProfile, this.resumeSnapshot, this.loadStoredRunHistory());
+            onSignInWithGoogle: () => { if (typeof window !== 'undefined')
+                void this.gameAuth.signInWithGoogle(window.location.origin); },
+            onSignOut: () => { void this.gameAuth.signOut(); },
+        }, this.threatProfile, this.masteryProfile, this.resumeSnapshot, this.loadStoredRunHistory(), this.authState, this.leaderboard, this.myLeaderboardBest);
+        if (refreshCloud)
+            void this.refreshCloudLeaderboard();
+    }
+    async refreshCloudLeaderboard() {
+        const threatLevel = this.threatProfile.selected;
+        if (this.authState.status !== 'authenticated') {
+            this.leaderboard = [];
+            this.myLeaderboardBest = null;
+            return;
+        }
+        const [leaderboard, myBest] = await Promise.all([
+            this.cloudRunHistory.loadLeaderboard(threatLevel),
+            this.cloudRunHistory.loadMine(this.authState.userId, threatLevel),
+        ]);
+        if (!this.lobbyOverlay.isOpen || threatLevel !== this.threatProfile.selected)
+            return;
+        this.leaderboard = leaderboard;
+        this.myLeaderboardBest = myBest;
+        this.openLobby(false);
     }
     openHeroSelect() {
         this.paused = true;
@@ -2858,7 +2918,7 @@ export class Game {
             },
             onHeroDamage: (amount, source = 'contact') => {
                 const auraMultiplier = edricAura ? combatBuild.edricHeroAuraMultiplier : 1;
-                const applied = amount * this.hero.equipmentDamageTakenMultiplier * this.runHeroDamageTakenMultiplier * auraMultiplier;
+                const applied = amount * armorDamageTakenMultiplier(this.hero.armor) * this.hero.equipmentDamageTakenMultiplier * this.runHeroDamageTakenMultiplier * auraMultiplier;
                 const beforeHpRatio = this.hero.hp / Math.max(1, this.hero.maxHp);
                 this.hero.hp = Math.max(0, this.hero.hp - applied);
                 const afterHpRatio = this.hero.hp / Math.max(1, this.hero.maxHp);
@@ -3015,7 +3075,7 @@ export class Game {
                     const blastDistance = Math.hypot(this.hero.pos.x - death.x, this.hero.pos.y - death.y);
                     if (blastDistance <= mutatorRuntime.volatileDeath.radius + this.hero.radius) {
                         const falloff = Math.max(.35, 1 - blastDistance / Math.max(1, mutatorRuntime.volatileDeath.radius));
-                        const applied = mutatorRuntime.volatileDeath.damage * falloff * this.hero.equipmentDamageTakenMultiplier * this.runHeroDamageTakenMultiplier;
+                        const applied = mutatorRuntime.volatileDeath.damage * falloff * armorDamageTakenMultiplier(this.hero.armor) * this.hero.equipmentDamageTakenMultiplier * this.runHeroDamageTakenMultiplier;
                         this.hero.hp = Math.max(0, this.hero.hp - applied);
                         if (applied > 0)
                             this.queueHeroResponseVfx('hit', .92);
@@ -3671,7 +3731,7 @@ export class Game {
     }
     render() {
         const ctx = this.ctx;
-        this.updatePresentationQuality();
+        const renderDt = this.updatePresentationQuality();
         ctx.clearRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
         const combatAttention = this.currentCombatAttentionPolicy();
         const worldVfxPriority = worldVfxPriorityPolicy(combatAttention.primary, this.presentation.quality);
@@ -3685,11 +3745,20 @@ export class Game {
         const shake = this.feedback.cameraOffset;
         const cameraPressureScale = this.presentationSettings.reducedShake ? 0.4 : 1;
         const cameraScale = 1 + this.feedback.cameraScaleOffset * cameraPressureScale;
+        const viewport = this.canvas.getBoundingClientRect();
+        this.mobileFollowCamera = advanceMobileFollowCamera(this.mobileFollowCamera, {
+            width: viewport.width,
+            height: viewport.height,
+            arena: { left: ARENA_MARGIN, top: ARENA_MARGIN + 38, right: LOGICAL_WIDTH - ARENA_MARGIN, bottom: LOGICAL_HEIGHT - ARENA_MARGIN },
+            hero: this.hero.pos,
+            deltaSeconds: renderDt,
+        });
+        const worldCamera = cameraTransform(this.mobileFollowCamera, cameraScale);
         ctx.save();
         ctx.translate(shake.x * shakeScale, shake.y * shakeScale);
         ctx.translate(LOGICAL_WIDTH / 2, LOGICAL_HEIGHT / 2);
-        ctx.scale(cameraScale, cameraScale);
-        ctx.translate(-LOGICAL_WIDTH / 2, -LOGICAL_HEIGHT / 2);
+        ctx.scale(worldCamera.scale, worldCamera.scale);
+        ctx.translate(-worldCamera.center.x, -worldCamera.center.y);
         this.drawArena(ctx);
         this.drawBattlefieldAtmosphereVfx(ctx);
         this.drawBattlefieldDepthOverlays(ctx);
@@ -3761,6 +3830,7 @@ export class Game {
         this.drawDangerVignette(ctx);
         this.drawEdgeThreatVfx(ctx);
         this.drawHud(ctx);
+        this.drawMobileMinimap(ctx);
         this.drawFinalFormTransformationCue(ctx);
         this.drawArcaneComboHud(ctx);
         this.drawControls(ctx);
@@ -3813,6 +3883,7 @@ export class Game {
         this.presentation.quality = this.vfxQualityTransition.current;
         const comfort = longRunComfortPolicy(this.elapsed);
         this.presentation.trimToBudget(Math.max(48, Math.round(governor.particleCap * comfort.vfxDensity * thermal.particleCapMultiplier)), Math.max(20, Math.round(governor.trailCap * comfort.vfxDensity * thermal.trailCapMultiplier)), governor.telegraphCap);
+        return qualityDt;
     }
     prepareManualTarget(spellWorld) {
         const target = this.manualTargetMemory.select(this.enemies.enemies, this.hero.pos, this.core.pos, this.elapsed);
@@ -6357,6 +6428,60 @@ export class Game {
         ctx.drawImage(this.bossResponseAckIdentityAtlasImage, icon.sx, icon.sy, icon.sw, icon.sh, dx, dy, size, size);
         ctx.restore();
     }
+    drawMobileMinimap(ctx) {
+        const viewport = this.canvas.getBoundingClientRect();
+        const layout = mobileMinimapLayout(viewport.width, viewport.height, this.mobileMinimapExpanded);
+        if (!layout.active)
+            return;
+        ctx.save();
+        if (layout.panel) {
+            const { panel } = layout;
+            ctx.fillStyle = 'rgba(5,12,23,.90)';
+            ctx.strokeStyle = 'rgba(152,211,255,.75)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.roundRect(panel.x, panel.y, panel.width, panel.height, 12);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#d9efff';
+            ctx.font = '800 13px system-ui';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('MAP', panel.x + 14, panel.y + 20);
+            const map = panel.map;
+            ctx.fillStyle = 'rgba(19,43,59,.90)';
+            ctx.fillRect(map.x, map.y, map.width, map.height);
+            ctx.strokeStyle = 'rgba(138,199,237,.42)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(map.x, map.y, map.width, map.height);
+            const arena = { left: ARENA_MARGIN, top: ARENA_MARGIN + 38, right: LOGICAL_WIDTH - ARENA_MARGIN, bottom: LOGICAL_HEIGHT - ARENA_MARGIN };
+            const marker = (point, radius, color) => {
+                const projected = projectMobileMinimapPoint(point, arena, layout);
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.arc(projected.x, projected.y, radius, 0, Math.PI * 2);
+                ctx.fill();
+            };
+            marker(this.core.pos, 5, '#75dfff');
+            marker(this.hero.pos, 4.5, '#ffe67a');
+            const importantEnemies = this.enemies.enemies.filter((enemy) => enemy.alive && (enemy.type === 'boss' || enemy.type === 'elite' || (enemy.target === 'core' && enemy.type !== 'grunt')));
+            for (const enemy of importantEnemies)
+                marker(enemy.pos, enemy.type === 'boss' ? 6 : enemy.type === 'elite' ? 4 : 3, enemy.type === 'boss' ? '#ff6877' : enemy.type === 'elite' ? '#d99cff' : '#ffb66f');
+        }
+        ctx.fillStyle = layout.expanded ? 'rgba(33,92,122,.98)' : 'rgba(21,55,78,.94)';
+        ctx.strokeStyle = '#aee7ff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(layout.toggle.x, layout.toggle.y, layout.toggle.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#effaff';
+        ctx.font = '800 10px system-ui';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(layout.expanded ? '\u00d7' : 'MAP', layout.toggle.x, layout.toggle.y + (layout.expanded ? -1 : 1));
+        ctx.restore();
+    }
     drawControls(ctx) {
         ctx.save();
         const boss = this.enemies.enemies.find((enemy) => enemy.alive && enemy.type === 'boss') ?? null;
@@ -6541,13 +6666,13 @@ export class Game {
             }
             this.drawSpellEvolutionActionCrest(ctx, button.id, button.x, button.y, button.radius);
             ctx.fillStyle = unavailableShop ? 'rgba(255,255,255,.45)' : '#fff';
-            ctx.font = `800 ${button.radius > 60 ? 18 : 15}px system-ui`;
+            ctx.font = `800 ${button.radius > 74 ? 22 : button.radius > 60 ? 18 : 15}px system-ui`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             const showShopTokenCount = eightTwelveShop.active ? eightTwelveShop.showTokenCount : fourEightShop.active ? fourEightShop.showTokenCount : ultraShopNeed.showTokenCount;
             const buttonLabel = button.id === 'shop' ? (showShopTokenCount ? `상점 ${this.shopTokens}` : '상점') : button.id === 'potion' ? `물약 ${this.hero.healingPotions}` : button.id === 'auto' ? (this.autoCastNormal ? 'AUTO ON' : 'AUTO') : heroActionLabel(this.hero.profileId, button.id);
             ctx.fillText(buttonLabel, button.x, button.y + iconPresentation.labelOffsetY);
-            ctx.font = '600 12px system-ui';
+            ctx.font = `600 ${button.radius > 74 ? 14 : 12}px system-ui`;
             ctx.fillStyle = 'rgba(255,255,255,.62)';
             const secondaryLabel = queuedCast ? 'QUEUED' : button.id === 'shop' && quietShop ? (eightTwelveShop.dormant ? eightTwelveShop.secondaryLabel : fourEightShop.suppressRoutinePressure ? fourEightShop.secondaryLabel : ultraShopNeed.deemphasizeShop ? ultraShopNeed.secondaryLabel : lateShopNeed.secondaryLabel) : button.id === 'auto' ? buttonState.autoLabel : buttonState.secondary;
             ctx.fillText(secondaryLabel, button.x, button.y + iconPresentation.secondaryOffsetY);
@@ -6982,7 +7107,7 @@ export class Game {
         if (hazardDamage > 0) {
             if (this.arenaDodgeChain.count > 0)
                 this.arenaDodgeChain = breakArenaDodgeChain(this.arenaDodgeChain);
-            const applied = hazardDamage * this.hero.equipmentDamageTakenMultiplier * this.runHeroDamageTakenMultiplier;
+            const applied = hazardDamage * armorDamageTakenMultiplier(this.hero.armor) * this.hero.equipmentDamageTakenMultiplier * this.runHeroDamageTakenMultiplier;
             this.hero.hp = Math.max(0, this.hero.hp - applied);
             if (applied > 0)
                 this.queueHeroResponseVfx('hit', .84);
@@ -7153,7 +7278,7 @@ export class Game {
             if (!projectile)
                 continue;
             const profile = edgeThreatVfxProfile(cue.level, cue.target);
-            const indicator = edgeThreatIndicator(projectile.visualPos ?? projectile.pos, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+            const indicator = edgeThreatIndicator(cameraWorldToScreen(projectile.visualPos ?? projectile.pos, this.mobileFollowCamera), LOGICAL_WIDTH, LOGICAL_HEIGHT);
             ctx.globalAlpha = this.presentationSettings.reducedFlash ? profile.alpha * .62 : profile.alpha;
             ctx.fillStyle = profile.color;
             const length = 48 + profile.segmentCount * 18, thickness = profile.thickness;
@@ -9630,7 +9755,7 @@ export class Game {
     openNextBossReward(generation) {
         if (this.queuedBossRewards <= 0 || this.gameOver)
             return;
-        const guidedChoices = guideBossRewardChoices(buildBossRewardChoices(this.spells, Math.random, this.hero.profileId, this.activeRelic, this.pendingBossArchetype, this.fusionRuntime.equipped, this.masteryProfile.heroes[this.hero.profileId].level), { activeRelic: this.activeRelic, activeFusionCount: this.fusionRuntime.equipped.length });
+        const guidedChoices = guideBossRewardChoices(buildBossRewardChoices(this.spells, Math.random, this.hero.profileId, this.activeRelic, this.pendingBossArchetype, this.fusionRuntime.equipped, this.masteryProfile.heroes[this.hero.profileId].level, this.hero.spellPowerUpgradeCount, this.hero.cooldownUpgradeCount), { activeRelic: this.activeRelic, activeFusionCount: this.fusionRuntime.equipped.length });
         const repeatChoices = reduceRepeatBossRewardDecision(guidedChoices, { elapsedSeconds: this.elapsed, activeRelic: this.activeRelic, activeFusionCount: this.fusionRuntime.equipped.length });
         const deepChoices = reduceDeepRunBossRewardDecision(repeatChoices, { elapsedSeconds: this.elapsed, activeRelic: this.activeRelic, activeFusionCount: this.fusionRuntime.equipped.length });
         const ultraReward = compactUltraLongBossRewards(deepChoices, { elapsedSeconds: this.elapsed, activeRelic: this.activeRelic, activeFusionCount: this.fusionRuntime.equipped.length });
@@ -9733,10 +9858,29 @@ export class Game {
                 const evolutionSpell = choice.id in this.spells.levels ? choice.id : null;
                 const beforeTier = evolutionSpell ? spellEvolutionTier(this.spells.levels[evolutionSpell]) : 0;
                 applyUpgrade(choice.id, this.hero, this.spells);
-                if (evolutionSpell)
-                    this.notifySpellEvolutionIfChanged(evolutionSpell, beforeTier);
+                const evolved = evolutionSpell ? this.notifySpellEvolutionIfChanged(evolutionSpell, beforeTier) : false;
+                const recovered = levelUpRecovery(this.hero.hp, this.hero.maxHp);
+                this.hero.hp += recovered;
+                if (!evolved)
+                    this.showEventToast(`강화 완료 · ${choice.title}${recovered > 0 ? ` · 체력 +${Math.round(recovered)}` : ''}`);
+                this.audio.play('purchase');
+                if (!this.presentationSettings.reducedMotion && !this.presentationSettings.reducedFlash) {
+                    for (let i = 0; i < 12; i++) {
+                        const angle = Math.PI * 2 * i / 12;
+                        this.presentation.emitParticle({ x: this.hero.pos.x, y: this.hero.pos.y, vx: Math.cos(angle) * 85, vy: Math.sin(angle) * 85 - 20, color: i % 2 ? '#ffe59a' : '#97ebc8', ttl: .65, size: 3, alpha: .75 });
+                    }
+                }
                 this.queuedLevelUps = Math.max(0, this.queuedLevelUps - 1);
             });
+        }, {
+            eyebrow: 'LEVEL UP · 성장 보상',
+            title: `레벨 ${this.hero.level - this.queuedLevelUps + 1} 달성!`,
+            subtitle: this.queuedLevelUps > 1
+                ? `축적한 힘을 골라주세요 · 남은 강화 ${this.queuedLevelUps}회`
+                : '더 강해질 시간! 원하는 힘을 하나 고르면 전투가 이어집니다',
+            celebration: true,
+            bonus: '✦ 성장 보너스 · 선택 시 최대 체력의 12% 회복',
+            reducedMotion: this.presentationSettings.reducedMotion || this.presentationSettings.reducedFlash,
         });
         this.decisionReplay = renderDecision;
         renderDecision(generation);
@@ -9819,7 +9963,7 @@ export class Game {
             return;
         const snapshot = {
             version: 1, savedAt: Date.now(), heroId: this.hero.profileId, traitId: this.selectedTrait, threatLevel: this.runThreatLevel, elapsed: this.elapsed,
-            hero: { level: this.hero.level, xp: this.hero.xp, xpNext: this.hero.xpNext, hp: this.hero.hp, maxHp: this.hero.maxHp, coins: this.hero.coins, kills: this.hero.kills },
+            hero: { level: this.hero.level, xp: this.hero.xp, xpNext: this.hero.xpNext, hp: this.hero.hp, maxHp: this.hero.maxHp, coins: this.hero.coins, kills: this.hero.kills, armor: this.hero.armor, critChance: this.hero.critChance, spellPowerUpgradeCount: this.hero.spellPowerUpgradeCount, cooldownUpgradeCount: this.hero.cooldownUpgradeCount },
             coreHp: this.core.hp, spellLevels: { ...this.spells.levels }, equipment: structuredClone(this.equipmentState), relic: this.activeRelic,
             fusions: [...this.fusionRuntime.equipped], fateChoices: [...this.fateRuntime.choices], map: { id: this.terrain.currentLayout.id, evolutionStage: this.terrain.evolutionStage },
             progression: { bossesKilled: this.bossesKilled, goldEarned: this.goldEarned, shopTokens: this.shopTokens },
@@ -9844,6 +9988,10 @@ export class Game {
         this.hero.maxHp = snapshot.hero.maxHp;
         this.hero.coins = snapshot.hero.coins;
         this.hero.kills = snapshot.hero.kills;
+        this.hero.armor = snapshot.hero.armor ?? 0;
+        this.hero.critChance = snapshot.hero.critChance ?? .05;
+        this.hero.spellPowerUpgradeCount = snapshot.hero.spellPowerUpgradeCount ?? 0;
+        this.hero.cooldownUpgradeCount = snapshot.hero.cooldownUpgradeCount ?? 0;
         this.core.hp = Math.min(this.core.maxHp, snapshot.coreHp);
         for (const id of Object.keys(snapshot.spellLevels))
             this.spells.levels[id] = snapshot.spellLevels[id];
@@ -10032,6 +10180,18 @@ export class Game {
             buildCapsule,
             ...(finalForm ? { finalForm: finalForm.id } : {}),
         });
+        const runKey = globalThis.crypto?.randomUUID?.();
+        if (runKey)
+            void this.cloudRunHistory.save(this.authState.userId, {
+                runKey,
+                heroId: this.hero.profileId,
+                survivedSeconds: this.elapsed,
+                level: this.hero.level,
+                kills: this.hero.kills,
+                goldEarned: this.goldEarned,
+                bossesKilled: this.bossesKilled,
+                threatLevel: this.runThreatLevel,
+            }).catch(() => { });
         const baseBuildSummary = compactPhase22BuildLabels({
             masteryLevel: this.masteryProfile.heroes[this.hero.profileId].level,
             relicName: this.activeRelic ? relicDisplayName(this.activeRelic) : null,

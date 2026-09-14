@@ -4,7 +4,7 @@ import { InputState } from '../core/input.js';
 import { logicalPointerPosition } from '../core/input-lifecycle.js';
 import { ACTION_BUTTONS, ARENA_MARGIN, LOGICAL_HEIGHT, LOGICAL_WIDTH, type ActionId } from './config.js';
 import { createGuardianCore, createHero, type GuardianCore, type Hero } from './entities.js';
-import { dangerTierForSeconds, xpNeededForLevel } from '../domain/progression.js';
+import { dangerTierForSeconds, levelUpRecovery, xpNeededForLevel } from '../domain/progression.js';
 import { catastropheAt, catastropheModifiers, type Catastrophe } from '../domain/catastrophe.js';
 import { EnemyManager, type Enemy, type EnemyDeathEvent, type EnemyType, type EnemyDeathVisualSource } from './enemies.js';
 import { bossPhaseForRatio, type BossArchetype, type BossVariantTier } from './boss-patterns.js';
@@ -5713,11 +5713,11 @@ export class Game {
       }
       this.drawSpellEvolutionActionCrest(ctx,button.id,button.x,button.y,button.radius);
       ctx.fillStyle = unavailableShop ? 'rgba(255,255,255,.45)' : '#fff';
-      ctx.font = `800 ${button.radius > 60 ? 18 : 15}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = `800 ${button.radius > 74 ? 22 : button.radius > 60 ? 18 : 15}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       const showShopTokenCount=eightTwelveShop.active?eightTwelveShop.showTokenCount:fourEightShop.active?fourEightShop.showTokenCount:ultraShopNeed.showTokenCount;
       const buttonLabel = button.id === 'shop' ? (showShopTokenCount ? `상점 ${this.shopTokens}` : '상점') : button.id === 'potion' ? `물약 ${this.hero.healingPotions}` : button.id === 'auto' ? (this.autoCastNormal ? 'AUTO ON' : 'AUTO') : heroActionLabel(this.hero.profileId, button.id);
       ctx.fillText(buttonLabel, button.x, button.y + iconPresentation.labelOffsetY);
-      ctx.font = '600 12px system-ui'; ctx.fillStyle = 'rgba(255,255,255,.62)';
+      ctx.font = `600 ${button.radius > 74 ? 14 : 12}px system-ui`; ctx.fillStyle = 'rgba(255,255,255,.62)';
       const secondaryLabel = queuedCast ? 'QUEUED' : button.id === 'shop' && quietShop ? (eightTwelveShop.dormant ? eightTwelveShop.secondaryLabel : fourEightShop.suppressRoutinePressure ? fourEightShop.secondaryLabel : ultraShopNeed.deemphasizeShop ? ultraShopNeed.secondaryLabel : lateShopNeed.secondaryLabel) : button.id === 'auto' ? buttonState.autoLabel : buttonState.secondary;
       ctx.fillText(secondaryLabel, button.x, button.y + iconPresentation.secondaryOffsetY);
     }
@@ -7701,9 +7701,28 @@ export class Game {
         const evolutionSpell=choice.id in this.spells.levels?choice.id as SpellId:null;
         const beforeTier=evolutionSpell?spellEvolutionTier(this.spells.levels[evolutionSpell]):0;
         applyUpgrade(choice.id, this.hero, this.spells);
-        if(evolutionSpell)this.notifySpellEvolutionIfChanged(evolutionSpell,beforeTier);
+        const evolved = evolutionSpell ? this.notifySpellEvolutionIfChanged(evolutionSpell,beforeTier) : false;
+        const recovered = levelUpRecovery(this.hero.hp, this.hero.maxHp);
+        this.hero.hp += recovered;
+        if (!evolved) this.showEventToast(`강화 완료 · ${choice.title}${recovered > 0 ? ` · 체력 +${Math.round(recovered)}` : ''}`);
+        this.audio.play('purchase');
+        if (!this.presentationSettings.reducedMotion && !this.presentationSettings.reducedFlash) {
+          for (let i = 0; i < 12; i++) {
+            const angle = Math.PI * 2 * i / 12;
+            this.presentation.emitParticle({x:this.hero.pos.x,y:this.hero.pos.y,vx:Math.cos(angle)*85,vy:Math.sin(angle)*85-20,color:i%2?'#ffe59a':'#97ebc8',ttl:.65,size:3,alpha:.75});
+          }
+        }
         this.queuedLevelUps = Math.max(0, this.queuedLevelUps - 1);
       });
+    }, {
+      eyebrow: 'LEVEL UP · 성장 보상',
+      title: `레벨 ${this.hero.level - this.queuedLevelUps + 1} 달성!`,
+      subtitle: this.queuedLevelUps > 1
+        ? `축적한 힘을 골라주세요 · 남은 강화 ${this.queuedLevelUps}회`
+        : '더 강해질 시간! 원하는 힘을 하나 고르면 전투가 이어집니다',
+      celebration: true,
+      bonus: '✦ 성장 보너스 · 선택 시 최대 체력의 12% 회복',
+      reducedMotion: this.presentationSettings.reducedMotion || this.presentationSettings.reducedFlash,
     });
     this.decisionReplay = renderDecision;
     renderDecision(generation);

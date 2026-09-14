@@ -5,7 +5,7 @@ const GENERIC_IDS = new Set(GENERIC_UPGRADE_EFFECTIVE_IDS);
 function shadowHero(hero) { return { ...hero, pos: { ...hero.pos }, facing: { ...hero.facing } }; }
 function metric(hero, id) { return id === 'maxHp' ? hero.maxHp : id === 'moveSpeed' ? hero.speed : id === 'spellPower' ? hero.spellPower : id === 'cooldown' ? hero.cooldownMultiplier : hero.pickupRadius; }
 function label(id) { return id === 'maxHp' ? '최대 HP' : id === 'moveSpeed' ? '이동속도' : id === 'spellPower' ? '마법 화력' : id === 'cooldown' ? '재사용시간' : '흡수거리'; }
-function nominal(id) { return id === 'moveSpeed' ? 7.5 : id === 'spellPower' ? 12 : id === 'cooldown' ? 6 : 0; }
+function nominal(hero, id) { return id === 'moveSpeed' ? 7.5 : id === 'spellPower' ? (hero.spellPowerUpgradeCount < 6 ? 9.6 : 3) : id === 'cooldown' ? (hero.cooldownUpgradeCount < 6 ? 4.2 : 1.5) : 0; }
 export function projectGenericUpgradeEffectiveGain(hero, id) {
     if (!GENERIC_IDS.has(id))
         return null;
@@ -17,10 +17,10 @@ export function projectGenericUpgradeEffectiveGain(hero, id) {
     if (upgradeId === 'cooldown') {
         if (Math.abs(after - before) < 1e-12)
             statusId = 'capped';
-        else if (effectivePercent < 5.999)
+        else if (effectivePercent < 4.199)
             statusId = 'diminished';
     }
-    return { upgradeId, statusId, label: label(upgradeId), before, after, delta, secondaryDelta, effectivePercent, nominalPercent: nominal(upgradeId) };
+    return { upgradeId, statusId, label: label(upgradeId), before, after, delta, secondaryDelta, effectivePercent, nominalPercent: nominal(hero, upgradeId) };
 }
 function signed(value, digits = 1) { return `${value >= 0 ? '+' : ''}${value.toFixed(digits)}`; }
 export function genericUpgradeEffectiveGainHint(p) {

@@ -1,5 +1,6 @@
 import { distance, normalize } from '../core/math.js';
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from './config.js';
+import { magicCriticalDamage } from './magic-critical.js';
 import { heroSpellIdentity } from './hero-spells.js';
 import { spellEvolution } from './spell-evolutions.js';
 import { composeFusionSpellModifiers } from './fusion-integration.js';
@@ -71,11 +72,12 @@ import { secondaryImpactLineageLabelCapacityBudget } from './secondary-impact-li
 import { persistentSpellGroundLayerCues, persistentSpellReadabilityLayerCues } from './persistent-spell-ground-ordering.js';
 export function spellTuning(id, level) {
     const l = Math.max(1, Math.floor(level));
+    const lateRankSteps = Math.max(0, l - 5);
     switch (id) {
         case 'fireBolt':
-            return { damage: 34 + (l - 1) * 8, cooldown: Math.max(0.20, 0.50 - (l - 1) * 0.024), radius: 11 + Math.floor((l - 1) / 3) * 2, projectiles: 1 + Math.floor((l - 1) / 4), jumps: 0, duration: 0 };
+            return { damage: l <= 5 ? 34 + (l - 1) * 8 : 66 + lateRankSteps * 4.4, cooldown: Math.max(0.20, l <= 5 ? 0.50 - (l - 1) * 0.024 : 0.404 - lateRankSteps * 0.012), radius: 11 + Math.floor((l - 1) / 3) * 2, projectiles: 1 + Math.floor((l - 1) / 4), jumps: 0, duration: 0 };
         case 'chainLightning':
-            return { damage: 48 + (l - 1) * 10, cooldown: Math.max(1.05, 2.25 - (l - 1) * 0.07), radius: 0, projectiles: 1, jumps: 3 + Math.floor((l - 1) / 3), duration: 0 };
+            return { damage: l <= 5 ? 48 + (l - 1) * 10 : 88 + lateRankSteps * 5.5, cooldown: Math.max(1.05, l <= 5 ? 2.25 - (l - 1) * 0.07 : 1.97 - lateRankSteps * 0.035), radius: 0, projectiles: 1, jumps: 3 + Math.floor((l - 1) / 3), duration: 0 };
         case 'frostNova':
             return { damage: 42 + (l - 1) * 7, cooldown: Math.max(2.2, 5.4 - (l - 1) * 0.13), radius: 150 + (l - 1) * 11, projectiles: 1, jumps: 0, duration: 2.1 + (l - 1) * 0.08 };
         case 'flameField':
@@ -829,7 +831,7 @@ export class SpellSystem {
             const hitSource = { ...(points[points.length - 1] ?? world.hero.pos) };
             points.push({ ...current.pos });
             const impactPos = this.targetAimPoint(world, current) ?? current.pos, impactResponse = projectileImpactResponseAt(world, impactPos, current);
-            const chainKilled = world.enemies.damage(current, tuning.damage * world.hero.spellPower * world.hero.equipmentSpellPower * identity.damageMultiplier * evolution.damageMultiplier * fusion.damageMultiplier * Math.pow(0.86, i), hitSource);
+            const chainKilled = world.enemies.damage(current, magicCriticalDamage(tuning.damage * world.hero.spellPower * world.hero.equipmentSpellPower * identity.damageMultiplier * evolution.damageMultiplier * fusion.damageMultiplier * Math.pow(0.86, i), world.hero), hitSource);
             if (identity.chainSlowFactor < 1)
                 world.enemies.applySlow(current, Math.max(0.24, identity.chainSlowFactor * evolution.slowFactorMultiplier), identity.chainSlowDuration * evolution.slowDurationMultiplier * fusion.slowDurationMultiplier, 'impact');
             if (i > 0) {
@@ -868,7 +870,7 @@ export class SpellSystem {
             if (!enemy.alive || distance(world.hero.pos, enemy.pos) > radius + enemy.radius)
                 continue;
             const seria = world.hero.profileId === 'seria';
-            world.enemies.damage(enemy, tuning.damage * world.hero.spellPower * world.hero.equipmentSpellPower * identity.novaDamageMultiplier * evolution.damageMultiplier * fusion.damageMultiplier * (seria ? 1.06 : 1), world.hero.pos, 'freeze');
+            world.enemies.damage(enemy, magicCriticalDamage(tuning.damage * world.hero.spellPower * world.hero.equipmentSpellPower * identity.novaDamageMultiplier * evolution.damageMultiplier * fusion.damageMultiplier * (seria ? 1.06 : 1), world.hero), world.hero.pos, 'freeze');
             world.enemies.applySlow(enemy, Math.max(0.20, (seria ? 0.42 : 0.53) * evolution.slowFactorMultiplier), tuning.duration * evolution.durationMultiplier * evolution.slowDurationMultiplier * fusion.slowDurationMultiplier * (seria ? 1.25 : 1), 'frost');
             if (identity.knockback > 0)
                 world.enemies.pushAway(enemy, world.hero.pos, identity.knockback * evolution.knockbackMultiplier);
@@ -960,7 +962,7 @@ export class SpellSystem {
                     continue;
                 const priorImpactCount = p.hitIds.size, continues = p.pierceLeft > 0, impactResponse = projectileImpactResponseAt(world, p.pos, enemy);
                 p.hitIds.add(enemy.id);
-                const killedByImpact = world.enemies.damage(enemy, p.damage, p.pos);
+                const killedByImpact = world.enemies.damage(enemy, magicCriticalDamage(p.damage, world.hero), p.pos);
                 const impactHandoff = projectileMultiHitImpactHandoff({ launchOffset: p.visualLaunchOffset, launchTtl: p.visualLaunchTtl, launchMaxTtl: p.visualLaunchMaxTtl, priorImpactCount, continues }, world.reducedMotion ?? false);
                 const entryOffset = impactHandoff.entryOffset, lineage = projectileImpactLineageTransferPresentation({ sourceLineageKey: p.visualImpactLineageId ?? `projectile-unbound`, impactIndex: priorImpactCount, continues }, world.reducedMotion ?? false);
                 this.projectileImpactVisuals.push({ pos: { ...p.pos }, entryOffset, impactLineageKey: lineage.lineageKey, impactDirection: { x: p.vel.x, y: p.vel.y }, impactResponseOwner: impactResponse.owner, impactResponseStrength: impactResponse.strength, enemyReactionOwner: killedByImpact ? 'death' : 'hit', heroId: p.heroId, ttl: 0.18, maxTtl: 0.18, size: Math.max(48, p.radius * 5.2) });
@@ -989,7 +991,7 @@ export class SpellSystem {
                             continue;
                         if (distance(enemy.pos, nearby.pos) <= p.splashRadius + nearby.radius) {
                             const splashResponse = projectileImpactResponseAt(world, nearby.pos, nearby);
-                            const splashKilled = world.enemies.damage(nearby, p.splashDamage, enemy.pos, 'explosion');
+                            const splashKilled = world.enemies.damage(nearby, magicCriticalDamage(p.splashDamage, world.hero), enemy.pos, 'explosion');
                             const secondary = secondaryImpactCanonicalPresentation('splash', nearby.pos, world.reducedFlash ?? false), secondaryLineage = projectileImpactLineageTransferPresentation({ sourceLineageKey: p.visualImpactLineageId ?? lineage.lineageKey, impactIndex: priorImpactCount, secondaryKind: 'splash', continues }, world.reducedMotion ?? false);
                             this.projectileImpactVisuals.push({ pos: secondary.pos, entryOffset: secondary.entryOffset, alphaScale: secondary.alphaScale, secondaryKind: 'splash', impactLineageKey: secondaryLineage.lineageKey, impactDirection: { x: nearby.pos.x - enemy.pos.x, y: nearby.pos.y - enemy.pos.y }, impactResponseOwner: splashResponse.owner, impactResponseStrength: splashResponse.strength, enemyReactionOwner: splashKilled ? 'death' : 'hit', heroId: p.heroId, ttl: .14, maxTtl: .14, size: Math.max(38, p.radius * 4.2) * secondary.sizeScale });
                             if (this.projectileImpactVisuals.length > 32)
@@ -1018,7 +1020,7 @@ export class SpellSystem {
             this.hitMagicTarget(world, field.pos, field.damage * 0.55, field.pos);
             for (const enemy of world.enemies.enemies) {
                 if (enemy.alive && distance(field.pos, enemy.pos) <= field.radius + enemy.radius) {
-                    world.enemies.damage(enemy, field.damage, field.pos);
+                    world.enemies.damage(enemy, magicCriticalDamage(field.damage, world.hero), field.pos);
                     if (field.slowFactor < 1)
                         world.enemies.applySlow(enemy, field.slowFactor, field.slowDuration, 'generic');
                 }
@@ -1046,7 +1048,7 @@ export class SpellSystem {
                     this.queueUltimatePostImpactResidue(meteor.heroId, 'meteorStorm', meteor.pos, meteor.radius, .48);
                     for (const enemy of world.enemies.enemies) {
                         if (enemy.alive && distance(meteor.pos, enemy.pos) <= meteor.radius + enemy.radius) {
-                            world.enemies.damage(enemy, meteor.damage, meteor.pos, 'ultimate');
+                            world.enemies.damage(enemy, magicCriticalDamage(meteor.damage, world.hero), meteor.pos, 'ultimate');
                             if (meteor.slowFactor < 1)
                                 world.enemies.applySlow(enemy, meteor.slowFactor, meteor.slowDuration, 'impact');
                         }
@@ -1073,7 +1075,7 @@ export class SpellSystem {
                 enemy.pos.x += dir.x * pull;
                 enemy.pos.y += dir.y * pull;
                 if (hole.tickTimer <= 0) {
-                    world.enemies.damage(enemy, hole.damage, hole.pos, 'ultimate');
+                    world.enemies.damage(enemy, magicCriticalDamage(hole.damage, world.hero), hole.pos, 'ultimate');
                     if (hole.slowFactor < 1)
                         world.enemies.applySlow(enemy, hole.slowFactor, hole.slowDuration, 'gravity');
                 }

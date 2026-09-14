@@ -18,7 +18,7 @@ export const SHOP_ITEM_ATLAS = {
     height: 1254,
 };
 export const FORGE_ITEM_ATLAS = {
-    src: './assets/ui/equipment-forge-items.png',
+    src: '/assets/ui/equipment-forge-items.png',
     columns: 3,
     rows: 3,
 };

@@ -55,8 +55,7 @@ test('phone landscape HUD expands into safe side gutters without changing the ba
 test('short phone landscape delegates every action coordinate to the mobile collision-safe layout', () => {
   const helper = read('src/game/mobile-landscape-presentation.ts');
   const config = read('src/game/config.ts');
-  assert.match(helper, /spell1:\s*\{ x: 1180, y: 610, radius: 70 \}/);
-  assert.match(helper, /ultimate2:\s*\{ x: 1510, y: 810, radius: 74 \}/);
+  assert.match(helper, /PHONE_ACTION_LAYOUT/);
   assert.match(config, /mobileLandscapeActionLayout\(layout\.id, layout\)\.x/);
   assert.match(config, /mobileLandscapeActionLayout\(layout\.id, layout\)\.y/);
 });

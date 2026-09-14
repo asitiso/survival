@@ -60,7 +60,7 @@ export function actionIconPresentation(radius: number, atlasReady: boolean): Act
       secondaryOffsetY: 17,
     };
   }
-  const safeRadius = Math.max(32, Math.min(72, Number.isFinite(radius) ? radius : 48));
+  const safeRadius = Math.max(32, Math.min(96, Number.isFinite(radius) ? radius : 48));
   return {
     visible: true,
     animated: false,

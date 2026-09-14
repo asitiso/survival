@@ -38,15 +38,17 @@ export interface MobileLandscapeActionLayout {
 }
 
 const PHONE_ACTION_LAYOUT: Readonly<Record<string, MobileLandscapeActionLayout>> = {
-  spell1: { x: 1180, y: 610, radius: 70 },
-  spell2: { x: 1350, y: 610, radius: 70 },
-  spell3: { x: 1180, y: 770, radius: 70 },
-  spell4: { x: 1350, y: 770, radius: 70 },
-  ultimate1: { x: 1510, y: 570, radius: 74 },
-  ultimate2: { x: 1510, y: 810, radius: 74 },
-  potion: { x: 1025, y: 610, radius: 52 },
-  shop: { x: 1025, y: 480, radius: 46 },
-  auto: { x: 1025, y: 770, radius: 48 },
+  // Lower-right 2x2 spells, staggered outer ultimates, separate utility column.
+  // Spacing includes the 1.24x assist ring and the touch envelope, not just discs.
+  spell1: { x: 1060, y: 554, radius: 86 },
+  spell2: { x: 1280, y: 554, radius: 86 },
+  spell3: { x: 1060, y: 778, radius: 86 },
+  spell4: { x: 1280, y: 778, radius: 86 },
+  ultimate1: { x: 1480, y: 434, radius: 90 },
+  ultimate2: { x: 1480, y: 678, radius: 90 },
+  potion: { x: 880, y: 610, radius: 54 },
+  shop: { x: 880, y: 442, radius: 46 },
+  auto: { x: 880, y: 790, radius: 50 },
 };
 
 function browserViewport(): readonly [width: number, height: number] {

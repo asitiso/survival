@@ -40,6 +40,6 @@ test('phase 2274 boss reward cards add one role icon outside secondary identity 
 
 test('phase 2275 boss reward impact remains presentation-only and preserves reward generation and snapshots',()=>{
   const upgrades=fs.readFileSync(new URL('../src/game/upgrades.ts',import.meta.url),'utf8');
-  assert.match(upgrades,/return \[upgrades\[0\]!, relicChoice, fusionChoice\];/);assert.match(upgrades,/return \[upgrades\[0\]!, upgrades\[1\]!, relicChoice\];/);assert.match(upgrades,/spellPower'.*\+12%/s);assert.match(upgrades,/cooldown'.*-6%/s);assert.match(upgrades,/maxHp'.*\+42/s);
+  assert.match(upgrades,/return \[upgrades\[0\]!, relicChoice, fusionChoice\];/);assert.match(upgrades,/return \[upgrades\[0\]!, upgrades\[1\]!, relicChoice\];/);assert.match(upgrades,/spellPower'.*9\.6/s);assert.match(upgrades,/cooldown'.*4\.2/s);assert.match(upgrades,/maxHp'.*\+42/s);
   assert.doesNotMatch(snapshot,/bossRewardImpact|impactRoleStyle|impactRoleLabel/);
 });

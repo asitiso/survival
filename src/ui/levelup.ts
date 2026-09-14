@@ -40,22 +40,96 @@ export class LevelUpOverlay {
     parent.append(this.root);
   }
 
+  private playCelebrationImpact(reducedMotion: boolean): void {
+    if (reducedMotion) return;
+
+    const flash = document.createElement('div');
+    flash.setAttribute('aria-hidden', 'true');
+    Object.assign(flash.style, {
+      position: 'absolute',
+      inset: '0',
+      zIndex: '30',
+      pointerEvents: 'none',
+      opacity: '0',
+      background: 'radial-gradient(circle at 50% 42%, rgba(255,238,166,.48) 0%, rgba(255,204,89,.2) 22%, rgba(255,204,89,0) 60%)',
+    });
+    this.root.append(flash);
+    const flashAnimation = flash.animate(
+      [
+        { opacity: 0 },
+        { opacity: 0.78, offset: 0.16 },
+        { opacity: 0.18, offset: 0.5 },
+        { opacity: 0 },
+      ],
+      { duration: 680, easing: 'ease-out' },
+    );
+    flashAnimation.onfinish = () => flash.remove();
+
+    const panel = this.root.querySelector<HTMLElement>('.levelup-panel');
+    panel?.animate(
+      [
+        { filter: 'brightness(1.28) saturate(1.16)' },
+        { filter: 'brightness(1.08) saturate(1.08)', offset: 0.42 },
+        { filter: 'brightness(1) saturate(1)' },
+      ],
+      { duration: 620, easing: 'cubic-bezier(.16,1,.3,1)' },
+    );
+
+    const title = this.root.querySelector<HTMLElement>('h2');
+    title?.animate(
+      [
+        { transform: 'scale(.92)', letterSpacing: '-.02em', filter: 'brightness(1.6)' },
+        { transform: 'scale(1.07)', letterSpacing: '.015em', filter: 'brightness(1.2)', offset: 0.48 },
+        { transform: 'scale(1)', letterSpacing: '0', filter: 'brightness(1)' },
+      ],
+      { duration: 560, easing: 'cubic-bezier(.16,1,.3,1)' },
+    );
+  }
+
   open<T extends ChoiceCard>(choices: T[], onPick: (choice: T) => void, copy?: { eyebrow: string; title: string; subtitle: string; celebration?: boolean; bonus?: string; reducedMotion?: boolean }): void {
     const celebrating = copy?.celebration ?? !copy;
+    const reducedMotion = copy?.reducedMotion ?? false;
     this.root.classList.toggle('levelup-celebrating', celebrating);
-    this.root.classList.toggle('levelup-reduced-motion', copy?.reducedMotion ?? false);
+    this.root.classList.toggle('levelup-reduced-motion', reducedMotion);
     const bonus = this.root.querySelector<HTMLElement>('.levelup-bonus');
     if (bonus) { bonus.textContent = copy?.bonus ?? ''; bonus.hidden = !celebrating || !copy?.bonus; }
     const starlight = this.root.querySelector<HTMLElement>('.levelup-starlight');
     if (starlight) {
       starlight.replaceChildren();
-      if (celebrating && !copy?.reducedMotion) for (let i = 0; i < 12; i++) {
-        const star = document.createElement('i');
-        const angle = Math.PI * 2 * i / 12;
-        star.textContent = i % 3 === 0 ? '✦' : '•';
-        star.style.setProperty('--dx', `${Math.cos(angle) * (65 + i % 3 * 18)}px`);
-        star.style.setProperty('--dy', `${Math.sin(angle) * (65 + i % 3 * 18)}px`);
-        starlight.append(star);
+      if (celebrating && !reducedMotion) {
+        for (let i = 0; i < 20; i++) {
+          const star = document.createElement('i');
+          const angle = Math.PI * 2 * i / 20;
+          const distance = 68 + (i % 5) * 13 + (i >= 10 ? 18 : 0);
+          star.textContent = i % 5 === 0 ? '✦' : i % 2 === 0 ? '✧' : '•';
+          star.style.setProperty('--dx', `${Math.cos(angle) * distance}px`);
+          star.style.setProperty('--dy', `${Math.sin(angle) * distance}px`);
+          star.style.animationDelay = `${(i % 5) * 16}ms`;
+          starlight.append(star);
+        }
+        for (let i = 0; i < 2; i++) {
+          const ring = document.createElement('b');
+          Object.assign(ring.style, {
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            width: '58px',
+            height: '58px',
+            borderRadius: '50%',
+            border: i === 0 ? '2px solid rgba(255,231,157,.88)' : '1px solid rgba(255,205,95,.72)',
+            boxShadow: '0 0 18px rgba(255,215,113,.32)',
+            pointerEvents: 'none',
+          });
+          starlight.append(ring);
+          ring.animate(
+            [
+              { opacity: 0.9, transform: 'translate(-50%,-50%) scale(.55)' },
+              { opacity: 0.42, offset: 0.48 },
+              { opacity: 0, transform: `translate(-50%,-50%) scale(${i === 0 ? 2.7 : 3.5})` },
+            ],
+            { duration: 760, delay: 70 + i * 90, easing: 'cubic-bezier(.16,1,.3,1)', fill: 'both' },
+          );
+        }
       }
     }
     const eyebrow = this.root.querySelector<HTMLElement>('.eyebrow');
@@ -66,6 +140,8 @@ export class LevelUpOverlay {
     if (subtitle) subtitle.textContent = copy?.subtitle ?? '원하는 힘을 하나 고르세요 · 선택 즉시 전투 재개';
     this.isOpen = true;
     this.root.hidden = false;
+    const prefersReducedMotion = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (celebrating) this.playCelebrationImpact(reducedMotion || prefersReducedMotion);
     this.cards.replaceChildren();
     for (const choice of choices) {
       const button = document.createElement('button');

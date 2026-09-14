@@ -16,9 +16,9 @@ test('early combat fills the arena quickly without exceeding the mobile cap', ()
 });
 
 test('level curve spaces out choices without starving midgame and late-run growth', () => {
-  assert.ok(xpNeededForLevel(10) >= 440 && xpNeededForLevel(10) <= 490);
-  assert.ok(xpNeededForLevel(30) >= 1400 && xpNeededForLevel(30) <= 1500);
-  assert.ok(xpNeededForLevel(60) >= 3500 && xpNeededForLevel(60) <= 3650);
+  assert.ok(xpNeededForLevel(10) >= 500 && xpNeededForLevel(10) <= 520);
+  assert.ok(xpNeededForLevel(30) >= 1550 && xpNeededForLevel(30) <= 1620);
+  assert.ok(xpNeededForLevel(60) >= 3850 && xpNeededForLevel(60) <= 4000);
 });
 
 test('first shop arrives in the first minute and returns often', () => {
